@@ -1,11 +1,17 @@
+import { AboutUs } from "./pages/AboutUs";
+import { ContactUs } from "./pages/ContactUs";
+import  Tour  from "./pages/Tour";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+
 function App() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-primary text-white text-4xl font-poppins font-bold">
-      EasyTravel ✈️
-      <p className="text-secondary text-lg mt-4">
-        Tailwind + Vite hoạt động rồi 🎉
-      </p>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/about-us" element={<AboutUs />} />
+        <Route path="/contact-us" element={<ContactUs />} />
+        <Route path="/" element={<Tour />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 

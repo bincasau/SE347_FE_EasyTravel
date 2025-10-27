@@ -1,0 +1,83 @@
+[
+  {
+    "id": 1,
+    "title": "Lucca Bike Tour",
+    "price": 34,
+    "img": "../assets/images/Tour/travel1.jpg",
+    "desc": "Explore the beauty of Lucca by bike with a local guide. Perfect for first-time visitors who love nature and culture.",
+    "schedule": "EVERY DAY",
+    "group": "3-10 PP"
+  },
+  {
+    "id": 2,
+    "title": "Wine Tasting in Tuscany",
+    "price": 45,
+    "img": "../assets/images/Tour/travel2.jpg",
+    "desc": "Taste authentic Tuscan wines and enjoy local cuisine surrounded by vineyards and scenic landscapes.",
+    "schedule": "MONDAY",
+    "group": "10-30 PP"
+  },
+  {
+    "id": 3,
+    "title": "Cinque Terre Adventure",
+    "price": 39,
+    "img": "../assets/images/Tour/travel3.jpg",
+    "desc": "Discover the five colorful villages of Cinque Terre with our professional guides and enjoy breathtaking views.",
+    "schedule": "WEDNESDAY",
+    "group": "10-50 PP"
+  },
+  {
+    "id": 4,
+    "title": "Venice Gondola Ride",
+    "price": 55,
+    "img": "../assets/images/Tour/travel4.jpg",
+    "desc": "Experience a romantic gondola ride through Venice’s historic canals and witness the magic of La Serenissima.",
+    "schedule": "EVERY DAY",
+    "group": "2-6 PP"
+  },
+  {
+    "id": 5,
+    "title": "Rome Ancient City Walk",
+    "price": 29,
+    "img": "../assets/images/Tour/travel5.jpg",
+    "desc": "Walk through the Colosseum, Roman Forum, and Palatine Hill with an expert historian by your side.",
+    "schedule": "TUESDAY",
+    "group": "10-25 PP"
+  },
+  {
+    "id": 6,
+    "title": "Amalfi Coast Day Trip",
+    "price": 60,
+    "img": "../assets/images/Tour/travel6.jpg",
+    "desc": "A full-day tour along the Amalfi Coast. Visit Positano, Amalfi, and Ravello with stunning seaside views.",
+    "schedule": "FRIDAY",
+    "group": "5-15 PP"
+  },
+  {
+    "id": 7,
+    "title": "Florence Art & Culture Tour",
+    "price": 42,
+    "img": "../assets/images/Tour/travel7.jpg",
+    "desc": "Dive into Florence’s art, architecture, and history with skip-the-line access to top museums.",
+    "schedule": "THURSDAY",
+    "group": "5-20 PP"
+  },
+  {
+    "id": 8,
+    "title": "Milan Fashion Experience",
+    "price": 38,
+    "img": "../assets/images/Tour/travel9.jpg",
+    "desc": "Explore Milan’s fashion district and visit boutique stores with an expert stylist as your guide.",
+    "schedule": "SATURDAY",
+    "group": "5-12 PP"
+  },
+  {
+    "id": 9,
+    "title": "Milan Fashion Experience",
+    "price": 38,
+    "img": "../assets/images/Tour/travel8.jpg",
+    "desc": "Explore Milan’s fashion district and visit boutique stores with an expert stylist as your guide.",
+    "schedule": "SATURDAY",
+    "group": "5-12 PP"
+  }
+]
