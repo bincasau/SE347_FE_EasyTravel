@@ -6,6 +6,8 @@ import Footer from "./components/layout/Footer";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { LangProvider } from "@/contexts/LangContext";
 import Tour from "./pages/Tour";
+import DetailTour from "./pages/DetailTour";
+import Booking from "./pages/Booking";
 import ScrollToTop from "./utils/ScrollToTop";
 
 function App() {
@@ -18,7 +20,9 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/about-us" element={<AboutUs />} />
           <Route path="/contact-us" element={<ContactUs />} />
+          <Route path="/detailtours" element={<DetailTour />} />
           <Route path="/tours" element={<Tour />} />
+          <Route path="/booking" element={<Booking />} />
           <Route path="/home" element={<Navigate to="/" replace />} />
         </Routes>
         <Footer />

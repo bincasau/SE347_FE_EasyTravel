@@ -4,7 +4,7 @@ export default function BookingVideo() {
   return (
     <section className="w-full mt-20 flex flex-col items-center">
       {/* Tiêu đề */}
-      <h2 className="text-3xl font-bold text-gray-900 mb-10 text-left w-[80%] max-w-6xl">
+      <h2 className="text-4xl font-podcast text-center text-gray-900 mb-5 text-left w-[80%] max-w-6xl">
         Beautiful Vietnam
       </h2>
 

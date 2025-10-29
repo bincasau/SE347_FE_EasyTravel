@@ -58,7 +58,7 @@ export default function TourPage() {
     <div className="bg-gray-50 py-12 flex flex-col items-center min-h-screen">
       <div className="w-full max-w-[calc(100%-280px)] mx-auto relative">
         {/* Tiêu đề */}
-        <h2 className="text-3xl font-bold text-gray-800 mb-6 text-left">
+        <h2 className="text-4xl font-podcast text-gray-800 mb-6 text-left">
           Tour Packages
         </h2>
 

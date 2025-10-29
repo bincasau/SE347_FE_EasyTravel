@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { NavLink, Link } from "react-router-dom";
+import { NavLink, Link, useLocation } from "react-router-dom";
 import { useLang } from "@/contexts/LangContext";
 import Logo from "@/assets/images/logo.png";
 
@@ -7,6 +7,7 @@ const Header = () => {
   const { lang, setLang, t } = useLang();
   const [openMenu, setOpenMenu] = useState(false);
   const [openLang, setOpenLang] = useState(false);
+  const location = useLocation();
 
   const navItems = useMemo(
     () => [
@@ -34,6 +35,12 @@ const Header = () => {
   const activeLink =
     "text-orange-500 relative after:absolute after:left-0 after:-bottom-2 after:h-[2px] after:w-full after:bg-orange-500";
 
+  // ✅ Tự nhận diện route chi tiết của tour
+  const isToursActive =
+    location.pathname.startsWith("/tours") ||
+    location.pathname.startsWith("/detailtours")||
+    location.pathname.startsWith("/booking");
+
   return (
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-gray-100">
       <div className="max-w-7xl mx-auto px-6">
@@ -57,9 +64,12 @@ const Header = () => {
                   <NavLink
                     to={it.to}
                     end={it.to === "/"}
-                    className={({ isActive }) =>
-                      `${isActive ? activeLink : baseLink} font-medium`
-                    }
+                    className={({ isActive }) => {
+                      // ✅ nếu là mục "Tours" → tô màu cả khi ở /detailtours
+                      if (it.to === "/tours" && isToursActive)
+                        return `${activeLink} font-medium`;
+                      return `${isActive ? activeLink : baseLink} font-medium`;
+                    }}
                   >
                     {t(`header.${it.key}`)}
                   </NavLink>

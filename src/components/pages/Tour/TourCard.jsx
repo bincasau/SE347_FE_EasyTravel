@@ -1,4 +1,5 @@
 import React from "react";
+import { useNavigate } from "react-router-dom"; // ✅ import navigate để điều hướng
 
 // ✅ Import ảnh
 import travel1 from "../../../assets/images/Tour/travel1.jpg";
@@ -24,10 +25,16 @@ const images = {
 };
 
 export default function TourCard({ tour }) {
+  const navigate = useNavigate(); // ✅ hook điều hướng
   const imgSrc = images[tour.id] || travel1;
 
+  // Hàm điều hướng tới trang chi tiết
+  const handleReadMore = () => {
+    navigate("/detailtours"); // đường dẫn tới DetailTour.jsx
+  };
+
   return (
-    <div className="bg-transparent rounded-2xl overflow-hidden w-[260px]">
+    <div className="bg-transparent rounded-2xl overflow-hidden w-[260px] hover:shadow-lg transition">
       {/* Ảnh cao hơn, hình chữ nhật, bo 4 góc */}
       <img
         src={imgSrc}
@@ -55,7 +62,11 @@ export default function TourCard({ tour }) {
 
         <p className="text-xs text-gray-700 mb-3 line-clamp-2">{tour.desc}</p>
 
-        <button className="text-orange-500 text-xs font-semibold hover:text-orange-600">
+        {/* Nút điều hướng */}
+        <button
+          onClick={handleReadMore}
+          className="text-orange-500 text-xs font-semibold hover:text-orange-600"
+        >
           Read More →
         </button>
       </div>
