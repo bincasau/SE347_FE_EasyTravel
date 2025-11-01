@@ -35,16 +35,21 @@ const Header = () => {
   const activeLink =
     "text-orange-500 relative after:absolute after:left-0 after:-bottom-2 after:h-[2px] after:w-full after:bg-orange-500";
 
-  // ✅ Tự nhận diện route chi tiết của tour
+  // ✅ Nhận diện route chi tiết của tour và blog
   const isToursActive =
     location.pathname.startsWith("/tours") ||
-    location.pathname.startsWith("/detailtours")||
+    location.pathname.startsWith("/detailtours") ||
     location.pathname.startsWith("/booking");
+
+  const isBlogActive =
+    location.pathname.startsWith("/blog") ||
+    location.pathname.startsWith("/detailblog");
 
   return (
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-gray-100">
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex items-center justify-between h-16">
+          {/* ---------- LOGO ---------- */}
           <Link
             to="/"
             className="flex items-center gap-2 shrink-0"
@@ -57,6 +62,7 @@ const Header = () => {
             </span>
           </Link>
 
+          {/* ---------- NAVIGATION ---------- */}
           <nav className="hidden md:flex flex-1 justify-center">
             <ul className="flex items-center gap-9">
               {navItems.map((it) => (
@@ -65,9 +71,15 @@ const Header = () => {
                     to={it.to}
                     end={it.to === "/"}
                     className={({ isActive }) => {
-                      // ✅ nếu là mục "Tours" → tô màu cả khi ở /detailtours
+                      // ✅ Nếu là mục "Tours" → active cả khi ở /detailtours, /booking
                       if (it.to === "/tours" && isToursActive)
                         return `${activeLink} font-medium`;
+
+                      // ✅ Nếu là mục "Blog" → active cả khi ở /blogdetail
+                      if (it.to === "/blog" && isBlogActive)
+                        return `${activeLink} font-medium`;
+
+                      // ✅ Mặc định
                       return `${isActive ? activeLink : baseLink} font-medium`;
                     }}
                   >
@@ -78,7 +90,9 @@ const Header = () => {
             </ul>
           </nav>
 
+          {/* ---------- RIGHT ACTIONS ---------- */}
           <div className="hidden md:flex items-center gap-4 ml-auto">
+            {/* Language switch */}
             <div className="relative">
               <button
                 onClick={() => setOpenLang((v) => !v)}
@@ -110,6 +124,7 @@ const Header = () => {
               )}
             </div>
 
+            {/* Login / Signup */}
             <Link
               to="/login"
               className="inline-flex h-10 items-center justify-center px-4 rounded-full border border-orange-500 text-orange-600 hover:bg-orange-50 transition-colors"

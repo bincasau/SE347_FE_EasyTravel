@@ -1,5 +1,5 @@
 import React from "react";
-import { useNavigate } from "react-router-dom"; // ✅ import navigate để điều hướng
+import { useNavigate } from "react-router-dom";
 
 // ✅ Import ảnh
 import travel1 from "../../../assets/images/Tour/travel1.jpg";
@@ -25,26 +25,29 @@ const images = {
 };
 
 export default function TourCard({ tour }) {
-  const navigate = useNavigate(); // ✅ hook điều hướng
+  const navigate = useNavigate();
   const imgSrc = images[tour.id] || travel1;
 
-  // Hàm điều hướng tới trang chi tiết
-  const handleReadMore = () => {
-    navigate("/detailtours"); // đường dẫn tới DetailTour.jsx
+  // 👉 Khi click vào card → đi tới trang chi tiết
+  const handleClick = () => {
+    navigate("/detailtours");
   };
 
   return (
-    <div className="bg-transparent rounded-2xl overflow-hidden w-[260px] hover:shadow-lg transition">
-      {/* Ảnh cao hơn, hình chữ nhật, bo 4 góc */}
+    <div
+      onClick={handleClick}
+      className="bg-transparent rounded-2xl overflow-hidden w-[260px] hover:shadow-lg transition cursor-pointer group"
+    >
+      {/* Ảnh */}
       <img
         src={imgSrc}
         alt={tour.title}
-        className="w-full h-[280px] object-cover rounded-2xl"
+        className="w-full h-[280px] object-cover rounded-2xl group-hover:scale-[1.03] transition-transform"
       />
 
       {/* Nội dung */}
       <div className="p-4 text-left">
-        <h3 className="text-base font-semibold text-gray-900 truncate">
+        <h3 className="text-base font-semibold text-gray-900 truncate group-hover:text-orange-500 transition">
           {tour.title}
         </h3>
 
@@ -61,14 +64,6 @@ export default function TourCard({ tour }) {
         </div>
 
         <p className="text-xs text-gray-700 mb-3 line-clamp-2">{tour.desc}</p>
-
-        {/* Nút điều hướng */}
-        <button
-          onClick={handleReadMore}
-          className="text-orange-500 text-xs font-semibold hover:text-orange-600"
-        >
-          Read More →
-        </button>
       </div>
     </div>
   );
