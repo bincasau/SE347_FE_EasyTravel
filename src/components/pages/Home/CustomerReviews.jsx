@@ -1,6 +1,6 @@
 import React from "react";
 import { useLang } from "@/contexts/LangContext";
-import bgImage from "@/assets/images/home/CustomerReviews_bg.png";
+import bgImage from "@/assets/images/Home/CustomerReviews_bg.png";
 import customerImg from "@/assets/images/home/customer.png";
 import { FaStar } from "react-icons/fa";
 

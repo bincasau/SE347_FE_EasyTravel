@@ -7,32 +7,50 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { LangProvider } from "@/contexts/LangContext";
 import Tour from "./pages/Tour";
 import DetailTour from "./pages/DetailTour";
-import Blog from "./pages/Blog";
-import BlogDetail from "./pages/BlogDetail";
 import Booking from "./pages/Booking";
 import ScrollToTop from "./utils/ScrollToTop";
+import LoginModal from "./pages/Login";
+import { useEffect, useState } from "react";
+import Signup from "./pages/SignUp";
 
-function App() {
+export default function App() {
+  const [openLogin, setOpenLogin] = useState(false);
+
+  // khoá scroll khi mở modal
+  useEffect(() => {
+    document.body.style.overflow = openLogin ? "hidden" : "";
+    return () => (document.body.style.overflow = "");
+  }, [openLogin]);
+
   return (
     <LangProvider>
       <BrowserRouter>
         <ScrollToTop />
-        <Header />
+        <Header onOpenLogin={() => setOpenLogin(true)} />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/about-us" element={<AboutUs />} />
           <Route path="/contact-us" element={<ContactUs />} />
           <Route path="/detailtours" element={<DetailTour />} />
           <Route path="/tours" element={<Tour />} />
-          <Route path="/blog" element={<Blog />} />
-          <Route path="/detailblog" element={<BlogDetail />} />
+          <Route path="/sign-up" element={<Signup />} />
           <Route path="/booking" element={<Booking />} />
+          <Route path="/hotel" element={<div />} />
+          <Route path="/blog" element={<div />} />
           <Route path="/home" element={<Navigate to="/" replace />} />
         </Routes>
         <Footer />
+        {openLogin && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setOpenLogin(false);
+            }}
+          >
+            <LoginModal onClose={() => setOpenLogin(false)} />
+          </div>
+        )}
       </BrowserRouter>
     </LangProvider>
   );
 }
-
-export default App;
