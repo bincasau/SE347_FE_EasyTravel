@@ -98,7 +98,14 @@ export default function Header({ onOpenLogin }) {
   const isToursActive =
     location.pathname.startsWith("/tours") ||
     location.pathname.startsWith("/detailtours") ||
-    location.pathname.startsWith("/booking");
+    (location.pathname.startsWith("/booking") &&
+      !location.pathname.startsWith("/booking-room"));
+
+  //  Nhận diện các trang thuộc Hotel
+  const isHotelActive =
+    location.pathname.startsWith("/hotel") ||
+    location.pathname.startsWith("/rooms") ||
+    location.pathname.startsWith("/booking-room");
 
   return (
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-gray-100">
@@ -121,6 +128,10 @@ export default function Header({ onOpenLogin }) {
                     className={({ isActive }) => {
                       if (it.to === "/tours" && isToursActive)
                         return `${activeLink} font-medium`;
+
+                      if (it.to === "/hotel" && isHotelActive)
+                        return `${activeLink} font-medium`;
+
                       return `${isActive ? activeLink : baseLink} font-medium`;
                     }}
                   >

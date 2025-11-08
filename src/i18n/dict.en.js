@@ -1,6 +1,3 @@
-import PopularHotels from "../components/pages/Home/PopularHotels";
-import PopularTopics from "../components/pages/Home/PopularTopics";
-
 export const en = {
   // ===== HEADER =====
   header: {
@@ -107,5 +104,14 @@ export const en = {
       name: "Cameron William",
       position: "Marketing Director, Oliver’s LAB llc.",
     },
+  },
+  hotelPage: {
+    title: "Hotels",
+    searchPlaceholder: "Search hotels...",
+    noResult: "No hotels found.",
+    only: "Only",
+    hotline: "HotLine",
+    bookNow: "Book Now",
+    night: "night",
   },
 };

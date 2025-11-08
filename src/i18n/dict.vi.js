@@ -1,5 +1,3 @@
-import PopularTopics from "../components/pages/Home/PopularTopics";
-
 export const vi = {
   // ===== HEADER =====
   header: {
@@ -7,7 +5,7 @@ export const vi = {
     about: "Về chúng tôi",
     tours: "Tour du lịch",
     hotel: "Khách sạn",
-    blog: "Blog",
+    blog: "Bài viết",
     contact: "Liên hệ",
     login: "Đăng nhập",
     signup: "Đăng ký",
@@ -106,5 +104,14 @@ export const vi = {
       name: "Cameron William",
       position: "Giám đốc Marketing, Oliver’s LAB llc.",
     },
+  },
+  hotelPage: {
+    title: "Danh sách khách sạn",
+    searchPlaceholder: "Tìm khách sạn...",
+    noResult: "Không tìm thấy khách sạn nào.",
+    only: "Chỉ từ",
+    hotline: "Đường dây nóng",
+    bookNow: "Đặt ngay",
+    night: "Đêm",
   },
 };
