@@ -1,5 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { FaFilter, FaSearch, FaSortAmountDownAlt, FaSortAmountUpAlt } from "react-icons/fa";
+import {
+  FaFilter,
+  FaSearch,
+  FaSortAmountDownAlt,
+  FaSortAmountUpAlt,
+} from "react-icons/fa";
 import TourCard from "../components/pages/Tour/TourCard";
 import Pagination from "../utils/Pagination";
 import BookingVideo from "../components/pages/Tour/Video";
@@ -21,7 +26,17 @@ export default function TourPage() {
   useEffect(() => {
     const loadedTours = toursData.map(
       (t) =>
-        new Tour(t.id, t.title, t.price, t.img, t.desc, t.schedule, t.group, t.location)
+        new Tour(
+          t.tour_id, // id
+          t.title, // title
+          t.price_adult, // giá người lớn
+          t.main_image, // ảnh
+          t.description, // mô tả
+          t.start_date, // ngày bắt đầu (hiển thị như schedule)
+          t.destination, // hiển thị địa điểm
+          t.percent_discount, // ✅ giảm giá
+          t.limit_seats // ✅ số chỗ giới hạn
+        )
     );
     setTours(loadedTours);
   }, []);
@@ -92,7 +107,9 @@ export default function TourPage() {
 
             {showFilter && (
               <div className="absolute right-0 mt-2 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-20 p-2 text-sm">
-                <p className="font-semibold mb-2 text-gray-700">Filter by Location</p>
+                <p className="font-semibold mb-2 text-gray-700">
+                  Filter by Location
+                </p>
                 {["All", "Tuscany", "Venice", "Rome", "Florence", "Milan"].map(
                   (loc) => (
                     <button
@@ -131,7 +148,9 @@ export default function TourPage() {
 
             {showSort && (
               <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-20 p-2 text-sm">
-                <p className="font-semibold mb-2 text-gray-700">Sort by Price</p>
+                <p className="font-semibold mb-2 text-gray-700">
+                  Sort by Price
+                </p>
                 <button
                   onClick={() => handleSortChange("asc")}
                   className={`block w-full text-left px-3 py-1.5 rounded-md hover:bg-orange-100 ${

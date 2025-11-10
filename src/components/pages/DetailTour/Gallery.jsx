@@ -33,9 +33,9 @@ export default function TourGallery() {
   const current = gallerySets[index];
 
   return (
-    <section className="max-w-6xl mx-auto px-6 mt-20">
+    <section className="max-w-6xl mx-auto px-6 mt-10">
       {/* Header + nav */}
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex justify-between items-center mb-10">
         <h2 className="text-4xl font-podcast text-gray-800">Gallery</h2>
 
         <div className="flex gap-3">

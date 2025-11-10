@@ -59,7 +59,7 @@ export default function Header({ onOpenLogin }) {
   };
 
   useEffect(() => {
-    fetchMe(); // Fetch 1 lần khi load trang
+    fetchMe();
     const onJwtChanged = () => fetchMe();
     window.addEventListener("jwt-changed", onJwtChanged);
     const onStorage = (e) => {
@@ -72,6 +72,7 @@ export default function Header({ onOpenLogin }) {
       window.removeEventListener("storage", onStorage);
     };
   }, []);
+
   const handleLogout = () => {
     const confirmed = window.confirm("Bạn có chắc chắn muốn đăng xuất không?");
     if (!confirmed) return;
@@ -95,22 +96,28 @@ export default function Header({ onOpenLogin }) {
   const activeLink =
     "text-orange-500 relative after:absolute after:left-0 after:-bottom-2 after:h-[2px] after:w-full after:bg-orange-500";
 
+  // ✅ Các nhóm route cần giữ trạng thái active
   const isToursActive =
     location.pathname.startsWith("/tours") ||
     location.pathname.startsWith("/detailtours") ||
     (location.pathname.startsWith("/booking") &&
       !location.pathname.startsWith("/booking-room"));
 
-  //  Nhận diện các trang thuộc Hotel
   const isHotelActive =
     location.pathname.startsWith("/hotel") ||
     location.pathname.startsWith("/rooms") ||
     location.pathname.startsWith("/booking-room");
 
+  const isBlogActive =
+    location.pathname.startsWith("/blog") ||
+    location.pathname.startsWith("/detailblog") ||
+    location.pathname.startsWith("/blogs");
+
   return (
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-gray-100">
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex items-center justify-between h-16">
+          {/* Logo */}
           <Link to="/" className="flex items-center gap-2 shrink-0">
             <img src={Logo} alt="EasyTravel" className="h-9 w-auto" />
             <span className="text-2xl font-semibold text-orange-500">Easy</span>
@@ -118,6 +125,8 @@ export default function Header({ onOpenLogin }) {
               Travel
             </span>
           </Link>
+
+          {/* Navigation */}
           <nav className="hidden md:flex flex-1 justify-center">
             <ul className="flex items-center gap-9">
               {navItems.map((it) => (
@@ -128,10 +137,10 @@ export default function Header({ onOpenLogin }) {
                     className={({ isActive }) => {
                       if (it.to === "/tours" && isToursActive)
                         return `${activeLink} font-medium`;
-
                       if (it.to === "/hotel" && isHotelActive)
                         return `${activeLink} font-medium`;
-
+                      if (it.to === "/blog" && isBlogActive)
+                        return `${activeLink} font-medium`;
                       return `${isActive ? activeLink : baseLink} font-medium`;
                     }}
                   >
@@ -141,7 +150,10 @@ export default function Header({ onOpenLogin }) {
               ))}
             </ul>
           </nav>
+
+          {/* User / Language / Auth */}
           <div className="hidden md:flex items-center gap-4 ml-auto">
+            {/* Language Switcher */}
             <div className="relative">
               <button
                 onClick={() => setOpenLang((v) => !v)}
@@ -172,6 +184,8 @@ export default function Header({ onOpenLogin }) {
                 </div>
               )}
             </div>
+
+            {/* User login */}
             {loadingUser ? (
               <div className="h-10 inline-flex items-center px-3 text-gray-400 text-sm">
                 Loading...
@@ -202,7 +216,7 @@ export default function Header({ onOpenLogin }) {
                 <button
                   type="button"
                   onClick={() => onOpenLogin?.()}
-                  className="inline-flex h-10 items-center justify-center px-4 rounded-full border border-orange-500 text-orange-600 hover:bg-orange-50 transition-colors"
+                  className="inline-flex h-10 items-center justify-center px-4 rounded-full border border-orange-500 text-orange-600 bg-white hover:bg-orange-50 transition-colors"
                 >
                   {t("header.login")}
                 </button>

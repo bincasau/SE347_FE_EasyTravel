@@ -3,72 +3,90 @@ import {
   FaUsers,
   FaClock,
   FaMapMarkerAlt,
-  FaUserTie,
-  FaLanguage,
-  FaTicketAlt,
-  FaBus,
+  FaCalendarAlt,
+  FaMapSigns,
+  FaDollarSign,
+  FaTag,
 } from "react-icons/fa";
 
 export default function TourDetailsInfo() {
   return (
-    <section className="max-w-6xl mx-auto px-6 mt-20">
+    <section className="max-w-6xl mx-auto px-6 mt-10">
       {/* Tiêu đề */}
-      <h2 className="text-4xl font-podcast text-gray-800 mb-4">Details</h2>
+      <h2 className="text-4xl font-podcast text-gray-800 mb-4">
+        Lucca Bike Tour
+      </h2>
 
       {/* Mô tả */}
       <p className="text-gray-600 leading-relaxed mb-6 max-w-[60%]">
-        Lorem Ipsum is simply dummy text of the printing and typesetting industry.
-        Lorem Ipsum has been the industry's standard dummy text ever since the
-        1500s, when an unknown printer took a galley of type and scrambled it to
-        make a type specimen book. It has survived not only five centuries, but
-        also the leap into electronic typesetting, remaining essentially
-        unchanged. It was popularised in the 1960s with the release of Letraset
-        sheets containing Lorem Ipsum passages, and more recently with desktop
-        publishing software like Aldus PageMaker including versions of Lorem Ipsum.
+        Explore the beauty of Lucca by bike with a local guide. Perfect for
+        first-time visitors who love nature and culture.
       </p>
 
       {/* Danh sách thông tin */}
-      <ul className="space-y-3 text-gray-700">
+      <ul className="space-y-3 text-gray-700 text-sm">
         <li className="flex items-center gap-3">
-          <FaUsers className="text-orange-500 text-lg" />
+          <FaMapSigns className="text-orange-500 text-lg" />
           <span>
-            <strong>Number of group:</strong> 15–30
+            <strong>Departure location:</strong> Lucca Center
           </span>
         </li>
-        <li className="flex items-center gap-3">
-          <FaClock className="text-orange-500 text-lg" />
-          <span>
-            <strong>Duration:</strong> 15 hours and 45 minutes
-          </span>
-        </li>
+
         <li className="flex items-center gap-3">
           <FaMapMarkerAlt className="text-orange-500 text-lg" />
           <span>
-            <strong>Departuring and arriving areas:</strong> Lucca
+            <strong>Destination:</strong> Lucca, Italy
           </span>
         </li>
+
         <li className="flex items-center gap-3">
-          <FaUserTie className="text-orange-500 text-lg" />
+          <FaCalendarAlt className="text-orange-500 text-lg" />
           <span>
-            <strong>Guide service:</strong> Included
+            <strong>Start Date:</strong> 2025-03-01 &nbsp;|&nbsp;
+            <strong>End Date:</strong> 2025-03-01
           </span>
         </li>
+
         <li className="flex items-center gap-3">
-          <FaLanguage className="text-orange-500 text-lg" />
+          <FaClock className="text-orange-500 text-lg" />
           <span>
-            <strong>Language:</strong> English, Italian
+            <strong>Duration:</strong> 1 day
           </span>
         </li>
+
         <li className="flex items-center gap-3">
-          <FaTicketAlt className="text-orange-500 text-lg" />
+          <FaUsers className="text-orange-500 text-lg" />
           <span>
-            <strong>Entry Fees:</strong> Lorem Ipsum
+            <strong>Seats:</strong> Limit 15 &nbsp;|&nbsp; Available 10
           </span>
         </li>
+
         <li className="flex items-center gap-3">
-          <FaBus className="text-orange-500 text-lg" />
+          <FaDollarSign className="text-orange-500 text-lg" />
           <span>
-            <strong>Transportation:</strong> Bus
+            <strong>Adult Price:</strong> 34 € &nbsp;|&nbsp;
+            <strong>Child Price:</strong> 25 €
+          </span>
+        </li>
+
+        <li className="flex items-center gap-3">
+          <FaTag className="text-orange-500 text-lg" />
+          <span>
+            <strong>Discount:</strong> -10%
+          </span>
+        </li>
+
+        <li className="flex items-center gap-3">
+          <FaCalendarAlt className="text-orange-500 text-lg" />
+          <span>
+            <strong>Status:</strong> Active
+          </span>
+        </li>
+
+        <li className="flex items-center gap-3">
+          <FaClock className="text-orange-500 text-lg" />
+          <span>
+            <strong>Created at:</strong> 2025-02-15
           </span>
         </li>
       </ul>
