@@ -1,130 +1,165 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import BlogCard from "../components/pages/Blog/BlogCard";
 import BlogSidebar from "../components/pages/Blog/BlogSiderbar";
-import Pagination from "../utils/Pagination";
-import Blog1 from "../assets/images/Blog/blog1.jpg";
-import Blog2 from "../assets/images/Blog/blog2.jpg";
-import Blog3 from "../assets/images/Blog/blog3.jpg";
-import Blog4 from "../assets/images/Blog/blog4.jpg";
-import Blog5 from "../assets/images/Blog/blog5.jpg";
-import Blog6 from "../assets/images/Blog/blog6.jpg";
-import Blog7 from "../assets/images/Blog/blog7.jpg";
-import Blog8 from "../assets/images/Blog/blog8.jpg";
-import Blog9 from "../assets/images/Blog/blog9.jpg";
-import Blog10 from "../assets/images/Blog/blog10.jpg";
 
-const Blog = () => {
-  const blogs = [
-    {
-      image: Blog1,
-      date: "July 13, 2023",
-      author: "Admin",
-      title: "The Impact of Covid-19 on travel & tourism industry",
-      description:
-        "Istanbul, the vibrant and historic city straddling the continents of Europe and Asia, offers an enchanting blend of cultures, sights, and experiences that captivate...",
-    },
-    {
-      image: Blog2,
-      date: "July 15, 2023",
-      author: "Admin",
-      title: "Exploring the ancient wonders of Egypt",
-      description:
-        "From the majestic pyramids to the bustling bazaars of Cairo, Egypt invites you to explore the cradle of civilization...",
-    },
-    {
-      image: Blog3,
-      date: "July 18, 2023",
-      author: "Admin",
-      title: "Top 10 travel destinations for 2024",
-      description:
-        "Discover breathtaking locations across the globe that should be on every traveler’s bucket list this year...",
-    },
-    {
-      image: Blog4,
-      date: "July 20, 2023",
-      author: "Admin",
-      title: "Cultural gems of Southeast Asia",
-      description:
-        "Immerse yourself in the diverse traditions, cuisines, and landscapes of Southeast Asia — a paradise for explorers...",
-    },
-    {
-      image: Blog5,
-      date: "July 22, 2023",
-      author: "Admin",
-      title: "The ultimate guide to sustainable travel",
-      description:
-        "Travel responsibly with these tips to reduce your carbon footprint while exploring the beauty of our planet...",
-    },
-    {
-      image: Blog6,
-      date: "July 25, 2023",
-      author: "Admin",
-      title: "Hidden beaches you must visit in Europe",
-      description:
-        "Escape the crowds with these secret European coastal gems that promise tranquility and crystal-clear waters...",
-    },
-    {
-      image: Blog7,
-      date: "July 27, 2023",
-      author: "Admin",
-      title: "Backpacking essentials for solo travelers",
-      description:
-        "Make your solo adventures safe and memorable with these must-have travel essentials...",
-    },
-    {
-      image: Blog8,
-      date: "July 29, 2023",
-      author: "Admin",
-      title: "Discovering the charm of small towns in Italy",
-      description:
-        "Explore the heart of Italy through its picturesque villages, cobblestone streets, and authentic cuisine...",
-    },
-    {
-      image: Blog9,
-      date: "August 1, 2023",
-      author: "Admin",
-      title: "Why mountain hiking boosts mental health",
-      description:
-        "Research shows that hiking not only strengthens your body but also rejuvenates your mind...",
-    },
-    {
-      image: Blog10,
-      date: "August 3, 2023",
-      author: "Admin",
-      title: "Packing smart: Travel light without missing essentials",
-      description:
-        "Learn how to pack efficiently for your next trip — light, organized, and stress-free...",
-    },
-  ];
-
-  // Pagination setup: 5 blogs per page
+export default function Blog() {
+  const [blogs, setBlogs] = useState([]);
+  const [filteredBlogs, setFilteredBlogs] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [loading, setLoading] = useState(true);
+
   const blogsPerPage = 5;
-  const totalPages = Math.ceil(blogs.length / blogsPerPage);
-  const indexOfLastBlog = currentPage * blogsPerPage;
-  const indexOfFirstBlog = indexOfLastBlog - blogsPerPage;
-  const currentBlogs = blogs.slice(indexOfFirstBlog, indexOfLastBlog);
+
+  // ✅ Fetch blog theo trang
+  const fetchBlogs = async (page = 1) => {
+    try {
+      setLoading(true);
+      const res = await fetch(
+        `http://localhost:8080/blogs?page=${page - 1}&size=${blogsPerPage}`
+      );
+      if (!res.ok) throw new Error("Không thể tải danh sách blog");
+      const data = await res.json();
+
+      const items = data._embedded
+        ? data._embedded.blogs
+        : Array.isArray(data)
+        ? data
+        : [];
+
+      const formatted = items.map((b, index) => ({
+        id: b.blogId || index,
+        title: b.title,
+        date: new Date(b.createdAt).toLocaleDateString("vi-VN"),
+        description:
+          b.details?.slice(0, 200) +
+            (b.details?.length > 200 ? "..." : "") ||
+          "Không có mô tả.",
+        image:
+          b.thumbnail && !/^https?:\/\//i.test(b.thumbnail)
+            ? `http://localhost:8080/uploads/${b.thumbnail}`
+            : b.thumbnail ||
+              "https://via.placeholder.com/400x300?text=No+Image",
+        createdAt: b.createdAt,
+      }));
+
+      setBlogs(formatted);
+      setFilteredBlogs(formatted);
+      setTotalPages(data.page?.totalPages || 1);
+    } catch (err) {
+      console.error("❌ Lỗi fetch blogs:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBlogs(currentPage);
+  }, [currentPage]);
+
+  // ✅ Search filter — giữ search khi chuyển trang
+  useEffect(() => {
+    if (searchTerm.trim() === "") {
+      setFilteredBlogs(blogs);
+      return;
+    }
+
+    const filtered = blogs.filter(
+      (b) =>
+        b.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        b.description.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    setFilteredBlogs(filtered);
+  }, [searchTerm, blogs]);
+
+  // ✅ Pagination (3 nút hiển thị)
+  const getVisiblePages = () => {
+    const pages = [];
+    const maxVisible = 3;
+    let start = Math.max(1, currentPage - 1);
+    let end = Math.min(totalPages, start + maxVisible - 1);
+
+    if (end - start < maxVisible - 1) {
+      start = Math.max(1, end - maxVisible + 1);
+    }
+
+    for (let i = start; i <= end; i++) pages.push(i);
+    return pages;
+  };
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  if (loading)
+    return (
+      <div className="text-center py-10 text-gray-500 text-lg">
+        Đang tải bài viết...
+      </div>
+    );
 
   return (
     <div className="max-w-[1150px] mx-auto px-[70px] py-12 lg:flex gap-8">
-      {/* Left: Blog List */}
+      {/* Left: Danh sách blog */}
       <div className="lg:w-[68%] w-full">
-        {currentBlogs.map((blog, index) => (
-          <BlogCard key={index} {...blog} />
-        ))}
-        <div className="mt-8">
-          <Pagination
-            totalPages={totalPages}
-            currentPage={currentPage}
-            onPageChange={setCurrentPage}
-          />
-        </div>
+        {filteredBlogs.length > 0 ? (
+          filteredBlogs.map((blog) => <BlogCard key={blog.id} {...blog} />)
+        ) : (
+          <p className="text-gray-500 text-center py-8">
+            Không tìm thấy bài viết nào.
+          </p>
+        )}
+
+        {/* ✅ Hiển thị pagination chỉ khi không search và có nhiều trang */}
+        {searchTerm === "" && totalPages > 1 && (
+          <div className="flex justify-center items-center gap-2 mt-10">
+            <button
+              onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className={`px-5 py-2 rounded-full text-sm font-semibold border transition-all duration-200 ${
+                currentPage === 1
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-white text-gray-700 hover:bg-orange-100"
+              }`}
+            >
+              ‹ Prev
+            </button>
+
+            {getVisiblePages().map((page) => (
+              <button
+                key={page}
+                onClick={() => handlePageChange(page)}
+                className={`px-4 py-2 rounded-full text-sm font-semibold border transition-all duration-200 ${
+                  currentPage === page
+                    ? "bg-orange-500 text-white border-orange-500 shadow-md"
+                    : "bg-white text-gray-700 hover:bg-orange-100"
+                }`}
+              >
+                {page}
+              </button>
+            ))}
+
+            <button
+              onClick={() =>
+                handlePageChange(Math.min(totalPages, currentPage + 1))
+              }
+              disabled={currentPage === totalPages}
+              className={`px-5 py-2 rounded-full text-sm font-semibold border transition-all duration-200 ${
+                currentPage === totalPages
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-white text-gray-700 hover:bg-orange-100"
+              }`}
+            >
+              Next ›
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Right: Sidebar */}
-      <BlogSidebar />
+      <BlogSidebar blogs={blogs} onSearch={setSearchTerm} />
     </div>
   );
-};
-
-export default Blog;
+}

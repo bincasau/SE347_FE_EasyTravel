@@ -37,7 +37,7 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/about-us" element={<AboutUs />} />
           <Route path="/contact-us" element={<ContactUs />} />
-          <Route path="/detailtours" element={<DetailTour />} />
+          <Route path="/detailtour/:id" element={<DetailTour />} />
           <Route path="/tours" element={<Tour />} />
           <Route path="/sign-up" element={<Signup />} />
           <Route path="/booking" element={<Booking />} />
@@ -45,7 +45,7 @@ export default function App() {
           <Route path="/hotel/:hotelId" element={<Room />} />
           <Route path="/booking-room" element={<RoomBooking />} />
           <Route path="/blog" element={<Blog />} />
-          <Route path="/detailblog" element={<BlogDetail />} />
+          <Route path="/detailblog/:id" element={<BlogDetail />} />
           <Route path="/home" element={<Navigate to="/" replace />} />
         </Routes>
         <Footer />

@@ -27,7 +27,7 @@ export default function Header({ onOpenLogin }) {
     []
   );
 
-  // Fetch user detail từ backend
+  // Fetch user
   const fetchMe = async () => {
     const token = localStorage.getItem("jwt");
     if (!token) {
@@ -50,7 +50,7 @@ export default function Header({ onOpenLogin }) {
               data.name || "U"
             )}`,
       });
-    } catch (e) {
+    } catch {
       localStorage.removeItem("jwt");
       setUser(null);
     } finally {
@@ -96,10 +96,10 @@ export default function Header({ onOpenLogin }) {
   const activeLink =
     "text-orange-500 relative after:absolute after:left-0 after:-bottom-2 after:h-[2px] after:w-full after:bg-orange-500";
 
-  // ✅ Các nhóm route cần giữ trạng thái active
+  // ✅ Active logic chính xác
   const isToursActive =
     location.pathname.startsWith("/tours") ||
-    location.pathname.startsWith("/detailtours") ||
+    location.pathname.startsWith("/detailtour") || // 👈 sửa lại đúng route
     (location.pathname.startsWith("/booking") &&
       !location.pathname.startsWith("/booking-room"));
 
@@ -110,7 +110,7 @@ export default function Header({ onOpenLogin }) {
 
   const isBlogActive =
     location.pathname.startsWith("/blog") ||
-    location.pathname.startsWith("/detailblog") ||
+    location.pathname.startsWith("/detailblog") || // 👈 thêm để menu sáng ở trang chi tiết blog
     location.pathname.startsWith("/blogs");
 
   return (

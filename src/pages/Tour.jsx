@@ -10,58 +10,97 @@ import Pagination from "../utils/Pagination";
 import BookingVideo from "../components/pages/Tour/Video";
 import BookingHotel from "../components/pages/Tour/BookingHotel";
 import Tour from "../models/Tour";
-import toursData from "../data/Tour.json";
 
 export default function TourPage() {
   const [tours, setTours] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOrder, setSortOrder] = useState("asc");
   const [showFilter, setShowFilter] = useState(false);
   const [showSort, setShowSort] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState("All");
+  const [isLoading, setIsLoading] = useState(false);
 
   const toursPerPage = 8;
 
+  // ✅ Fetch theo trang (8 tour mỗi lần)
   useEffect(() => {
-    const loadedTours = toursData.map(
-      (t) =>
-        new Tour(
-          t.tour_id, // id
-          t.title, // title
-          t.price_adult, // giá người lớn
-          t.main_image, // ảnh
-          t.description, // mô tả
-          t.start_date, // ngày bắt đầu (hiển thị như schedule)
-          t.destination, // hiển thị địa điểm
-          t.percent_discount, // ✅ giảm giá
-          t.limit_seats // ✅ số chỗ giới hạn
-        )
-    );
-    setTours(loadedTours);
-  }, []);
+    const fetchToursByPage = async () => {
+      try {
+        setIsLoading(true);
+        const response = await fetch(
+          `http://localhost:8080/tours?page=${currentPage - 1}&size=${toursPerPage}`
+        );
+        if (!response.ok) throw new Error("Failed to fetch tours");
 
-  // Lọc + tìm kiếm
+        const data = await response.json();
+        setTotalPages(data.page.totalPages);
+
+        const loadedTours = data._embedded.tours.map(
+          (t) =>
+            new Tour(
+              t.tourId,
+              t.title,
+              t.priceAdult,
+              t.mainImage,
+              t.description,
+              t.startDate,
+              t.destination,
+              t.percentDiscount,
+              t.limitSeats
+            )
+        );
+
+        setTours(loadedTours);
+      } catch (error) {
+        console.error("Error fetching tours:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchToursByPage();
+  }, [currentPage]);
+
+  // ✅ Tạo danh sách địa điểm động
+  const locations = ["All", ...new Set(tours.map((t) => t.destination))];
+
+  // 🔍 Lọc + tìm kiếm
   const filteredTours = tours.filter(
     (t) =>
       t.title.toLowerCase().includes(searchTerm.toLowerCase()) &&
-      (selectedLocation === "All" || t.location === selectedLocation)
+      (selectedLocation === "All" || t.destination === selectedLocation)
   );
 
-  // Sắp xếp theo giá
+  // ↕️ Sắp xếp theo giá
   const sortedTours = [...filteredTours].sort((a, b) =>
     sortOrder === "asc" ? a.price - b.price : b.price - a.price
   );
 
-  // Phân trang
-  const indexOfLastTour = currentPage * toursPerPage;
-  const indexOfFirstTour = indexOfLastTour - toursPerPage;
-  const currentTours = sortedTours.slice(indexOfFirstTour, indexOfLastTour);
-  const totalPages = Math.ceil(sortedTours.length / toursPerPage);
+  // ⚙️ Tạo danh sách trang động (hiển thị tối đa 3 trang)
+  const getVisiblePages = () => {
+    const pages = [];
+    const maxVisible = 3;
+    let startPage = Math.max(currentPage - 1, 1);
+    let endPage = Math.min(startPage + maxVisible - 1, totalPages);
+
+    if (endPage - startPage < maxVisible - 1) {
+      startPage = Math.max(endPage - maxVisible + 1, 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+
+    return pages;
+  };
 
   const handlePageChange = (pageNumber) => {
-    setCurrentPage(pageNumber);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (pageNumber >= 1 && pageNumber <= totalPages) {
+      setCurrentPage(pageNumber);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   };
 
   const handleSortChange = (order) => {
@@ -110,22 +149,20 @@ export default function TourPage() {
                 <p className="font-semibold mb-2 text-gray-700">
                   Filter by Location
                 </p>
-                {["All", "Tuscany", "Venice", "Rome", "Florence", "Milan"].map(
-                  (loc) => (
-                    <button
-                      key={loc}
-                      onClick={() => {
-                        setSelectedLocation(loc);
-                        setShowFilter(false);
-                      }}
-                      className={`block w-full text-left px-3 py-1.5 rounded-md hover:bg-orange-100 ${
-                        selectedLocation === loc ? "bg-orange-200" : ""
-                      }`}
-                    >
-                      {loc}
-                    </button>
-                  )
-                )}
+                {locations.map((loc) => (
+                  <button
+                    key={loc}
+                    onClick={() => {
+                      setSelectedLocation(loc);
+                      setShowFilter(false);
+                    }}
+                    className={`block w-full text-left px-3 py-1.5 rounded-md hover:bg-orange-100 ${
+                      selectedLocation === loc ? "bg-orange-200" : ""
+                    }`}
+                  >
+                    {loc}
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -173,19 +210,27 @@ export default function TourPage() {
         </div>
 
         {/* Grid Tour */}
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4 justify-items-center">
-          {currentTours.map((tour) => (
-            <TourCard key={tour.id} tour={tour} />
-          ))}
-        </div>
+        {isLoading ? (
+          <div className="flex justify-center py-16 text-gray-500 text-lg">
+            Đang tải danh sách tour...
+          </div>
+        ) : (
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4 justify-items-center">
+            {sortedTours.map((tour) => (
+              <TourCard key={tour.id} tour={tour} />
+            ))}
+          </div>
+        )}
 
-        {/* ✅ Pagination riêng */}
+        {/* ✅ Pagination dùng component bạn gửi */}
         <Pagination
           totalPages={totalPages}
           currentPage={currentPage}
           onPageChange={handlePageChange}
+          visiblePages={getVisiblePages()} // 3 số trang động
         />
 
+        {/* Booking sections */}
         <BookingHotel />
         <BookingVideo />
       </div>

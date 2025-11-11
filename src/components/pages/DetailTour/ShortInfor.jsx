@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   startOfMonth,
   endOfMonth,
@@ -11,30 +11,69 @@ import {
   isWithinInterval,
   parseISO,
 } from "date-fns";
-import { useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 
-import imgMain from "../../../assets/images/Tour/travel2.jpg";
 import img2 from "../../../assets/images/Tour/travel3.jpg";
 import img3 from "../../../assets/images/Tour/travel4.jpg";
 import img4 from "../../../assets/images/Tour/travel5.jpg";
 
 export default function TourDetail() {
   const navigate = useNavigate();
+  const { id } = useParams();
 
-  // 🔸 Giả lập dữ liệu (sau này fetch từ API)
-  const tour = {
-    title: "Wine Tasting in Tuscany",
-    description:
-      "Taste authentic Tuscan wines and enjoy local cuisine surrounded by vineyards and scenic landscapes.",
-    price: 45,
-    start_date: "2025-03-02",
-    end_date: "2025-03-05",
-    image: imgMain,
-  };
+  const [tour, setTour] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const startDate = parseISO(tour.start_date);
-  const endDate = parseISO(tour.end_date);
-  const currentMonth = startDate;
+  // 🔸 Fetch dữ liệu từ backend
+  useEffect(() => {
+    const fetchTour = async () => {
+      try {
+        const response = await fetch(`http://localhost:8080/tours/${id}`);
+        if (!response.ok) throw new Error("Failed to fetch tour data");
+        const data = await response.json();
+        setTour(data);
+      } catch (error) {
+        console.error("❌ Error fetching tour:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTour();
+  }, [id]);
+
+  if (loading)
+    return (
+      <div className="flex justify-center items-center h-screen text-gray-500">
+        Đang tải dữ liệu tour...
+      </div>
+    );
+
+  if (!tour)
+    return (
+      <div className="flex justify-center items-center h-screen text-red-500">
+        Không tìm thấy tour.
+      </div>
+    );
+
+  // --- Giải nén dữ liệu ---
+  const {
+    title,
+    description,
+    priceAdult,
+    startDate,
+    endDate,
+    mainImage,
+  } = tour;
+
+  // --- Format tiền ---
+  const formatCurrency = (val) =>
+    Number(val ?? 0).toLocaleString("vi-VN", { style: "currency", currency: "VND" });
+
+  // --- Parse date ---
+  const start = parseISO(startDate);
+  const end = parseISO(endDate);
+  const currentMonth = start;
 
   // --- Calendar header ---
   const renderHeader = () => (
@@ -49,10 +88,7 @@ export default function TourDetail() {
     return (
       <div className="grid grid-cols-7 mb-1">
         {days.map((d) => (
-          <div
-            key={d}
-            className="text-center text-xs font-semibold text-gray-500 py-1"
-          >
+          <div key={d} className="text-center text-xs font-semibold text-gray-500 py-1">
             {d}
           </div>
         ))}
@@ -60,7 +96,7 @@ export default function TourDetail() {
     );
   };
 
-  // --- Lịch với dải cam ngang ---
+  // --- Lịch với range ---
   const renderCells = () => {
     const monthStart = startOfMonth(currentMonth);
     const monthEnd = endOfMonth(monthStart);
@@ -75,32 +111,23 @@ export default function TourDetail() {
       for (let i = 0; i < 7; i++) {
         const formatted = format(day, "d");
         const isOtherMonth = !isSameMonth(day, monthStart);
-        const isStart = isSameDay(day, startDate);
-        const isEnd = isSameDay(day, endDate);
+        const isStart = isSameDay(day, start);
+        const isEnd = isSameDay(day, end);
         const isInRange =
-          isWithinInterval(day, { start: startDate, end: endDate }) &&
-          !isStart &&
-          !isEnd;
+          isWithinInterval(day, { start, end }) && !isStart && !isEnd;
 
         let cellClass =
           "relative text-xs sm:text-sm text-center py-[10px] transition-all duration-100 select-none flex items-center justify-center ";
 
-        if (isOtherMonth) {
-          cellClass += "text-gray-300";
-        } else if (isStart || isEnd) {
-          cellClass +=
-            "bg-orange-500 text-white font-semibold shadow-md z-10 rounded-md"; // 👈 bo góc nhẹ
-        } else if (isInRange) {
-          cellClass += "bg-orange-100 text-gray-700";
-        } else {
-          cellClass += "text-gray-400";
-        }
+        if (isOtherMonth) cellClass += "text-gray-300";
+        else if (isStart || isEnd)
+          cellClass += "bg-orange-500 text-white font-semibold rounded-md shadow-md";
+        else if (isInRange) cellClass += "bg-orange-100 text-gray-700";
+        else cellClass += "text-gray-400";
 
         days.push(
           <div key={day} className="relative">
-            {isInRange && (
-              <div className="absolute inset-0 bg-orange-200 z-0"></div>
-            )}
+            {isInRange && <div className="absolute inset-0 bg-orange-200 z-0"></div>}
             <div className={cellClass}>{formatted}</div>
           </div>
         );
@@ -119,31 +146,32 @@ export default function TourDetail() {
     return <div>{rows}</div>;
   };
 
-  // --- Nút mua ---
+  // --- Nút đặt tour ---
   const handleBuyNow = () => {
     navigate("/booking", {
       state: {
         tour: {
-          name: tour.title,
-          price: tour.price,
-          date: tour.start_date,
-          image: tour.image,
+          name: title,
+          price: priceAdult,
+          startDate,
+          image: mainImage,
         },
       },
     });
   };
+
+  // --- Ảnh hiển thị ---
+  const mainImg = mainImage
+    ? `http://localhost:8080/uploads/${mainImage}`
+    : img2;
 
   // --- Giao diện ---
   return (
     <div className="max-w-6xl mx-auto px-6 py-8 grid md:grid-cols-2 gap-10 items-end">
       {/* Left - Hình ảnh */}
       <div className="flex flex-col relative">
-        {/* Nút Back bo góc nhẹ */}
         <button
-          onClick={() => {
-            if (window.history.length > 1) navigate(-1);
-            else navigate("/tours");
-          }}
+          onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/tours"))}
           className="absolute -top-10 mb-10 left-0 flex items-center gap-2 
             border border-orange-500 text-orange-500 
             bg-white text-[15px] font-medium 
@@ -155,8 +183,8 @@ export default function TourDetail() {
         </button>
 
         <img
-          src={tour.image}
-          alt={tour.title}
+          src={mainImg}
+          alt={title}
           className="rounded-2xl w-full h-[540px] object-cover shadow-md hover:scale-[1.01] transition"
         />
 
@@ -175,18 +203,18 @@ export default function TourDetail() {
       <div className="flex flex-col justify-between h-full pb-4">
         <div className="mt-[60px]">
           <h1 className="text-4xl font-podcast font-light mb-1 text-gray-800 leading-snug">
-            {tour.title}
+            {title}
           </h1>
 
           <p className="text-lg text-gray-600 mb-3">
             from{" "}
             <span className="text-3xl text-orange-500 font-bold">
-              {tour.price} €
+              {formatCurrency(priceAdult)}
             </span>
           </p>
 
           <p className="text-gray-500 mb-5 leading-relaxed text-justify">
-            {tour.description}
+            {description}
           </p>
 
           <p className="font-medium mb-2 text-gray-700">Trip Duration</p>
@@ -202,7 +230,7 @@ export default function TourDetail() {
           onClick={handleBuyNow}
           className="bg-orange-500 hover:bg-orange-600 text-white w-44 self-center md:self-start rounded-full px-6 py-3 shadow-md transition-all mt-6"
         >
-          Buy Now
+          Book Now
         </button>
       </div>
     </div>

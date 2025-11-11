@@ -1,95 +1,125 @@
 import React from "react";
 import {
-  FaUsers,
-  FaClock,
   FaMapMarkerAlt,
   FaCalendarAlt,
-  FaMapSigns,
-  FaDollarSign,
-  FaTag,
+  FaClock,
+  FaUsers,
+  FaChild,
+  FaTags,
+  FaCheckCircle,
+  FaPlaneDeparture,
 } from "react-icons/fa";
 
-export default function TourDetailsInfo() {
+export default function Detail({ tour }) {
+  if (!tour) return null;
+
+  const {
+    priceAdult,
+    priceChild,
+    percentDiscount,
+    durationDays,
+    startDate,
+    endDate,
+    departureLocation,
+    destination,
+    availableSeats,
+    limitSeats,
+    status,
+    createdAt,
+  } = tour;
+
+  const formatCurrency = (val) =>
+    Number(val ?? 0).toLocaleString("vi-VN", {
+      style: "currency",
+      currency: "VND",
+    });
+
   return (
-    <section className="max-w-6xl mx-auto px-6 mt-10">
-      {/* Tiêu đề */}
-      <h2 className="text-4xl font-podcast text-gray-800 mb-4">
-        Lucca Bike Tour
-      </h2>
+    <section className="max-w-6xl mx-auto px-6 py-10">
+      {/* 🧭 Tiêu đề */}
+      <h2 className="text-3xl font-semibold text-gray-800 mb-10">Overview</h2>
 
-      {/* Mô tả */}
-      <p className="text-gray-600 leading-relaxed mb-6 max-w-[60%]">
-        Explore the beauty of Lucca by bike with a local guide. Perfect for
-        first-time visitors who love nature and culture.
-      </p>
+      {/* Grid thông tin dạng icon trên, text dưới */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-8 text-center text-gray-700">
+        {/* 1 */}
+        <div className="flex flex-col items-center">
+          <FaPlaneDeparture className="text-orange-500 text-3xl mb-2" />
+          <p className="text-sm font-medium">Departure</p>
+          <p className="text-[13px]">{departureLocation}</p>
+        </div>
 
-      {/* Danh sách thông tin */}
-      <ul className="space-y-3 text-gray-700 text-sm">
-        <li className="flex items-center gap-3">
-          <FaMapSigns className="text-orange-500 text-lg" />
-          <span>
-            <strong>Departure location:</strong> Lucca Center
-          </span>
-        </li>
+        {/* 2 */}
+        <div className="flex flex-col items-center">
+          <FaMapMarkerAlt className="text-orange-500 text-3xl mb-2" />
+          <p className="text-sm font-medium">Destination</p>
+          <p className="text-[13px]">{destination}</p>
+        </div>
 
-        <li className="flex items-center gap-3">
-          <FaMapMarkerAlt className="text-orange-500 text-lg" />
-          <span>
-            <strong>Destination:</strong> Lucca, Italy
-          </span>
-        </li>
+        {/* 3 */}
+        <div className="flex flex-col items-center">
+          <FaCalendarAlt className="text-orange-500 text-3xl mb-2" />
+          <p className="text-sm font-medium">Start Date</p>
+          <p className="text-[13px]">{startDate}</p>
+        </div>
 
-        <li className="flex items-center gap-3">
-          <FaCalendarAlt className="text-orange-500 text-lg" />
-          <span>
-            <strong>Start Date:</strong> 2025-03-01 &nbsp;|&nbsp;
-            <strong>End Date:</strong> 2025-03-01
-          </span>
-        </li>
+        {/* 4 */}
+        <div className="flex flex-col items-center">
+          <FaCalendarAlt className="text-orange-500 text-3xl mb-2" />
+          <p className="text-sm font-medium">End Date</p>
+          <p className="text-[13px]">{endDate}</p>
+        </div>
 
-        <li className="flex items-center gap-3">
-          <FaClock className="text-orange-500 text-lg" />
-          <span>
-            <strong>Duration:</strong> 1 day
-          </span>
-        </li>
+        {/* 5 */}
+        <div className="flex flex-col items-center">
+          <FaClock className="text-orange-500 text-3xl mb-2" />
+          <p className="text-sm font-medium">Duration</p>
+          <p className="text-[13px]">{durationDays} days</p>
+        </div>
 
-        <li className="flex items-center gap-3">
-          <FaUsers className="text-orange-500 text-lg" />
-          <span>
-            <strong>Seats:</strong> Limit 15 &nbsp;|&nbsp; Available 10
-          </span>
-        </li>
+        {/* 6 */}
+        <div className="flex flex-col items-center">
+          <FaUsers className="text-orange-500 text-3xl mb-2" />
+          <p className="text-sm font-medium">Seats</p>
+          <p className="text-[13px]">
+            Limit {limitSeats} | Avail. {availableSeats}
+          </p>
+        </div>
 
-        <li className="flex items-center gap-3">
-          <FaDollarSign className="text-orange-500 text-lg" />
-          <span>
-            <strong>Adult Price:</strong> 34 € &nbsp;|&nbsp;
-            <strong>Child Price:</strong> 25 €
-          </span>
-        </li>
+        {/* 7 */}
+        <div className="flex flex-col items-center">
+          <FaUsers className="text-orange-500 text-3xl mb-2" />
+          <p className="text-sm font-medium">Adult Price</p>
+          <p className="text-[13px]">{formatCurrency(priceAdult)}</p>
+        </div>
 
-        <li className="flex items-center gap-3">
-          <FaTag className="text-orange-500 text-lg" />
-          <span>
-            <strong>Discount:</strong> -10%
-          </span>
-        </li>
+        {/* 8 */}
+        <div className="flex flex-col items-center">
+          <FaChild className="text-orange-500 text-3xl mb-2" />
+          <p className="text-sm font-medium">Child Price</p>
+          <p className="text-[13px]">{formatCurrency(priceChild)}</p>
+        </div>
 
-        <li className="flex items-center gap-3">
-          <FaCalendarAlt className="text-orange-500 text-lg" />
-          <span>
-            <strong>Status:</strong> Active
-          </span>
-        </li>
+        {/* 9 */}
+        <div className="flex flex-col items-center">
+          <FaTags className="text-orange-500 text-3xl mb-2" />
+          <p className="text-sm font-medium">Discount</p>
+          <p className="text-[13px]">-{percentDiscount}%</p>
+        </div>
 
-        <li className="flex items-center gap-3">
-          <FaClock className="text-orange-500 text-lg" />
-          <span>
-            <strong>Created at:</strong> 2025-02-15
-          </span>
-        </li>
-      </ul>
+        {/* 10 */}
+        <div className="flex flex-col items-center">
+          <FaCheckCircle className="text-orange-500 text-3xl mb-2" />
+          <p className="text-sm font-medium">Status</p>
+          <p className="text-[13px]">{status}</p>
+        </div>
+
+        {/* 11 */}
+        <div className="flex flex-col items-center">
+          <FaCalendarAlt className="text-orange-500 text-3xl mb-2" />
+          <p className="text-sm font-medium">Created At</p>
+          <p className="text-[13px]">{createdAt}</p>
+        </div>
+      </div>
     </section>
   );
 }
