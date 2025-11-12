@@ -1,23 +1,26 @@
 export default class Tour {
   constructor(
-    id,
+    tourId,
     title,
-    price,
-    img,
-    desc,
-    schedule,
-    destination,        // 👈 thay group thành destination
-    percent_discount = 0,
-    limit_seats = 0
+    priceAdult,
+    mainImage,
+    description,
+    startDate,
+    destination,
+    percentDiscount,
+    limitSeats,
+    imagesHref
   ) {
-    this.id = id;
+    this.id = tourId;
+    this.tourId = tourId;
     this.title = title;
-    this.price = price;
-    this.img = img;
-    this.desc = desc;
-    this.schedule = schedule;
-    this.destination = destination; // ✅ dùng destination thay vì group
-    this.percent_discount = percent_discount;
-    this.limit_seats = limit_seats;
+    this.priceAdult = priceAdult;
+    this.mainImage = mainImage;
+    this.description = description;
+    this.startDate = startDate;
+    this.destination = destination;
+    this.percentDiscount = percentDiscount;
+    this.limitSeats = limitSeats;
+    this.imagesHref = imagesHref;
   }
 }

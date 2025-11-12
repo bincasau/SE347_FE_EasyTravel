@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   startOfMonth,
   endOfMonth,
@@ -11,29 +12,51 @@ import {
   isWithinInterval,
   parseISO,
 } from "date-fns";
-import { useParams, useNavigate } from "react-router-dom";
-
-import img2 from "../../../assets/images/Tour/travel3.jpg";
-import img3 from "../../../assets/images/Tour/travel4.jpg";
-import img4 from "../../../assets/images/Tour/travel5.jpg";
+import travel1 from "../../../assets/images/Tour/travel1.jpg";
+import travel2 from "../../../assets/images/Tour/travel2.jpg";
+import travel3 from "../../../assets/images/Tour/travel3.jpg";
+import travel4 from "../../../assets/images/Tour/travel4.jpg";
 
 export default function TourDetail() {
-  const navigate = useNavigate();
   const { id } = useParams();
-
+  const navigate = useNavigate();
   const [tour, setTour] = useState(null);
+  const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // 🔸 Fetch dữ liệu từ backend
+  // 🧩 FETCH TOUR DATA GIỐNG TOURPAGE
   useEffect(() => {
     const fetchTour = async () => {
       try {
-        const response = await fetch(`http://localhost:8080/tours/${id}`);
-        if (!response.ok) throw new Error("Failed to fetch tour data");
-        const data = await response.json();
+        const res = await fetch(`http://localhost:8080/tours/${id}`);
+        if (!res.ok) throw new Error("Không thể tải dữ liệu tour");
+        const data = await res.json();
+        console.log("✅ Dữ liệu tour:", data);
         setTour(data);
-      } catch (error) {
-        console.error("❌ Error fetching tour:", error);
+
+        // Fetch ảnh nếu có link
+        const imagesHref = data._links?.images?.href;
+        if (imagesHref) {
+          const imgRes = await fetch(imagesHref);
+          if (!imgRes.ok) throw new Error("Không thể tải ảnh");
+          const imgData = await imgRes.json();
+          console.log("✅ Dữ liệu ảnh:", imgData);
+
+          let list = [];
+          if (imgData._embedded?.images) list = imgData._embedded.images;
+          else if (Array.isArray(imgData)) list = imgData;
+
+          const formatted = list.map((img) => {
+            const link =
+              img.url || img.imageUrl || img.name || img.path || img;
+            return /^https?:\/\//i.test(link)
+              ? link
+              : `http://localhost:8080/uploads/${link}`;
+          });
+          setImages(formatted);
+        }
+      } catch (err) {
+        console.error("❌ Lỗi khi fetch tour:", err);
       } finally {
         setLoading(false);
       }
@@ -63,32 +86,36 @@ export default function TourDetail() {
     priceAdult,
     startDate,
     endDate,
+    destination,
     mainImage,
   } = tour;
 
-  // --- Format tiền ---
   const formatCurrency = (val) =>
-    Number(val ?? 0).toLocaleString("vi-VN", { style: "currency", currency: "VND" });
+    Number(val ?? 0).toLocaleString("vi-VN", {
+      style: "currency",
+      currency: "VND",
+    });
 
   // --- Parse date ---
   const start = parseISO(startDate);
   const end = parseISO(endDate);
   const currentMonth = start;
 
-  // --- Calendar header ---
   const renderHeader = () => (
     <div className="flex justify-center items-center mb-1 text-sm text-gray-700 font-semibold">
       {format(currentMonth, "MMMM yyyy")}
     </div>
   );
 
-  // --- Tên ngày ---
   const renderDays = () => {
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     return (
       <div className="grid grid-cols-7 mb-1">
         {days.map((d) => (
-          <div key={d} className="text-center text-xs font-semibold text-gray-500 py-1">
+          <div
+            key={d}
+            className="text-center text-xs font-semibold text-gray-500 py-1"
+          >
             {d}
           </div>
         ))}
@@ -96,7 +123,6 @@ export default function TourDetail() {
     );
   };
 
-  // --- Lịch với range ---
   const renderCells = () => {
     const monthStart = startOfMonth(currentMonth);
     const monthEnd = endOfMonth(monthStart);
@@ -121,13 +147,16 @@ export default function TourDetail() {
 
         if (isOtherMonth) cellClass += "text-gray-300";
         else if (isStart || isEnd)
-          cellClass += "bg-orange-500 text-white font-semibold rounded-md shadow-md";
+          cellClass +=
+            "bg-orange-500 text-white font-semibold rounded-md shadow-md";
         else if (isInRange) cellClass += "bg-orange-100 text-gray-700";
         else cellClass += "text-gray-400";
 
         days.push(
           <div key={day} className="relative">
-            {isInRange && <div className="absolute inset-0 bg-orange-200 z-0"></div>}
+            {isInRange && (
+              <div className="absolute inset-0 bg-orange-200 z-0"></div>
+            )}
             <div className={cellClass}>{formatted}</div>
           </div>
         );
@@ -146,7 +175,18 @@ export default function TourDetail() {
     return <div>{rows}</div>;
   };
 
-  // --- Nút đặt tour ---
+  // 🖼️ Ảnh hiển thị (lấy BE trước, fallback local)
+  const mainImg =
+    images[0] ||
+    (mainImage
+      ? `http://localhost:8080/uploads/${mainImage}`
+      : travel1);
+
+  const previewImages =
+    images.length > 1
+      ? images.slice(1, 4)
+      : [travel2, travel3, travel4];
+
   const handleBuyNow = () => {
     navigate("/booking", {
       state: {
@@ -154,24 +194,20 @@ export default function TourDetail() {
           name: title,
           price: priceAdult,
           startDate,
-          image: mainImage,
+          image: mainImg,
         },
       },
     });
   };
 
-  // --- Ảnh hiển thị ---
-  const mainImg = mainImage
-    ? `http://localhost:8080/uploads/${mainImage}`
-    : img2;
-
-  // --- Giao diện ---
   return (
     <div className="max-w-6xl mx-auto px-6 py-8 grid md:grid-cols-2 gap-10 items-end">
-      {/* Left - Hình ảnh */}
+      {/* Left - Ảnh */}
       <div className="flex flex-col relative">
         <button
-          onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/tours"))}
+          onClick={() =>
+            window.history.length > 1 ? navigate(-1) : navigate("/tours")
+          }
           className="absolute -top-10 mb-10 left-0 flex items-center gap-2 
             border border-orange-500 text-orange-500 
             bg-white text-[15px] font-medium 
@@ -186,25 +222,30 @@ export default function TourDetail() {
           src={mainImg}
           alt={title}
           className="rounded-2xl w-full h-[540px] object-cover shadow-md hover:scale-[1.01] transition"
+          onError={(e) => (e.currentTarget.src = travel1)}
         />
 
         <div className="flex gap-4 mt-4">
-          {[img2, img3, img4].map((img, i) => (
+          {previewImages.map((img, i) => (
             <img
               key={i}
               src={img}
+              alt={`preview-${i}`}
               className="w-1/3 h-32 rounded-xl object-cover hover:scale-105 transition"
+              onError={(e) => (e.currentTarget.src = travel2)}
             />
           ))}
         </div>
       </div>
 
-      {/* Right - Chi tiết tour */}
+      {/* Right - Thông tin tour */}
       <div className="flex flex-col justify-between h-full pb-4">
         <div className="mt-[60px]">
           <h1 className="text-4xl font-podcast font-light mb-1 text-gray-800 leading-snug">
             {title}
           </h1>
+
+          <p className="text-sm text-gray-500 mb-1">{destination}</p>
 
           <p className="text-lg text-gray-600 mb-3">
             from{" "}

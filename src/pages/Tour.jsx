@@ -48,7 +48,8 @@ export default function TourPage() {
               t.startDate,
               t.destination,
               t.percentDiscount,
-              t.limitSeats
+              t.limitSeats,
+              t._links?.images?.href||null
             )
         );
 
