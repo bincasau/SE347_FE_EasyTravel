@@ -12,7 +12,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { LangProvider } from "@/contexts/LangContext";
 import Tour from "./pages/Tour";
 import DetailTour from "./pages/DetailTour";
-import Booking from "./pages/Booking";
+import Booking from "./pages/BookingTour";
 
 import ScrollToTop from "./utils/ScrollToTop";
 import LoginModal from "./pages/Login";
@@ -40,7 +40,7 @@ export default function App() {
           <Route path="/detailtour/:id" element={<DetailTour />} />
           <Route path="/tours" element={<Tour />} />
           <Route path="/sign-up" element={<Signup />} />
-          <Route path="/booking" element={<Booking />} />
+          <Route path="/booking/:tourId" element={<Booking />} />
           <Route path="/hotel" element={<Hotel />} />
           <Route path="/hotel/:hotelId" element={<Room />} />
           <Route path="/booking-room" element={<RoomBooking />} />

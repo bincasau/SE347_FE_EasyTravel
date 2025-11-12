@@ -36,11 +36,8 @@ export default function Blog() {
           b.details?.slice(0, 200) +
             (b.details?.length > 200 ? "..." : "") ||
           "Không có mô tả.",
-        image:
-          b.thumbnail && !/^https?:\/\//i.test(b.thumbnail)
-            ? `http://localhost:8080/uploads/${b.thumbnail}`
-            : b.thumbnail ||
-              "https://via.placeholder.com/400x300?text=No+Image",
+        // ✅ Ảnh blog lấy theo thư mục /images/blog/blog_${id}_img_1.jpg
+        image: `/images/blog/blog_${b.blogId}_img_1.jpg`,
         createdAt: b.createdAt,
       }));
 
@@ -58,7 +55,7 @@ export default function Blog() {
     fetchBlogs(currentPage);
   }, [currentPage]);
 
-  // ✅ Search filter — giữ search khi chuyển trang
+  // ✅ Search filter
   useEffect(() => {
     if (searchTerm.trim() === "") {
       setFilteredBlogs(blogs);
@@ -112,7 +109,7 @@ export default function Blog() {
           </p>
         )}
 
-        {/* ✅ Hiển thị pagination chỉ khi không search và có nhiều trang */}
+        {/* Pagination giữ nguyên */}
         {searchTerm === "" && totalPages > 1 && (
           <div className="flex justify-center items-center gap-2 mt-10">
             <button

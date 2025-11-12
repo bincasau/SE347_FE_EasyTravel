@@ -20,26 +20,18 @@ export default function Itineraries({ tourId }) {
         if (!res.ok) throw new Error("Failed to fetch itineraries");
         const data = await res.json();
 
-        const items = data._embedded
-          ? data._embedded.itineraries
-          : Array.isArray(data)
-          ? data
-          : [];
+        console.log("✅ Raw itineraries:", data);
 
-        const normalized = items.map((i, index) => {
-          // đảm bảo luôn có Day X
-          const dayNumber =
-            i.day_number || i.dayNumber || i.title?.match(/\d+/)?.[0] || index + 1;
-          const title = `Day ${dayNumber}${
-            i.title && !/day/i.test(i.title) ? `: ${i.title}` : ""
-          }`;
+        const items = data._embedded?.itineraries || data.itineraries || data || [];
 
-          return {
-            id: i.itinerary_id || i.id || index,
-            title,
-            activities: i.activities || "",
-          };
-        });
+        const normalized = items.map((i, index) => ({
+          id: i.itinerary_id || i.id || index,
+          title:
+            i.title?.trim() ||
+            `Day ${i.day_number || index + 1}`,
+          activities: i.activities || "",
+          dayNumber: i.day_number || i.dayNumber || index + 1,
+        }));
 
         setItineraries(normalized);
       } catch (err) {
@@ -54,27 +46,31 @@ export default function Itineraries({ tourId }) {
 
   const parseActivities = (activities) => {
     const lines = activities.split("\n").filter((l) => l.trim() !== "");
-    const parsed = lines.map((line) => {
+    return lines.map((line) => {
       const timeMatch = line.match(/^(\d{1,2}[:.]\d{2})/);
       const time = timeMatch ? timeMatch[1] : "";
       const text = time ? line.replace(time, "").trim() : line.trim();
       const hour = parseInt(time.split(":")[0]);
       return { time, text, hour: !isNaN(hour) ? hour : null };
     });
-    return parsed;
   };
 
   if (!itineraries.length)
     return (
       <section className="max-w-6xl mx-auto px-6 py-10 text-gray-500">
-        <h2 className="text-3xl font-semibold text-gray-800 mb-6">Itineraries</h2>
+        <h2 className="text-5xl font-podcast text-gray-800 mb-6">
+          Itineraries
+        </h2>
         <p>No itinerary available for this tour.</p>
       </section>
     );
 
   return (
     <section className="max-w-6xl mx-auto px-6 py-10">
-      <h2 className="text-3xl font-semibold text-gray-800 mb-8">Itineraries</h2>
+      {/* ✅ Giữ font-podcast, bỏ font-semibold */}
+      <h2 className="text-5xl font-podcast text-gray-800 mb-8">
+        Itineraries
+      </h2>
 
       <div className="flex flex-col gap-5">
         {itineraries.map((item, index) => {
@@ -82,7 +78,6 @@ export default function Itineraries({ tourId }) {
           const theme = colorThemes[index % colorThemes.length];
           const parsed = parseActivities(item.activities);
 
-          // nhóm theo buổi
           const morning = parsed.filter((a) => a.hour >= 5 && a.hour < 12);
           const afternoon = parsed.filter((a) => a.hour >= 12 && a.hour < 18);
           const evening = parsed.filter((a) => a.hour >= 18);
@@ -101,7 +96,10 @@ export default function Itineraries({ tourId }) {
                   <div className="bg-orange-500 text-white rounded-full p-2 shadow-sm">
                     <FaCalendarDay size={18} />
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-800">{item.title}</h3>
+                  {/* ✅ Giữ font-podcast, không dùng semibold */}
+                  <h3 className="text-2xl font-podcast text-gray-800">
+                    {item.title}
+                  </h3>
                 </div>
                 {isOpen ? (
                   <FaChevronUp className="text-orange-500" />
@@ -117,11 +115,11 @@ export default function Itineraries({ tourId }) {
                 }`}
               >
                 <div className="mt-3 grid sm:grid-cols-2 gap-x-10 gap-y-3">
-                  {/* Left: Morning */}
+                  {/* Morning */}
                   <div>
                     {morning.length > 0 && (
                       <>
-                        <p className="text-xs font-semibold text-gray-500 uppercase mb-1">
+                        <p className="text-xs text-gray-500 uppercase mb-1">
                           Morning
                         </p>
                         <div className="flex flex-col gap-2">
@@ -142,13 +140,13 @@ export default function Itineraries({ tourId }) {
                     )}
                   </div>
 
-                  {/* Right: Afternoon + Evening */}
+                  {/* Afternoon + Evening */}
                   <div>
                     {(afternoon.length > 0 || evening.length > 0) && (
                       <>
                         {afternoon.length > 0 && (
                           <>
-                            <p className="text-xs font-semibold text-gray-500 uppercase mb-1">
+                            <p className="text-xs text-gray-500 uppercase mb-1">
                               Afternoon
                             </p>
                             <div className="flex flex-col gap-2 mb-3">
@@ -169,7 +167,7 @@ export default function Itineraries({ tourId }) {
                         )}
                         {evening.length > 0 && (
                           <>
-                            <p className="text-xs font-semibold text-gray-500 uppercase mb-1">
+                            <p className="text-xs text-gray-500 uppercase mb-1">
                               Evening
                             </p>
                             <div className="flex flex-col gap-2">

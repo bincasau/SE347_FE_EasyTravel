@@ -50,7 +50,7 @@ export default function DetailTour() {
       <ShortInfor tour={tour} />
       <Detail tour={tour} />
       <Itineraries tourId={id} /> {/* 🧭 Phần lịch trình — nằm TRÊN Gallery */}
-      <Gallery tour={tour} />
+      <Gallery tourId={id} /> 
       <Reviews tourId={id} /> {/* 🌟 Phần đánh giá — nằm DƯỚI Gallery */}
     </div>
   );

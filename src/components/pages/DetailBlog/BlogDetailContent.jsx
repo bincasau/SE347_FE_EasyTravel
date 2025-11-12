@@ -37,11 +37,8 @@ export default function BlogDetailContent() {
           id: detailData.blogId,
           title: detailData.title,
           details: detailData.details,
-          thumbnail:
-            detailData.thumbnail && !/^https?:\/\//i.test(detailData.thumbnail)
-              ? `http://localhost:8080/uploads/${detailData.thumbnail}`
-              : detailData.thumbnail ||
-                "https://via.placeholder.com/800x400?text=No+Image",
+          // ✅ Dùng ảnh tĩnh từ thư mục /images/blog/
+          thumbnail: `/images/blog/blog_${detailData.blogId}_img_1.jpg`,
           createdAt: new Date(detailData.createdAt).toLocaleDateString("vi-VN"),
         };
 
@@ -110,7 +107,8 @@ export default function BlogDetailContent() {
       />
 
       <div className="mt-6 text-sm text-gray-500">
-        {blog.createdAt} • <span className="text-gray-600 font-medium">Admin</span>
+        {blog.createdAt} •{" "}
+        <span className="text-gray-600 font-medium">Admin</span>
       </div>
 
       <h1 className="text-3xl font-bold text-gray-900 mt-2 leading-snug">
@@ -157,7 +155,9 @@ export default function BlogDetailContent() {
               </a>
             ))}
             <button
-              onClick={() => navigator.clipboard.writeText(window.location.href)}
+              onClick={() =>
+                navigator.clipboard.writeText(window.location.href)
+              }
               className="hover:text-gray-800"
             >
               <FaLink />
@@ -198,13 +198,12 @@ export default function BlogDetailContent() {
               >
                 <div className="w-full h-44 overflow-hidden rounded-lg">
                   <img
-                    src={
-                      r.thumbnail && !/^https?:\/\//i.test(r.thumbnail)
-                        ? `http://localhost:8080/uploads/${r.thumbnail}`
-                        : r.thumbnail ||
-                          "https://via.placeholder.com/300x200?text=Blog"
-                    }
+                    src={`/images/blog/blog_${r.blogId}_img_1.jpg`}
                     alt={r.title}
+                    onError={(e) =>
+                      (e.currentTarget.src =
+                        "https://via.placeholder.com/300x200?text=No+Image")
+                    }
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                 </div>

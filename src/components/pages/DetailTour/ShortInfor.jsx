@@ -24,35 +24,28 @@ export default function TourDetail() {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // 🧩 FETCH TOUR DATA GIỐNG TOURPAGE
   useEffect(() => {
     const fetchTour = async () => {
       try {
+        // --- Fetch tour ---
         const res = await fetch(`http://localhost:8080/tours/${id}`);
         if (!res.ok) throw new Error("Không thể tải dữ liệu tour");
         const data = await res.json();
-        console.log("✅ Dữ liệu tour:", data);
         setTour(data);
 
-        // Fetch ảnh nếu có link
+        // --- Fetch ảnh ---
         const imagesHref = data._links?.images?.href;
         if (imagesHref) {
           const imgRes = await fetch(imagesHref);
           if (!imgRes.ok) throw new Error("Không thể tải ảnh");
           const imgData = await imgRes.json();
-          console.log("✅ Dữ liệu ảnh:", imgData);
 
-          let list = [];
-          if (imgData._embedded?.images) list = imgData._embedded.images;
-          else if (Array.isArray(imgData)) list = imgData;
-
+          const list = imgData._embedded?.images || [];
           const formatted = list.map((img) => {
-            const link =
-              img.url || img.imageUrl || img.name || img.path || img;
-            return /^https?:\/\//i.test(link)
-              ? link
-              : `http://localhost:8080/uploads/${link}`;
+            const link = img.url || img.imageUrl || img.name || img.path;
+            return /^https?:\/\//i.test(link) ? link : `/images/tour/${link}`;
           });
+
           setImages(formatted);
         }
       } catch (err) {
@@ -175,28 +168,17 @@ export default function TourDetail() {
     return <div>{rows}</div>;
   };
 
-  // 🖼️ Ảnh hiển thị (lấy BE trước, fallback local)
+  // 🖼️ Ảnh hiển thị (ưu tiên BE, fallback local)
   const mainImg =
-    images[0] ||
-    (mainImage
-      ? `http://localhost:8080/uploads/${mainImage}`
-      : travel1);
+    images[0] || (mainImage ? `/images/tour/${mainImage}` : travel1);
 
   const previewImages =
-    images.length > 1
-      ? images.slice(1, 4)
-      : [travel2, travel3, travel4];
+    images.length > 1 ? images.slice(1, 4) : [travel2, travel3, travel4];
 
+  // 🚀 Khi bấm Book Now → chuyển tới booking theo tour id
   const handleBuyNow = () => {
-    navigate("/booking", {
-      state: {
-        tour: {
-          name: title,
-          price: priceAdult,
-          startDate,
-          image: mainImg,
-        },
-      },
+    navigate(`/booking/${id}`, {
+      state: { tour, images }, // 👈 Gửi luôn tour + danh sách ảnh
     });
   };
 
