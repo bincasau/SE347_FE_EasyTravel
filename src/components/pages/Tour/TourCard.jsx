@@ -8,14 +8,13 @@ export default function TourCard({ tour }) {
 
   const id = tour.id ?? tour.tourId;
   const title = tour.title;
-  const price = tour.price ?? tour.priceAdult ?? 0;
+  const price = tour.priceAdult ?? 0;  // ⭐ FIX Ở ĐÂY
   const percentDiscount = tour.percentDiscount ?? 0;
   const startDate = tour.startDate ?? "";
   const destination = tour.destination;
   const description = tour.description ?? "";
   const imagesHref = tour.imagesHref ?? null;
 
-  // 🧩 Fetch ảnh từ backend qua link BE (giống cách fetch hotel)
   useEffect(() => {
     if (!imagesHref) return;
     fetch(imagesHref)
@@ -32,7 +31,7 @@ export default function TourCard({ tour }) {
             first.imageUrl ||
             first.name ||
             first.path ||
-            first; // fallback
+            first;
           setImageUrl(
             /^https?:\/\//i.test(link)
               ? link
@@ -43,20 +42,17 @@ export default function TourCard({ tour }) {
       .catch((err) => console.error("Lỗi khi tải ảnh tour:", err));
   }, [imagesHref]);
 
-  // 💰 Định dạng tiền
   const formatCurrency = (val) =>
     Number(val ?? 0).toLocaleString("vi-VN", {
       style: "currency",
       currency: "VND",
     });
 
-  // 💸 Tính giá sau giảm
   const discountedPrice =
     percentDiscount && Number(percentDiscount) > 0
       ? Number(price) - (Number(price) * Number(percentDiscount)) / 100
       : null;
 
-  // 👉 Chuyển trang chi tiết
   const handleClick = () => navigate(`/detailtour/${id}`);
 
   return (
@@ -64,7 +60,6 @@ export default function TourCard({ tour }) {
       onClick={handleClick}
       className="bg-white rounded-2xl overflow-hidden w-[260px] hover:shadow-lg transition cursor-pointer group"
     >
-      {/* Ảnh */}
       <div className="relative">
         <img
           src={
@@ -79,7 +74,6 @@ export default function TourCard({ tour }) {
           }}
         />
 
-        {/* Ribbon giảm giá */}
         {Number(percentDiscount) > 0 && (
           <>
             <div className="absolute top-3 left-0 bg-red-600 text-white text-[12px] font-bold px-3 py-1 rounded-r-md shadow-md">
@@ -90,13 +84,11 @@ export default function TourCard({ tour }) {
         )}
       </div>
 
-      {/* Nội dung */}
       <div className="p-4 text-left">
         <h3 className="text-base font-semibold text-gray-900 truncate group-hover:text-orange-500 transition">
           {title}
         </h3>
 
-        {/* Giá */}
         <div className="mt-2 mb-3">
           {discountedPrice ? (
             <div className="flex flex-col">
@@ -114,7 +106,6 @@ export default function TourCard({ tour }) {
           )}
         </div>
 
-        {/* Ngày & địa điểm */}
         <div className="flex justify-between text-xs text-gray-600 mb-3">
           <span>📅 {startDate || "Đang cập nhật"}</span>
           <span className="flex items-center gap-1">
@@ -123,7 +114,6 @@ export default function TourCard({ tour }) {
           </span>
         </div>
 
-        {/* Mô tả */}
         <p className="text-xs text-gray-700 mb-3 line-clamp-2">
           {description || "Hiện chưa có mô tả cho tour này."}
         </p>

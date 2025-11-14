@@ -27,13 +27,11 @@ export default function TourDetail() {
   useEffect(() => {
     const fetchTour = async () => {
       try {
-        // --- Fetch tour ---
         const res = await fetch(`http://localhost:8080/tours/${id}`);
         if (!res.ok) throw new Error("Không thể tải dữ liệu tour");
         const data = await res.json();
         setTour(data);
 
-        // --- Fetch ảnh ---
         const imagesHref = data._links?.images?.href;
         if (imagesHref) {
           const imgRes = await fetch(imagesHref);
@@ -42,8 +40,8 @@ export default function TourDetail() {
 
           const list = imgData._embedded?.images || [];
           const formatted = list.map((img) => {
-            const link = img.url || img.imageUrl || img.name || img.path;
-            return /^https?:\/\//i.test(link) ? link : `/images/tour/${link}`;
+            const url = img.url || img.imageUrl || img.name || img.path;
+            return /^https?:\/\//i.test(url) ? url : `/images/tour/${url}`;
           });
 
           setImages(formatted);
@@ -72,11 +70,11 @@ export default function TourDetail() {
       </div>
     );
 
-  // --- Giải nén dữ liệu ---
   const {
     title,
     description,
     priceAdult,
+    percentDiscount,
     startDate,
     endDate,
     destination,
@@ -89,7 +87,6 @@ export default function TourDetail() {
       currency: "VND",
     });
 
-  // --- Parse date ---
   const start = parseISO(startDate);
   const end = parseISO(endDate);
   const currentMonth = start;
@@ -168,23 +165,21 @@ export default function TourDetail() {
     return <div>{rows}</div>;
   };
 
-  // 🖼️ Ảnh hiển thị (ưu tiên BE, fallback local)
   const mainImg =
     images[0] || (mainImage ? `/images/tour/${mainImage}` : travel1);
 
   const previewImages =
     images.length > 1 ? images.slice(1, 4) : [travel2, travel3, travel4];
 
-  // 🚀 Khi bấm Book Now → chuyển tới booking theo tour id
   const handleBuyNow = () => {
     navigate(`/booking/${id}`, {
-      state: { tour, images }, // 👈 Gửi luôn tour + danh sách ảnh
+      state: { tour, images },
     });
   };
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-8 grid md:grid-cols-2 gap-10 items-end">
-      {/* Left - Ảnh */}
+      {/* Left images */}
       <div className="flex flex-col relative">
         <button
           onClick={() =>
@@ -220,7 +215,7 @@ export default function TourDetail() {
         </div>
       </div>
 
-      {/* Right - Thông tin tour */}
+      {/* Right info */}
       <div className="flex flex-col justify-between h-full pb-4">
         <div className="mt-[60px]">
           <h1 className="text-4xl font-podcast font-light mb-1 text-gray-800 leading-snug">
@@ -229,12 +224,28 @@ export default function TourDetail() {
 
           <p className="text-sm text-gray-500 mb-1">{destination}</p>
 
-          <p className="text-lg text-gray-600 mb-3">
-            from{" "}
-            <span className="text-3xl text-orange-500 font-bold">
-              {formatCurrency(priceAdult)}
-            </span>
-          </p>
+          {/* ⭐ PRICE + DISCOUNT ⭐ */}
+          <div className="mb-4">
+            {percentDiscount > 0 ? (
+              <div className="flex flex-col gap-1">
+                <p className="text-sm text-gray-500 line-through">
+                  {formatCurrency(priceAdult)}
+                </p>
+
+                <p className="text-3xl text-orange-500 font-bold">
+                  {formatCurrency(priceAdult * (1 - percentDiscount / 100))}
+                </p>
+
+                <p className="text-sm font-semibold text-green-600">
+                  -{percentDiscount}% OFF
+                </p>
+              </div>
+            ) : (
+              <p className="text-3xl text-orange-500 font-bold">
+                {formatCurrency(priceAdult)}
+              </p>
+            )}
+          </div>
 
           <p className="text-gray-500 mb-5 leading-relaxed text-justify">
             {description}

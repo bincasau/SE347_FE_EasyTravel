@@ -6,21 +6,29 @@ export default class Tour {
     mainImage,
     description,
     startDate,
+    endDate,
     destination,
     percentDiscount,
     limitSeats,
-    imagesHref
+    imagesHref,
+    durationDays
   ) {
     this.id = tourId;
     this.tourId = tourId;
     this.title = title;
-    this.priceAdult = priceAdult;
+    this.priceAdult = Number(priceAdult) || 0;
     this.mainImage = mainImage;
     this.description = description;
-    this.startDate = startDate;
+
+    // ⭐ Quan trọng — gán giá trị start & end
+    this.startDate = startDate || null;
+    this.endDate = endDate || null;
+
     this.destination = destination;
-    this.percentDiscount = percentDiscount;
+    this.percentDiscount = percentDiscount || 0;
     this.limitSeats = limitSeats;
+
     this.imagesHref = imagesHref;
+    this.durationDays = durationDays || 0;
   }
 }

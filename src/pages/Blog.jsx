@@ -33,8 +33,7 @@ export default function Blog() {
         title: b.title,
         date: new Date(b.createdAt).toLocaleDateString("vi-VN"),
         description:
-          b.details?.slice(0, 200) +
-            (b.details?.length > 200 ? "..." : "") ||
+          b.details?.slice(0, 200) + (b.details?.length > 200 ? "..." : "") ||
           "Không có mô tả.",
         // ✅ Ảnh blog lấy theo thư mục /images/blog/blog_${id}_img_1.jpg
         image: `/images/blog/blog_${b.blogId}_img_1.jpg`,
@@ -90,12 +89,19 @@ export default function Blog() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  if (loading)
-    return (
+  <div className="lg:w-[68%] w-full">
+    {loading ? (
       <div className="text-center py-10 text-gray-500 text-lg">
         Đang tải bài viết...
       </div>
-    );
+    ) : filteredBlogs.length > 0 ? (
+      filteredBlogs.map((blog) => <BlogCard key={blog.id} {...blog} />)
+    ) : (
+      <p className="text-gray-500 text-center py-8">
+        Không tìm thấy bài viết nào.
+      </p>
+    )}
+  </div>;
 
   return (
     <div className="max-w-[1150px] mx-auto px-[70px] py-12 lg:flex gap-8">

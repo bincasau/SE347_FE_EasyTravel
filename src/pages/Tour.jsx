@@ -4,7 +4,9 @@ import {
   FaSearch,
   FaSortAmountDownAlt,
   FaSortAmountUpAlt,
+  FaCalendarAlt,
 } from "react-icons/fa";
+
 import TourCard from "../components/pages/Tour/TourCard";
 import Pagination from "../utils/Pagination";
 import BookingVideo from "../components/pages/Tour/Video";
@@ -13,225 +15,391 @@ import Tour from "../models/Tour";
 
 export default function TourPage() {
   const [tours, setTours] = useState([]);
+  const [allTours, setAllTours] = useState([]);
+
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortOrder, setSortOrder] = useState("asc");
+  const [sortOrder, setSortOrder] = useState("recent");
+  const [selectedLocation, setSelectedLocation] = useState("All");
+  const [selectedDuration, setSelectedDuration] = useState("All");
+  const [selectedDate, setSelectedDate] = useState("");
+
   const [showFilter, setShowFilter] = useState(false);
   const [showSort, setShowSort] = useState(false);
-  const [selectedLocation, setSelectedLocation] = useState("All");
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
   const [isLoading, setIsLoading] = useState(false);
 
   const toursPerPage = 8;
 
-  // ✅ Fetch theo trang (8 tour mỗi lần)
+  /** Fetch All */
+  const fetchAllTours = async () => {
+    try {
+      const res = await fetch(
+        "http://localhost:8080/tours?page=0&size=9999&sort=createdAt,desc"
+      );
+      const data = await res.json();
+
+      const full = data._embedded.tours.map((t) => {
+        return new Tour(
+          t.tourId,
+          t.title,
+          t.priceAdult,
+          t.mainImage,
+          t.description,
+          t.startDate,
+          t.endDate,
+          t.destination,
+          t.percentDiscount,
+          t.limitSeats,
+          t._links?.images?.href || null,
+          t.durationDays
+        );
+      });
+
+      setAllTours(full);
+    } catch (e) {
+      console.error("Load all tours error:", e);
+    }
+  };
+
+  /** Pagination fetch */
+  const fetchPagedTours = async () => {
+    try {
+      setIsLoading(true);
+
+      const res = await fetch(
+        `http://localhost:8080/tours?page=${
+          currentPage - 1
+        }&size=${toursPerPage}`
+      );
+
+      const data = await res.json();
+      setTotalPages(data.page.totalPages);
+
+      const paging = data._embedded.tours.map((t) => {
+        return new Tour(
+          t.tourId,
+          t.title,
+          t.priceAdult,
+          t.mainImage,
+          t.description,
+          t.startDate,
+          t.endDate,
+          t.destination,
+          t.percentDiscount,
+          t.limitSeats,
+          t._links?.images?.href || null,
+          t.durationDays
+        );
+      });
+
+      setTours(paging);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchToursByPage = async () => {
-      try {
-        setIsLoading(true);
-        const response = await fetch(
-          `http://localhost:8080/tours?page=${currentPage - 1}&size=${toursPerPage}`
-        );
-        if (!response.ok) throw new Error("Failed to fetch tours");
+    fetchAllTours();
+    fetchPagedTours();
+  }, []);
 
-        const data = await response.json();
-        setTotalPages(data.page.totalPages);
+  /** FILTER + SORT */
+  const applyFiltersAndSorting = () => {
+    let result = [...allTours];
 
-        const loadedTours = data._embedded.tours.map(
-          (t) =>
-            new Tour(
-              t.tourId,
-              t.title,
-              t.priceAdult,
-              t.mainImage,
-              t.description,
-              t.startDate,
-              t.destination,
-              t.percentDiscount,
-              t.limitSeats,
-              t._links?.images?.href||null
-            )
-        );
+    // search
+    if (searchTerm.trim() !== "") {
+      result = result.filter((t) =>
+        t.title.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
 
-        setTours(loadedTours);
-      } catch (error) {
-        console.error("Error fetching tours:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    // location
+    if (selectedLocation !== "All") {
+      result = result.filter((t) => t.destination === selectedLocation);
+    }
 
-    fetchToursByPage();
-  }, [currentPage]);
+    // duration
+    if (selectedDuration !== "All") {
+      result = result.filter(
+        (t) => Number(t.durationDays) === Number(selectedDuration)
+      );
+    }
 
-  // ✅ Tạo danh sách địa điểm động
-  const locations = ["All", ...new Set(tours.map((t) => t.destination))];
+    // ⭐ DATE FILTER
+    if (selectedDate) {
+      const selected = new Date(selectedDate);
 
-  // 🔍 Lọc + tìm kiếm
-  const filteredTours = tours.filter(
-    (t) =>
-      t.title.toLowerCase().includes(searchTerm.toLowerCase()) &&
-      (selectedLocation === "All" || t.destination === selectedLocation)
-  );
+      result = result.filter((t) => {
+        if (!t.startDate) return false;
+        const start = new Date(t.startDate);
+        return start >= selected;
+      });
 
-  // ↕️ Sắp xếp theo giá
-  const sortedTours = [...filteredTours].sort((a, b) =>
-    sortOrder === "asc" ? a.price - b.price : b.price - a.price
-  );
+      // ⭐ PRIORITY SORT: nearest date first
+      result.sort((a, b) => {
+        const da = new Date(a.startDate);
+        const db = new Date(b.startDate);
 
-  // ⚙️ Tạo danh sách trang động (hiển thị tối đa 3 trang)
+        const diffA = Math.abs(da - selected);
+        const diffB = Math.abs(db - selected);
+
+        return diffA - diffB; // nhỏ hơn → gần hơn → lên đầu
+      });
+
+      return result;
+    }
+
+    // ⭐ NORMAL SORTING (không lọc ngày)
+    if (sortOrder === "discount") {
+      result.sort((a, b) => b.percentDiscount - a.percentDiscount);
+    } else if (sortOrder === "asc") {
+      result.sort((a, b) => a.priceAdult - b.priceAdult);
+    } else if (sortOrder === "desc") {
+      result.sort((a, b) => b.priceAdult - a.priceAdult);
+    } else {
+      result.sort(
+        (a, b) =>
+          new Date(b.createdAt || b.startDate) -
+          new Date(a.createdAt || a.startDate)
+      );
+    }
+
+    return result;
+  };
+
+  /** When filter changes */
+  useEffect(() => {
+    const filtered = applyFiltersAndSorting();
+
+    const pages = Math.max(1, Math.ceil(filtered.length / toursPerPage));
+    setTotalPages(pages);
+
+    const safePage = Math.min(currentPage, pages);
+    const start = (safePage - 1) * toursPerPage;
+    const end = start + toursPerPage;
+
+    setTours(filtered.slice(start, end));
+  }, [
+    searchTerm,
+    selectedLocation,
+    selectedDuration,
+    selectedDate,
+    sortOrder,
+    currentPage,
+  ]);
+
+  const locations = ["All", ...new Set(allTours.map((t) => t.destination))];
+  const durations = ["All", 2, 3, 4, 5, 7, 10];
+
+  /** pagination numbers 5 items */
   const getVisiblePages = () => {
     const pages = [];
-    const maxVisible = 3;
-    let startPage = Math.max(currentPage - 1, 1);
-    let endPage = Math.min(startPage + maxVisible - 1, totalPages);
+    const max = 5;
 
-    if (endPage - startPage < maxVisible - 1) {
-      startPage = Math.max(endPage - maxVisible + 1, 1);
+    let start = Math.max(currentPage - 2, 1);
+    let end = Math.min(start + max - 1, totalPages);
+
+    if (end - start < max - 1) {
+      start = Math.max(end - max + 1, 1);
     }
 
-    for (let i = startPage; i <= endPage; i++) {
-      pages.push(i);
-    }
-
+    for (let i = start; i <= end; i++) pages.push(i);
     return pages;
-  };
-
-  const handlePageChange = (pageNumber) => {
-    if (pageNumber >= 1 && pageNumber <= totalPages) {
-      setCurrentPage(pageNumber);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  };
-
-  const handleSortChange = (order) => {
-    setSortOrder(order);
-    setShowSort(false);
   };
 
   return (
     <div className="bg-gray-50 py-12 flex flex-col items-center min-h-screen">
-      <div className="w-full max-w-[calc(100%-280px)] mx-auto relative">
-        {/* Tiêu đề */}
-        <h2 className="text-4xl font-podcast text-gray-800 mb-6 text-left">
+      <div className="w-full max-w-[calc(100%-280px)] relative z-10">
+        <h2 className="text-4xl font-podcast text-gray-800 mb-6">
           Tour Packages
         </h2>
 
-        {/* Thanh tìm kiếm + filter + sort */}
+        {/* TOP BAR */}
         <div className="flex items-center justify-between gap-3 mb-10 relative">
-          {/* Search bar */}
-          <div className="flex items-center w-full bg-white border border-gray-300 rounded-full px-5 py-2 shadow-sm">
+          {/* SEARCH */}
+          <div className="flex items-center flex-1 bg-white border border-gray-300 rounded-full px-5 py-2 shadow-sm">
             <input
               type="text"
-              placeholder="Search tours..."
+              placeholder="Search..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1 text-sm outline-none bg-transparent"
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="flex-1 text-sm outline-none"
             />
-            <button className="text-gray-600 hover:text-orange-500">
-              <FaSearch size={16} />
-            </button>
+            <FaSearch size={16} className="text-gray-600" />
           </div>
 
-          {/* Filter */}
+          {/* DATE PICKER BUTTON */}
           <div className="relative">
             <button
               onClick={() => {
-                setShowFilter(!showFilter);
+                setShowDatePicker((prev) => !prev);
+                setShowFilter(false);
                 setShowSort(false);
               }}
-              className="bg-white border border-gray-300 rounded-lg w-10 h-10 flex items-center justify-center shadow-sm hover:bg-orange-50"
+              className="bg-white border border-gray-300 rounded-lg w-10 h-10 flex items-center justify-center hover:bg-orange-50"
             >
-              <FaFilter size={16} className="text-gray-600" />
+              <FaCalendarAlt size={16} className="text-gray-700" />
+            </button>
+
+            {showDatePicker && (
+              <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-[9999]">
+                <p className="font-semibold mb-2 text-gray-700">Start date</p>
+
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => {
+                    setSelectedDate(e.target.value);
+                    setShowDatePicker(false);
+                    setCurrentPage(1);
+                  }}
+                  className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm outline-none"
+                />
+
+                <button
+                  onClick={() => {
+                    setSelectedDate("");
+                    setShowDatePicker(false);
+                    setCurrentPage(1);
+                  }}
+                  className="w-full mt-2 py-1.5 text-sm bg-gray-200 rounded-md hover:bg-gray-300"
+                >
+                  Clear date
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* FILTER */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                setShowFilter((prev) => !prev);
+                setShowSort(false);
+                setShowDatePicker(false);
+              }}
+              className="bg-white border border-gray-300 rounded-lg w-10 h-10 flex items-center justify-center hover:bg-orange-50"
+            >
+              <FaFilter size={16} />
             </button>
 
             {showFilter && (
-              <div className="absolute right-0 mt-2 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-20 p-2 text-sm">
-                <p className="font-semibold mb-2 text-gray-700">
-                  Filter by Location
-                </p>
-                {locations.map((loc) => (
+              <div className="absolute right-0 mt-2 w-60 bg-white border border-gray-200 rounded-lg shadow-lg p-4 grid grid-cols-2 gap-3 z-[9999]">
+                <div>
+                  <p className="font-semibold mb-2">Location</p>
+                  {locations.map((loc) => (
+                    <button
+                      key={loc}
+                      className={`block w-full text-left px-3 py-1 rounded-md hover:bg-orange-100 ${
+                        selectedLocation === loc ? "bg-orange-200" : ""
+                      }`}
+                      onClick={() => {
+                        setSelectedLocation(loc);
+                        setShowFilter(false);
+                        setCurrentPage(1);
+                      }}
+                    >
+                      {loc}
+                    </button>
+                  ))}
+                </div>
+
+                <div>
+                  <p className="font-semibold mb-2">Duration</p>
+                  {durations.map((d) => (
+                    <button
+                      key={d}
+                      className={`block w-full text-left px-3 py-1 rounded-md hover:bg-orange-100 ${
+                        selectedDuration === d ? "bg-orange-200" : ""
+                      }`}
+                      onClick={() => {
+                        setSelectedDuration(d);
+                        setShowFilter(false);
+                        setCurrentPage(1);
+                      }}
+                    >
+                      {d === "All" ? "All" : `${d} days`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* SORT */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                setShowSort((prev) => !prev);
+                setShowFilter(false);
+                setShowDatePicker(false);
+              }}
+              className="bg-white border border-gray-300 rounded-lg w-10 h-10 flex items-center justify-center hover:bg-orange-50"
+            >
+              {sortOrder === "asc" ? (
+                <FaSortAmountUpAlt size={16} />
+              ) : (
+                <FaSortAmountDownAlt size={16} />
+              )}
+            </button>
+
+            {showSort && (
+              <div className="absolute right-0 mt-2 w-52 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-[9999]">
+                <p className="font-semibold mb-2">Sort by</p>
+
+                {[
+                  ["recent", "Recently Added"],
+                  ["discount", "Biggest Discount"],
+                  ["asc", "Low → High"],
+                  ["desc", "High → Low"],
+                ].map(([k, label]) => (
                   <button
-                    key={loc}
-                    onClick={() => {
-                      setSelectedLocation(loc);
-                      setShowFilter(false);
-                    }}
+                    key={k}
                     className={`block w-full text-left px-3 py-1.5 rounded-md hover:bg-orange-100 ${
-                      selectedLocation === loc ? "bg-orange-200" : ""
+                      sortOrder === k ? "bg-orange-200" : ""
                     }`}
+                    onClick={() => {
+                      setSortOrder(k);
+                      setShowSort(false);
+                      setCurrentPage(1);
+                    }}
                   >
-                    {loc}
+                    {label}
                   </button>
                 ))}
               </div>
             )}
           </div>
-
-          {/* Sort */}
-          <div className="relative">
-            <button
-              onClick={() => {
-                setShowSort(!showSort);
-                setShowFilter(false);
-              }}
-              className="bg-white border border-gray-300 rounded-lg w-10 h-10 flex items-center justify-center shadow-sm hover:bg-orange-50"
-            >
-              {sortOrder === "asc" ? (
-                <FaSortAmountUpAlt size={16} className="text-gray-600" />
-              ) : (
-                <FaSortAmountDownAlt size={16} className="text-gray-600" />
-              )}
-            </button>
-
-            {showSort && (
-              <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-20 p-2 text-sm">
-                <p className="font-semibold mb-2 text-gray-700">
-                  Sort by Price
-                </p>
-                <button
-                  onClick={() => handleSortChange("asc")}
-                  className={`block w-full text-left px-3 py-1.5 rounded-md hover:bg-orange-100 ${
-                    sortOrder === "asc" ? "bg-orange-200" : ""
-                  }`}
-                >
-                  Low to High
-                </button>
-                <button
-                  onClick={() => handleSortChange("desc")}
-                  className={`block w-full text-left px-3 py-1.5 rounded-md hover:bg-orange-100 ${
-                    sortOrder === "desc" ? "bg-orange-200" : ""
-                  }`}
-                >
-                  High to Low
-                </button>
-              </div>
-            )}
-          </div>
         </div>
 
-        {/* Grid Tour */}
+        {/* LIST */}
         {isLoading ? (
-          <div className="flex justify-center py-16 text-gray-500 text-lg">
-            Đang tải danh sách tour...
+          <div className="text-center py-16 text-gray-500 text-lg">
+            Loading tours...
           </div>
         ) : (
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4 justify-items-center">
-            {sortedTours.map((tour) => (
-              <TourCard key={tour.id} tour={tour} />
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+            {tours.map((t) => (
+              <TourCard key={t.id} tour={t} />
             ))}
           </div>
         )}
 
-        {/* ✅ Pagination dùng component bạn gửi */}
         <Pagination
           totalPages={totalPages}
           currentPage={currentPage}
-          onPageChange={handlePageChange}
-          visiblePages={getVisiblePages()} // 3 số trang động
+          onPageChange={setCurrentPage}
+          visiblePages={getVisiblePages()}
         />
 
-        {/* Booking sections */}
         <BookingHotel />
         <BookingVideo />
       </div>

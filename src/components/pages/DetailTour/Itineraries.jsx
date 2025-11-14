@@ -68,7 +68,7 @@ export default function Itineraries({ tourId }) {
   return (
     <section className="max-w-6xl mx-auto px-6 py-10">
       {/* ✅ Giữ font-podcast, bỏ font-semibold */}
-      <h2 className="text-5xl font-podcast text-gray-800 mb-8">
+      <h2 className="text-4xl font-podcast text-gray-800 mb-8">
         Itineraries
       </h2>
 
