@@ -7,6 +7,14 @@ import {
   FaCalendarAlt,
 } from "react-icons/fa";
 
+import {
+  searchByTitle,
+  searchByLocation,
+  searchByDuration,
+  searchByStartDate,
+  getTours,
+} from "../apis/Tour";
+
 import TourCard from "../components/pages/Tour/TourCard";
 import Pagination from "../utils/Pagination";
 import BookingVideo from "../components/pages/Tour/Video";
@@ -15,13 +23,30 @@ import Tour from "../models/Tour";
 
 export default function TourPage() {
   const [tours, setTours] = useState([]);
-  const [locations, setLocations] = useState([]);
+
+  // Hard-coded locations
+  const [locations] = useState([
+    "",
+    "Đà Lạt",
+    "Phú Quốc",
+    "Sa Pa",
+    "Hội An",
+    "Nha Trang",
+    "Hạ Long",
+    "Đà Nẵng",
+    "Huế",
+    "Côn Đảo",
+  ]);
+
   const [durations] = useState(["", 2, 3, 4, 5, 7, 10]);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+  // Search + debounce
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+
   const [sortOrder, setSortOrder] = useState("recent");
   const [selectedLocation, setSelectedLocation] = useState("");
   const [selectedDuration, setSelectedDuration] = useState("");
@@ -30,11 +55,23 @@ export default function TourPage() {
   const [showFilter, setShowFilter] = useState(false);
   const [showSort, setShowSort] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
 
+  const [isLoading, setIsLoading] = useState(false);
   const pageSize = 8;
 
-  /** ================== API SORT FORMAT ================== */
+  /** =============================
+   *  ⏳ Debounce 2 seconds
+   * ============================= */
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+      setCurrentPage(1);
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  /** SORT */
   const mapSort = () => {
     switch (sortOrder) {
       case "recent":
@@ -50,114 +87,153 @@ export default function TourPage() {
     }
   };
 
-  /** ================== FETCH TOURS (BACKEND) ================== */
+  /** =============================
+   *  FETCH TOURS
+   * ============================= */
   const fetchTours = useCallback(async () => {
     setIsLoading(true);
 
     try {
-      let url = `http://localhost:8080/tours?page=${currentPage - 1}&size=${pageSize}`;
+      let data;
+      let isSearchEndpoint = false;
+      let sortDateMode = false;
 
-      // SORT
-      url += `&sort=${mapSort()}`;
-
-      // SEARCH
-      if (searchTerm.trim()) {
-        url += `&search=${encodeURIComponent(searchTerm)}`;
+      // 🔍 Search by name
+      if (debouncedSearchTerm.trim()) {
+        data = await searchByTitle(debouncedSearchTerm);
+        isSearchEndpoint = true;
+      }
+      // 📍 Location
+      else if (selectedLocation) {
+        data = await searchByLocation(selectedLocation);
+        isSearchEndpoint = true;
+      }
+      // ⏳ Duration
+      else if (selectedDuration) {
+        data = await searchByDuration(selectedDuration);
+        isSearchEndpoint = true;
+      }
+      // 📅 Start Date >=
+      else if (selectedDate) {
+        data = await searchByStartDate(selectedDate);
+        isSearchEndpoint = true;
+        sortDateMode = true;
+      }
+      // Default (with backend pagination)
+      else {
+        data = await getTours(currentPage - 1, pageSize, mapSort());
+        isSearchEndpoint = false;
       }
 
-      // LOCATION
-      if (selectedLocation) {
-        url += `&destination=${encodeURIComponent(selectedLocation)}`;
+      /** Normalize list */
+      let rawList = Array.isArray(data)
+        ? data
+        : data._embedded?.tours
+        ? data._embedded.tours
+        : [];
+
+      let result = rawList.map(
+        (t) =>
+          new Tour(
+            t.tourId,
+            t.title,
+            t.priceAdult,
+            t.mainImage,
+            t.description,
+            t.startDate,
+            t.endDate,
+            t.destination,
+            t.percentDiscount,
+            t.limitSeats,
+            t._links?.images?.href || null,
+            t.durationDays
+          )
+      );
+
+      /** Sort by date (only for date filter) */
+      if (sortDateMode) {
+        result.sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
       }
 
-      // DURATION
-      if (selectedDuration) {
-        url += `&durationDays=${selectedDuration}`;
+      /** FE pagination for search mode */
+      if (isSearchEndpoint) {
+        const total = result.length;
+        const pages = Math.ceil(total / pageSize);
+        setTotalPages(pages);
+
+        const startIndex = (currentPage - 1) * pageSize;
+        result = result.slice(startIndex, startIndex + pageSize);
+      } else {
+        setTotalPages(data.page?.totalPages || 1);
       }
-
-      // DATE >=
-      if (selectedDate) {
-        url += `&startDate%3E=${selectedDate}`;
-      }
-
-      const res = await fetch(url);
-      const data = await res.json();
-
-      setTotalPages(data.page.totalPages);
-
-      const result = data._embedded.tours.map((t) => {
-        return new Tour(
-          t.tourId,
-          t.title,
-          t.priceAdult,
-          t.mainImage,
-          t.description,
-          t.startDate,
-          t.endDate,
-          t.destination,
-          t.percentDiscount,
-          t.limitSeats,
-          t._links?.images?.href || null,
-          t.durationDays
-        );
-      });
 
       setTours(result);
-    } catch (e) {
-      console.error("Fetch tours error:", e);
+    } catch (error) {
+      console.error("Fetch tours error:", error);
     } finally {
       setIsLoading(false);
     }
   }, [
     currentPage,
-    searchTerm,
+    debouncedSearchTerm,
     selectedLocation,
     selectedDuration,
     selectedDate,
     sortOrder,
   ]);
 
-  /** ================== LOAD LOCATIONS ================== */
-  const loadLocations = async () => {
-    try {
-      const res = await fetch("http://localhost:8080/tours?size=9999");
-      const data = await res.json();
-
-      const locs = [...new Set(data._embedded.tours.map((t) => t.destination))];
-      setLocations(locs);
-    } catch (e) {
-      console.error("Location error: ", e);
-    }
-  };
-
   /** FIRST LOAD */
   useEffect(() => {
     fetchTours();
-    loadLocations();
   }, []);
 
-  /** AUTO FETCH WHEN FILTER CHANGES */
+  /** Reload when filters change */
   useEffect(() => {
     fetchTours();
   }, [
     sortOrder,
+    debouncedSearchTerm,
     selectedLocation,
     selectedDuration,
     selectedDate,
     currentPage,
   ]);
 
-  /** ================== PAGINATION 5 ITEMS ================== */
+  /** =============================
+   *  Pagination slide effect
+   * ============================= */
   const getVisiblePages = () => {
-    const pages = [];
-    const max = 5;
+    let pages = [];
 
-    let start = Math.max(currentPage - 2, 1);
-    let end = Math.min(start + max - 1, totalPages);
-
-    if (end - start < max - 1) {
-      start = Math.max(end - max + 1, 1);
+    if (totalPages <= 5) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+      return pages;
     }
+
+    if (currentPage === 1) return [1, 2, 3];
+    if (currentPage === 2) return [1, 2, 3, 4];
+    if (currentPage === 3) return [1, 2, 3, 4, 5];
+
+    if (currentPage === totalPages)
+      return [totalPages - 2, totalPages - 1, totalPages];
+
+    if (currentPage === totalPages - 1)
+      return [totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+
+    if (currentPage === totalPages - 2)
+      return [
+        totalPages - 4,
+        totalPages - 3,
+        totalPages - 2,
+        totalPages - 1,
+        totalPages,
+      ];
+
+    let start = currentPage - 2;
+    let end = currentPage + 2;
+
+    if (start < 1) start = 1;
+    if (end > totalPages) end = totalPages;
 
     for (let i = start; i <= end; i++) pages.push(i);
     return pages;
@@ -165,33 +241,28 @@ export default function TourPage() {
 
   return (
     <div className="bg-gray-50 py-12 flex flex-col items-center min-h-screen">
-      {/* FIXED: NO MORE OVERFLOW CLIP */}
-      <div className="w-full max-w-7xl mx-auto px-4 relative z-30 overflow-visible">
-
+      <div className="w-full max-w-7xl mx-auto px-4 relative z-30">
         <h2 className="text-4xl font-podcast text-gray-800 mb-6">
           Tour Packages
         </h2>
 
-        {/* ================== TOP BAR ================== */}
-        <div className="flex items-center justify-between gap-3 mb-10 relative z-[999]">
+        {/* ================= TOP BAR ================= */}
+        <div className="flex items-center justify-between gap-3 mb-10">
 
-          {/* SEARCH */}
-          <div className="flex items-center flex-1 bg-white border border-gray-300 rounded-full px-5 py-2 shadow-sm relative z-[999]">
+          {/* 🔍 SEARCH */}
+          <div className="flex items-center flex-1 bg-white border border-gray-300 rounded-full px-5 py-2 shadow-sm">
             <input
               type="text"
               placeholder="Search..."
               value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="flex-1 text-sm outline-none"
             />
             <FaSearch size={16} className="text-gray-600" />
           </div>
 
-          {/* DATE PICKER */}
-          <div className="relative z-[999]">
+          {/* 📅 DATE PICKER */}
+          <div className="relative">
             <button
               onClick={() => {
                 setShowDatePicker(!showDatePicker);
@@ -200,12 +271,12 @@ export default function TourPage() {
               }}
               className="bg-white border border-gray-300 rounded-lg w-10 h-10 flex items-center justify-center hover:bg-orange-50"
             >
-              <FaCalendarAlt size={16} className="text-gray-700" />
+              <FaCalendarAlt size={16} />
             </button>
 
             {showDatePicker && (
-              <div className="absolute right-0 mt-2 w-56 bg-white border rounded-lg shadow-lg p-3 z-[9999]">
-                <p className="font-semibold mb-2 text-gray-700">Start date (≥)</p>
+              <div className="absolute right-0 mt-2 w-56 bg-white border rounded-lg shadow-lg p-3">
+                <p className="font-semibold mb-2">Start date (≥)</p>
 
                 <input
                   type="date"
@@ -232,8 +303,8 @@ export default function TourPage() {
             )}
           </div>
 
-          {/* FILTER */}
-          <div className="relative z-[999]">
+          {/* 🎛 FILTER */}
+          <div className="relative">
             <button
               onClick={() => {
                 setShowFilter(!showFilter);
@@ -246,11 +317,12 @@ export default function TourPage() {
             </button>
 
             {showFilter && (
-              <div className="absolute right-0 mt-2 w-60 bg-white border rounded-lg shadow-lg p-4 grid grid-cols-2 gap-3 z-[9999]">
+              <div className="absolute right-0 mt-2 w-60 bg-white border rounded-lg shadow-lg p-4 grid grid-cols-2 gap-3">
+
                 {/* LOCATION */}
                 <div>
                   <p className="font-semibold mb-2">Location</p>
-                  {["", ...locations].map((loc) => (
+                  {locations.map((loc) => (
                     <button
                       key={loc}
                       className={`block w-full text-left px-3 py-1 rounded hover:bg-orange-100 ${
@@ -291,7 +363,7 @@ export default function TourPage() {
           </div>
 
           {/* SORT */}
-          <div className="relative z-[999]">
+          <div className="relative">
             <button
               onClick={() => {
                 setShowSort(!showSort);
@@ -308,7 +380,7 @@ export default function TourPage() {
             </button>
 
             {showSort && (
-              <div className="absolute right-0 mt-2 w-52 bg-white border rounded-lg shadow-lg p-3 z-[9999]">
+              <div className="absolute right-0 mt-2 w-52 bg-white border rounded-lg shadow-lg p-3">
                 <p className="font-semibold mb-2">Sort by</p>
 
                 {[
@@ -336,20 +408,20 @@ export default function TourPage() {
           </div>
         </div>
 
-        {/* ================== LIST ================== */}
+        {/* ================= LIST ================= */}
         {isLoading ? (
           <div className="text-center py-16 text-gray-500 text-lg">
             Loading tours...
           </div>
         ) : (
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4 relative z-0">
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             {tours.map((t) => (
               <TourCard key={t.id} tour={t} />
             ))}
           </div>
         )}
 
-        {/* ================== PAGINATION ================== */}
+        {/* ================= PAGINATION ================= */}
         <Pagination
           totalPages={totalPages}
           currentPage={currentPage}

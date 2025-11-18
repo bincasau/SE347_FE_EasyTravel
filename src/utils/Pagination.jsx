@@ -4,7 +4,7 @@ export default function Pagination({
   totalPages,
   currentPage,
   onPageChange,
-  visiblePages, // nhận danh sách trang động từ HotelList
+  visiblePages, // nhận danh sách trang động
 }) {
   if (totalPages <= 1) return null;
 
@@ -13,9 +13,10 @@ export default function Pagination({
 
   return (
     <div className="flex justify-center items-center gap-2 mt-10">
-      {/* Nút Prev */}
+
+      {/* FIRST */}
       <button
-        onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+        onClick={() => onPageChange(1)}
         disabled={currentPage === 1}
         className={`px-5 py-2 rounded-full text-sm font-semibold border transition-all duration-200 ${
           currentPage === 1
@@ -23,10 +24,10 @@ export default function Pagination({
             : "bg-white text-gray-700 hover:bg-orange-100"
         }`}
       >
-        ‹ Prev
+        « First
       </button>
 
-      {/* Các nút số */}
+      {/* PAGE BUTTONS */}
       {pages.map((page) => (
         <button
           key={page}
@@ -41,9 +42,9 @@ export default function Pagination({
         </button>
       ))}
 
-      {/* Nút Next */}
+      {/* LAST */}
       <button
-        onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+        onClick={() => onPageChange(totalPages)}
         disabled={currentPage === totalPages}
         className={`px-5 py-2 rounded-full text-sm font-semibold border transition-all duration-200 ${
           currentPage === totalPages
@@ -51,7 +52,7 @@ export default function Pagination({
             : "bg-white text-gray-700 hover:bg-orange-100"
         }`}
       >
-        Next ›
+        Last »
       </button>
     </div>
   );
