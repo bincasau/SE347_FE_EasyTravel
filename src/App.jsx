@@ -17,29 +17,32 @@ import Booking from "./pages/BookingTour";
 import ScrollToTop from "./utils/ScrollToTop";
 import LoginModal from "./pages/Login";
 import { useEffect, useState } from "react";
-import Signup from "./pages/SignUp";
+import SignupModal from "./pages/SignUp";
 
 export default function App() {
   const [openLogin, setOpenLogin] = useState(false);
+  const [openSignup, setOpenSignup] = useState(false);
 
-  // khoá scroll khi mở modal
   useEffect(() => {
-    document.body.style.overflow = openLogin ? "hidden" : "";
+    const hasModal = openLogin || openSignup;
+    document.body.style.overflow = hasModal ? "hidden" : "";
     return () => (document.body.style.overflow = "");
-  }, [openLogin]);
+  }, [openLogin, openSignup]);
 
   return (
     <LangProvider>
       <BrowserRouter>
         <ScrollToTop />
-        <Header onOpenLogin={() => setOpenLogin(true)} />
+        <Header
+          onOpenLogin={() => setOpenLogin(true)}
+          onOpenSignup={() => setOpenSignup(true)}
+        />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/about-us" element={<AboutUs />} />
           <Route path="/contact-us" element={<ContactUs />} />
           <Route path="/detailtour/:id" element={<DetailTour />} />
           <Route path="/tours" element={<Tour />} />
-          <Route path="/sign-up" element={<Signup />} />
           <Route path="/booking/:tourId" element={<Booking />} />
           <Route path="/hotel" element={<Hotel />} />
           <Route path="/hotel/:hotelId" element={<Room />} />
@@ -49,6 +52,8 @@ export default function App() {
           <Route path="/home" element={<Navigate to="/" replace />} />
         </Routes>
         <Footer />
+
+        {/* Login Modal */}
         {openLogin && (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
@@ -56,7 +61,31 @@ export default function App() {
               if (e.target === e.currentTarget) setOpenLogin(false);
             }}
           >
-            <LoginModal onClose={() => setOpenLogin(false)} />
+            <LoginModal
+              onClose={() => setOpenLogin(false)}
+              onOpenSignup={() => {
+                setOpenLogin(false);
+                setOpenSignup(true);
+              }}
+            />
+          </div>
+        )}
+
+        {/* Signup Modal */}
+        {openSignup && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setOpenSignup(false);
+            }}
+          >
+            <SignupModal
+              onClose={() => setOpenSignup(false)}
+              onOpenLogin={() => {
+                setOpenSignup(false);
+                setOpenLogin(true);
+              }}
+            />
           </div>
         )}
       </BrowserRouter>

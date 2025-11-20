@@ -1,214 +1,192 @@
 import { useState } from "react";
+import { signupApi } from "@/apis/LoginAPI";
 
-export default function Signup() {
-  const [form, setForm] = useState({
-    name: "",
-    address: "",
-    email: "",
-    gender: "",
-    username: "",
-    password: "",
-  });
+export default function SignupModal({ onClose, onOpenLogin }) {
+  const [err, setErr] = useState("");
+  const [success, setSuccess] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const [errors, setErrors] = useState({});
+  // Toggle password visibility
+  const [showPass, setShowPass] = useState(false);
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
 
-  const onChange = (e) => {
-    const { name, value } = e.target;
-    setForm((p) => ({ ...p, [name]: value }));
-  };
-
-  const validate = () => {
-    const e = {};
-    if (!form.name.trim()) e.name = "Please enter your full name.";
-    if (!form.address.trim()) e.address = "Please enter your address.";
-    if (!/^\S+@\S+\.\S+$/.test(form.email)) e.email = "Invalid email.";
-    if (!form.gender) e.gender = "Select your gender.";
-    if (!/^[a-zA-Z0-9._-]{4,}$/.test(form.username))
-      e.username = "Username must be 4+ chars (letters/numbers/_ . -).";
-    if (form.password.length < 6)
-      e.password = "Password must be at least 6 characters.";
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const onSubmit = (e) => {
+  async function handleSubmit(e) {
     e.preventDefault();
-    if (!validate()) return;
-    console.log("SIGNUP PAYLOAD:", form);
-    // TODO: call your API here
-    // fetch('/api/auth/register', {method:'POST', body: JSON.stringify(form)})
-  };
+    setErr("");
+    setSuccess("");
+
+    const fd = new FormData(e.currentTarget);
+    const payload = Object.fromEntries(fd.entries());
+
+    // 1️⃣ Kiểm tra password match
+    if (payload.password !== payload.confirmPassword) {
+      setErr("Passwords do not match!");
+      return;
+    }
+
+    delete payload.confirmPassword; // BE không cần field này
+
+    setLoading(true);
+    try {
+      await signupApi(payload);
+      setSuccess("Đăng ký thành công! Vui lòng kiểm tra email.");
+    } catch (error) {
+      setErr(error.message || "Sign up failed!");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleSwitchToLogin() {
+    onClose?.();
+    onOpenLogin?.();
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header area (breadcrumb / title) */}
-      <div className="bg-white border-b">
-        <div className="max-w-6xl mx-auto px-6 py-8">
-          <h1 className="text-3xl font-semibold text-gray-900">
-            Create Account
-          </h1>
-          <p className="mt-2 text-gray-600">
-            Please fill in your information below.
-          </p>
+    <div className="w-[92%] max-w-2xl rounded-2xl bg-white p-6 sm:p-8 shadow-2xl relative animate-fadeIn">
+      {/* Close */}
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+      >
+        ✕
+      </button>
+
+      <h3 className="text-2xl sm:text-3xl font-semibold text-gray-900 mb-2 text-center">
+        Create your account
+      </h3>
+      <p className="text-sm text-gray-500 mb-4 text-center">
+        Sign up to start your journey with EasyTravel.
+      </p>
+
+      {/* Error */}
+      {err && (
+        <p className="text-sm text-red-600 bg-red-50 p-2 rounded-lg mb-3 text-center">
+          {err}
+        </p>
+      )}
+
+      {/* Success */}
+      {success && (
+        <p className="text-sm text-green-600 bg-green-50 p-2 rounded-lg mb-3 text-center">
+          {success}
+        </p>
+      )}
+
+      <form className="space-y-4" onSubmit={handleSubmit}>
+        {/* Name + Email */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Field label="Full name" name="name" />
+          <Field label="Email" name="email" type="email" />
         </div>
-      </div>
 
-      {/* Form card */}
-      <div className="max-w-4xl mx-auto px-6 py-10">
-        <form
-          onSubmit={onSubmit}
-          className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8"
+        {/* Phone + Username */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Field label="Phone number" name="phoneNumber" required={false} />
+          <Field label="Username" name="username" />
+        </div>
+
+        {/* Password + confirm password */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* PASSWORD WITH EYE */}
+          <div className="space-y-1 relative">
+            <label className="text-sm font-medium text-gray-800">
+              Password
+            </label>
+            <input
+              name="password"
+              type={showPass ? "text" : "password"}
+              placeholder="Create a password"
+              required
+              className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5"
+            />
+            <span
+              onClick={() => setShowPass(!showPass)}
+              className="absolute right-4 top-10 cursor-pointer text-gray-500 hover:text-gray-700"
+            ></span>
+          </div>
+
+          {/* CONFIRM PASSWORD WITH EYE */}
+          <div className="space-y-1 relative">
+            <label className="text-sm font-medium text-gray-800">
+              Confirm password
+            </label>
+            <input
+              name="confirmPassword"
+              type={showConfirmPass ? "text" : "password"}
+              placeholder="Re-enter your password"
+              required
+              className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5"
+            />
+            <span
+              onClick={() => setShowConfirmPass(!showConfirmPass)}
+              className="absolute right-4 top-10 cursor-pointer text-gray-500 hover:text-gray-700"
+            ></span>
+          </div>
+        </div>
+
+        {/* DOB */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Field label="Date of birth" name="dob" type="date" />
+          <Field label="Address" name="address" required={false} />
+        </div>
+
+        {/* Gender */}
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-gray-800">Gender</label>
+          <select
+            name="gender"
+            className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5"
+          >
+            <option value="">Select gender</option>
+            <option value="F">Female</option>
+            <option value="M">Male</option>
+            <option value="O">Other</option>
+          </select>
+        </div>
+
+        {/* Submit */}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full rounded-full bg-orange-500 text-white font-semibold py-3 hover:bg-orange-400 transition disabled:opacity-60"
         >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* Name */}
-            <div className="col-span-1">
-              <label className="block text-sm font-medium text-gray-800 mb-1">
-                Full Name
-              </label>
-              <input
-                type="text"
-                name="name"
-                value={form.name}
-                onChange={onChange}
-                placeholder="Enter your name"
-                className={`w-full rounded-xl border px-4 py-2.5 focus:outline-none focus:ring-2 ${
-                  errors.name
-                    ? "border-red-400 focus:ring-red-300"
-                    : "border-gray-300 focus:ring-amber-400"
-                }`}
-              />
-              {errors.name && (
-                <p className="mt-1 text-sm text-red-500">{errors.name}</p>
-              )}
-            </div>
+          {loading ? "Creating account..." : "Sign Up"}
+        </button>
 
-            {/* Email */}
-            <div className="col-span-1">
-              <label className="block text-sm font-medium text-gray-800 mb-1">
-                Email
-              </label>
-              <input
-                type="email"
-                name="email"
-                value={form.email}
-                onChange={onChange}
-                placeholder="you@example.com"
-                className={`w-full rounded-xl border px-4 py-2.5 focus:outline-none focus:ring-2 ${
-                  errors.email
-                    ? "border-red-400 focus:ring-red-300"
-                    : "border-gray-300 focus:ring-amber-400"
-                }`}
-              />
-              {errors.email && (
-                <p className="mt-1 text-sm text-red-500">{errors.email}</p>
-              )}
-            </div>
+        <div className="flex items-center gap-3 pt-1">
+          <div className="h-px flex-1 bg-gray-200" />
+          <span className="text-xs text-gray-500">OR</span>
+          <div className="h-px flex-1 bg-gray-200" />
+        </div>
 
-            {/* Address (full width on md: span 2) */}
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-800 mb-1">
-                Address
-              </label>
-              <input
-                type="text"
-                name="address"
-                value={form.address}
-                onChange={onChange}
-                placeholder="Street, ward, district, city"
-                className={`w-full rounded-xl border px-4 py-2.5 focus:outline-none focus:ring-2 ${
-                  errors.address
-                    ? "border-red-400 focus:ring-red-300"
-                    : "border-gray-300 focus:ring-amber-400"
-                }`}
-              />
-              {errors.address && (
-                <p className="mt-1 text-sm text-red-500">{errors.address}</p>
-              )}
-            </div>
+        <p className="text-center text-sm text-gray-600">
+          Already have an account?{" "}
+          <button
+            type="button"
+            onClick={handleSwitchToLogin}
+            className="font-semibold text-orange-500 hover:underline"
+          >
+            Login
+          </button>
+        </p>
+      </form>
+    </div>
+  );
+}
 
-            {/* Gender */}
-            <div className="col-span-1">
-              <label className="block text-sm font-medium text-gray-800 mb-1">
-                Gender
-              </label>
-              <select
-                name="gender"
-                value={form.gender}
-                onChange={onChange}
-                className={`w-full rounded-xl border px-4 py-2.5 bg-white focus:outline-none focus:ring-2 ${
-                  errors.gender
-                    ? "border-red-400 focus:ring-red-300"
-                    : "border-gray-300 focus:ring-amber-400"
-                }`}
-              >
-                <option value="" disabled>
-                  Select gender
-                </option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="other">Other / Prefer not to say</option>
-              </select>
-              {errors.gender && (
-                <p className="mt-1 text-sm text-red-500">{errors.gender}</p>
-              )}
-            </div>
-
-            {/* Username */}
-            <div className="col-span-1">
-              <label className="block text-sm font-medium text-gray-800 mb-1">
-                Username
-              </label>
-              <input
-                type="text"
-                name="username"
-                value={form.username}
-                onChange={onChange}
-                placeholder="username"
-                className={`w-full rounded-xl border px-4 py-2.5 focus:outline-none focus:ring-2 ${
-                  errors.username
-                    ? "border-red-400 focus:ring-red-300"
-                    : "border-gray-300 focus:ring-amber-400"
-                }`}
-              />
-              {errors.username && (
-                <p className="mt-1 text-sm text-red-500">{errors.username}</p>
-              )}
-            </div>
-
-            {/* Password (full width on md: span 2) */}
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-800 mb-1">
-                Password
-              </label>
-              <input
-                type="password"
-                name="password"
-                value={form.password}
-                onChange={onChange}
-                placeholder="At least 6 characters"
-                className={`w-full rounded-xl border px-4 py-2.5 focus:outline-none focus:ring-2 ${
-                  errors.password
-                    ? "border-red-400 focus:ring-red-300"
-                    : "border-gray-300 focus:ring-amber-400"
-                }`}
-              />
-              {errors.password && (
-                <p className="mt-1 text-sm text-red-500">{errors.password}</p>
-              )}
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="mt-6 flex items-center justify-between gap-4">
-            <button
-              type="submit"
-              className="rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold px-6 py-3 hover:brightness-105 active:brightness-95 shadow"
-            >
-              Create Account
-            </button>
-          </div>
-        </form>
-      </div>
+/* Reusable Field component */
+function Field({ label, name, type = "text", placeholder, required = true }) {
+  return (
+    <div className="space-y-1">
+      <label className="text-sm font-medium text-gray-800">{label}</label>
+      <input
+        name={name}
+        type={type}
+        required={required}
+        placeholder={placeholder}
+        className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5"
+      />
     </div>
   );
 }

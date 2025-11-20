@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { loginApi } from "@/apis/LoginAPI";
 
-export default function LoginModal({ onClose }) {
+export default function LoginModal({ onClose, onOpenSignup }) {
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -20,6 +20,11 @@ export default function LoginModal({ onClose }) {
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleGoSignup() {
+    onClose?.();
+    onOpenSignup?.();
   }
 
   return (
@@ -119,12 +124,13 @@ export default function LoginModal({ onClose }) {
         {/* Footer */}
         <p className="text-center text-sm text-gray-600">
           Don’t have an account?{" "}
-          <a
-            href="/sign-up"
+          <button
+            type="button"
+            onClick={handleGoSignup}
             className="font-semibold text-orange-500 hover:underline"
           >
             Sign Up
-          </a>
+          </button>
         </p>
       </form>
     </div>

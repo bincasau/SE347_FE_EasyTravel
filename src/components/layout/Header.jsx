@@ -5,7 +5,7 @@ import Logo from "@/assets/images/logo.png";
 
 const API_BASE = "http://localhost:8080";
 
-export default function Header({ onOpenLogin }) {
+export default function Header({ onOpenLogin, onOpenSignup }) {
   const { lang, setLang, t } = useLang();
   const [openLang, setOpenLang] = useState(false);
   const [user, setUser] = useState(null);
@@ -99,7 +99,7 @@ export default function Header({ onOpenLogin }) {
   // ✅ Active logic chính xác
   const isToursActive =
     location.pathname.startsWith("/tours") ||
-    location.pathname.startsWith("/detailtour") || // 👈 sửa lại đúng route
+    location.pathname.startsWith("/detailtour") ||
     (location.pathname.startsWith("/booking") &&
       !location.pathname.startsWith("/booking-room"));
 
@@ -110,7 +110,7 @@ export default function Header({ onOpenLogin }) {
 
   const isBlogActive =
     location.pathname.startsWith("/blog") ||
-    location.pathname.startsWith("/detailblog") || // 👈 thêm để menu sáng ở trang chi tiết blog
+    location.pathname.startsWith("/detailblog") ||
     location.pathname.startsWith("/blogs");
 
   return (
@@ -185,7 +185,7 @@ export default function Header({ onOpenLogin }) {
               )}
             </div>
 
-            {/* User login */}
+            {/* User login / logout / auth buttons */}
             {loadingUser ? (
               <div className="h-10 inline-flex items-center px-3 text-gray-400 text-sm">
                 Loading...
@@ -220,12 +220,13 @@ export default function Header({ onOpenLogin }) {
                 >
                   {t("header.login")}
                 </button>
-                <Link
-                  to="/sign-up"
+                <button
+                  type="button"
+                  onClick={() => onOpenSignup?.()}
                   className="inline-flex h-10 items-center justify-center px-5 rounded-full bg-orange-500 text-white font-medium hover:bg-orange-400 transition-colors shadow-sm"
                 >
                   {t("header.signup")}
-                </Link>
+                </button>
               </>
             )}
           </div>

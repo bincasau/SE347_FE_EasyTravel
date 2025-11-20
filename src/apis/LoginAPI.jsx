@@ -51,6 +51,51 @@ export async function loginApi(payload) {
   return token;
 }
 
+/**
+ * Đăng ký tài khoản.
+ * Không lưu token, chỉ trả về message / data từ BE.
+ * @param {{
+ *  name: string,
+ *  email: string,
+ *  username: string,
+ *  password: string,
+ *  phoneNumber?: string,
+ *  address?: string,
+ *  dob?: string,      // yyyy-MM-dd
+ *  gender?: string    // 'M' | 'F' | 'O'
+ * }} payload
+ * @returns {Promise<any>} response data / message
+ */
+export async function signupApi(payload) {
+  const res = await fetch(`${API_BASE}/account/sign-up`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    let msg = "Sign up failed!";
+    try {
+      const ct = res.headers.get("content-type") || "";
+      if (ct.includes("application/json")) {
+        const data = await res.json();
+        msg = data.message || data.error || msg;
+      } else {
+        const text = await res.text();
+        msg = text || msg;
+      }
+    } catch {}
+    throw new Error(msg);
+  }
+
+  const ct = res.headers.get("content-type") || "";
+  if (ct.includes("application/json")) {
+    return res.json(); // trả luôn JSON cho FE dùng
+  } else {
+    return res.text(); // hoặc chỉ là message text
+  }
+}
+
 export function logout() {
   localStorage.removeItem("jwt");
   window.dispatchEvent(new Event("jwt-changed"));
