@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { loginApi } from "@/apis/LoginAPI";
+import { loginApi } from "@/apis/AccountAPI";
 
 export default function LoginModal({ onClose, onOpenSignup }) {
   const [err, setErr] = useState("");

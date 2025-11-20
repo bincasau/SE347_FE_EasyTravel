@@ -1,12 +1,10 @@
 import { useState } from "react";
-import { signupApi } from "@/apis/LoginAPI";
+import { signupApi } from "@/apis/AccountAPI";
 
 export default function SignupModal({ onClose, onOpenLogin }) {
   const [err, setErr] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
-
-  // Toggle password visibility
   const [showPass, setShowPass] = useState(false);
   const [showConfirmPass, setShowConfirmPass] = useState(false);
 
@@ -18,18 +16,37 @@ export default function SignupModal({ onClose, onOpenLogin }) {
     const fd = new FormData(e.currentTarget);
     const payload = Object.fromEntries(fd.entries());
 
-    // 1️⃣ Kiểm tra password match
+    // --- PASSWORD CHECK: >= 8 ký tự ---
+    if (!payload.password || payload.password.length < 8) {
+      setErr("Password must be at least 8 characters!");
+      return;
+    }
+
+    // --- CONFIRM PASSWORD CHECK ---
     if (payload.password !== payload.confirmPassword) {
       setErr("Passwords do not match!");
       return;
     }
 
-    delete payload.confirmPassword; // BE không cần field này
+    // --- PHONE CHECK: optional nhưng nếu có thì phải đúng E.164 ---
+    const rawPhone = payload.phoneNumber?.trim();
+    if (rawPhone) {
+      const e164Regex = /^\+?[1-9]\d{1,14}$/; // chuẩn quốc tế
+      if (!e164Regex.test(rawPhone)) {
+        setErr(
+          "Invalid phone number! Please enter a valid international format (E.164)."
+        );
+        return;
+      }
+      payload.phoneNumber = rawPhone;
+    }
+
+    delete payload.confirmPassword;
 
     setLoading(true);
     try {
       await signupApi(payload);
-      setSuccess("Đăng ký thành công! Vui lòng kiểm tra email.");
+      setSuccess("Registration successful! Please check your email.");
     } catch (error) {
       setErr(error.message || "Sign up failed!");
     } finally {
@@ -82,34 +99,39 @@ export default function SignupModal({ onClose, onOpenLogin }) {
 
         {/* Phone + Username */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Phone: KHÔNG BẮT BUỘC */}
           <Field label="Phone number" name="phoneNumber" required={false} />
+          {/* Username: BẮT BUỘC */}
           <Field label="Username" name="username" />
         </div>
 
-        {/* Password + confirm password */}
+        {/* Password + Confirm Password */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* PASSWORD WITH EYE */}
+          {/* Password */}
           <div className="space-y-1 relative">
             <label className="text-sm font-medium text-gray-800">
-              Password
+              Password <span className="text-red-500">*</span>
             </label>
             <input
               name="password"
               type={showPass ? "text" : "password"}
               placeholder="Create a password"
               required
+              minLength={8}
               className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5"
             />
             <span
               onClick={() => setShowPass(!showPass)}
               className="absolute right-4 top-10 cursor-pointer text-gray-500 hover:text-gray-700"
-            ></span>
+            >
+              {/* Bạn có thể thêm icon con mắt ở đây */}
+            </span>
           </div>
 
-          {/* CONFIRM PASSWORD WITH EYE */}
+          {/* Confirm Password */}
           <div className="space-y-1 relative">
             <label className="text-sm font-medium text-gray-800">
-              Confirm password
+              Confirm password <span className="text-red-500">*</span>
             </label>
             <input
               name="confirmPassword"
@@ -121,27 +143,36 @@ export default function SignupModal({ onClose, onOpenLogin }) {
             <span
               onClick={() => setShowConfirmPass(!showConfirmPass)}
               className="absolute right-4 top-10 cursor-pointer text-gray-500 hover:text-gray-700"
-            ></span>
+            >
+              {/* Icon con mắt thứ 2 */}
+            </span>
           </div>
         </div>
 
-        {/* DOB */}
+        {/* DOB + Address (NOT REQUIRED) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="Date of birth" name="dob" type="date" />
+          <Field
+            label="Date of birth"
+            name="dob"
+            type="date"
+            required={false}
+          />
           <Field label="Address" name="address" required={false} />
         </div>
 
-        {/* Gender */}
+        {/* Gender — NOT REQUIRED, ONLY Male/Female */}
         <div className="space-y-1">
-          <label className="text-sm font-medium text-gray-800">Gender</label>
+          <label className="text-sm font-medium text-gray-800">
+            Gender
+            {/* Không có dấu sao vì không bắt buộc */}
+          </label>
           <select
             name="gender"
             className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5"
           >
             <option value="">Select gender</option>
-            <option value="F">Female</option>
             <option value="M">Male</option>
-            <option value="O">Other</option>
+            <option value="F">Female</option>
           </select>
         </div>
 
@@ -179,7 +210,10 @@ export default function SignupModal({ onClose, onOpenLogin }) {
 function Field({ label, name, type = "text", placeholder, required = true }) {
   return (
     <div className="space-y-1">
-      <label className="text-sm font-medium text-gray-800">{label}</label>
+      <label className="text-sm font-medium text-gray-800">
+        {label}
+        {required && <span className="text-red-500 ml-0.5">*</span>}
+      </label>
       <input
         name={name}
         type={type}

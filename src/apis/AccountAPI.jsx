@@ -1,12 +1,7 @@
-// src/apis/LoginAPI.js
-const API_BASE = "http://localhost:8080"; // Đổi nếu BE khác port
+// src/apis/AccountAPI.js
+const API_BASE = "http://localhost:8080";
 
-/**
- * Đăng nhập và lưu JWT vào localStorage.
- * Tự phát sự kiện 'jwt-changed' để Header re-fetch user.
- * @param {{ username: string, password: string }} payload
- * @returns {Promise<string>} JWT token
- */
+/** ---------------- LOGIN ---------------- **/
 export async function loginApi(payload) {
   const res = await fetch(`${API_BASE}/account/login`, {
     method: "POST",
@@ -21,51 +16,30 @@ export async function loginApi(payload) {
       if (ct.includes("application/json")) {
         const data = await res.json();
         msg = data.message || data.error || msg;
-      } else {
-        const text = await res.text();
-        msg = text || msg;
-      }
+      } else msg = await res.text();
     } catch {}
     throw new Error(msg);
   }
 
-  // Hỗ trợ cả JSON lẫn text
   const ct = res.headers.get("content-type") || "";
   let token = "";
+
   if (ct.includes("application/json")) {
     const data = await res.json();
-    token =
-      data.token ||
-      data.access_token ||
-      data.jwt ||
-      (typeof data === "string" ? data : "");
+    token = data.token || data.jwt || data.access_token || "";
   } else {
-    token = (await res.text())?.trim();
+    token = (await res.text()).trim();
   }
 
   if (!token) throw new Error("Không nhận được token từ server!");
 
   localStorage.setItem("jwt", token);
-  window.dispatchEvent(new Event("jwt-changed")); // báo cho Header
+  window.dispatchEvent(new Event("jwt-changed"));
 
   return token;
 }
 
-/**
- * Đăng ký tài khoản.
- * Không lưu token, chỉ trả về message / data từ BE.
- * @param {{
- *  name: string,
- *  email: string,
- *  username: string,
- *  password: string,
- *  phoneNumber?: string,
- *  address?: string,
- *  dob?: string,      // yyyy-MM-dd
- *  gender?: string    // 'M' | 'F' | 'O'
- * }} payload
- * @returns {Promise<any>} response data / message
- */
+/** ---------------- SIGNUP ---------------- **/
 export async function signupApi(payload) {
   const res = await fetch(`${API_BASE}/account/sign-up`, {
     method: "POST",
@@ -80,22 +54,51 @@ export async function signupApi(payload) {
       if (ct.includes("application/json")) {
         const data = await res.json();
         msg = data.message || data.error || msg;
-      } else {
-        const text = await res.text();
-        msg = text || msg;
-      }
+      } else msg = await res.text();
     } catch {}
     throw new Error(msg);
   }
 
   const ct = res.headers.get("content-type") || "";
-  if (ct.includes("application/json")) {
-    return res.json(); // trả luôn JSON cho FE dùng
-  } else {
-    return res.text(); // hoặc chỉ là message text
-  }
+  return ct.includes("application/json") ? res.json() : res.text();
 }
 
+/** ---------------- DETAIL USER ---------------- **/
+export async function getAccountDetail() {
+  const token = localStorage.getItem("jwt");
+  if (!token) {
+    const err = new Error("NO_TOKEN");
+    err.code = "NO_TOKEN";
+    throw err;
+  }
+
+  const res = await fetch(`${API_BASE}/account/detail`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    const txt = await res.text();
+    const err = new Error(txt || "UNAOTHORIZED");
+    err.status = res.status;
+    throw err;
+  }
+
+  return res.json();
+}
+
+/** ---------------- ACTIVATE ACCOUNT ---------------- **/
+export async function activateAccount(email, code) {
+  const res = await fetch(
+    `${API_BASE}/account/active-account?email=${encodeURIComponent(
+      email
+    )}&code=${encodeURIComponent(code)}`
+  );
+
+  const msg = await res.text();
+  return { ok: res.ok, message: msg };
+}
+
+/** ---------------- LOGOUT ---------------- **/
 export function logout() {
   localStorage.removeItem("jwt");
   window.dispatchEvent(new Event("jwt-changed"));

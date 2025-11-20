@@ -13,6 +13,8 @@ import { LangProvider } from "@/contexts/LangContext";
 import Tour from "./pages/Tour";
 import DetailTour from "./pages/DetailTour";
 import Booking from "./pages/BookingTour";
+import Verify from "./pages/Verify";
+import Profile from "./pages/Profile";
 
 import ScrollToTop from "./utils/ScrollToTop";
 import LoginModal from "./pages/Login";
@@ -50,6 +52,8 @@ export default function App() {
           <Route path="/blog" element={<Blog />} />
           <Route path="/detailblog/:id" element={<BlogDetail />} />
           <Route path="/home" element={<Navigate to="/" replace />} />
+          <Route path="/verify" element={<Verify />} />
+          <Route path="/profile" element={<Profile />} />
         </Routes>
         <Footer />
 
