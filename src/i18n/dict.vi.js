@@ -113,5 +113,6 @@ export const vi = {
     hotline: "Đường dây nóng",
     bookNow: "Đặt ngay",
     night: "Đêm",
+    loading: "Đang tải...",
   },
 };

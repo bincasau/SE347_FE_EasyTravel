@@ -11,6 +11,19 @@ import { useLang } from "@/contexts/LangContext";
 import Pagination from "@/utils/Pagination";
 import HotelCard from "@/components/pages/Hotel/HotelCard";
 
+// ⭐ Skeleton for loading
+const HotelSkeleton = () => (
+  <div className="w-full animate-pulse">
+    <div className="h-56 bg-gray-300 rounded-2xl mb-4"></div>
+
+    <div className="h-4 bg-gray-300 rounded w-3/4 mb-3"></div>
+    <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
+    <div className="h-4 bg-gray-200 rounded w-1/3 mb-4"></div>
+
+    <div className="h-10 bg-gray-300 rounded-lg"></div>
+  </div>
+);
+
 const HotelList = () => {
   const { t } = useLang();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -27,52 +40,44 @@ const HotelList = () => {
 
   const hotelsPerPage = 8;
 
-  // 🔹 Fetch lần đầu: lấy tổng số trang trước tiên
+  // 🔹 Fetch lần đầu: lấy dữ liệu & tổng số trang
   useEffect(() => {
     setIsLoading(true);
+
     fetch("http://localhost:8080/hotels")
       .then((res) => res.json())
       .then((data) => {
         if (data._embedded?.hotels) {
           setHotelData(data._embedded.hotels);
           setTotalElements(data.page?.totalElements || 0);
-          if (data._links?.next?.href) setNextPageUrl(data._links.next.href);
+          setNextPageUrl(data._links?.next?.href || null);
         }
       })
       .catch((err) => console.error("Error fetching hotels:", err))
       .finally(() => setIsLoading(false));
   }, []);
 
-  // 🔹 Khi đã có tổng phần tử, tính tổng trang
   const totalPages = Math.max(1, Math.ceil(totalElements / hotelsPerPage));
 
-  // 🔹 Đồng bộ URL page sau khi có totalPages
+  // 🔹 Đồng bộ page từ URL
   useEffect(() => {
     if (isLoading || totalPages === 0) return;
 
     const urlParam = searchParams.get("page");
     let urlPage = parseInt(urlParam);
 
-    // Nếu không có hoặc không hợp lệ -> mặc định 1
     if (isNaN(urlPage) || urlPage < 1) urlPage = 1;
-
-    // Nếu vượt quá tổng trang -> về trang cuối
     if (urlPage > totalPages) urlPage = totalPages;
 
-    // Nếu khác với page hiện tại thì set lại
     if (urlPage !== page) setPage(urlPage);
 
-    // ✅ Cập nhật lại URL cho khớp
     if (urlParam !== String(urlPage)) {
-      if (urlPage === 1) {
-        setSearchParams({});
-      } else {
-        setSearchParams({ page: urlPage });
-      }
+      if (urlPage === 1) setSearchParams({});
+      else setSearchParams({ page: urlPage });
     }
   }, [searchParams, totalPages, isLoading]);
 
-  // 🔹 Khi đổi page, fetch thêm nếu chưa đủ dữ liệu
+  // 🔹 Load thêm nếu trang cần nhiều hơn dữ liệu hiện có
   useEffect(() => {
     const needHotels = page * hotelsPerPage;
 
@@ -83,7 +88,8 @@ const HotelList = () => {
           .then((data) => {
             if (data._embedded?.hotels?.length) {
               setHotelData((prev) => [...prev, ...data._embedded.hotels]);
-              const newLength = [...hotelData, ...data._embedded.hotels].length;
+              const newLength = hotelData.length + data._embedded.hotels.length;
+
               if (data._links?.next?.href && newLength < needHotels) {
                 loadMore(data._links.next.href);
               } else {
@@ -97,26 +103,25 @@ const HotelList = () => {
     }
   }, [page, isLoading]);
 
-  // 🔹 Lọc theo tên hoặc địa chỉ
+  // 🔹 Lọc
   const filteredHotels = hotelData.filter(
     (hotel) =>
       hotel.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       hotel.address?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // 🔹 Sắp xếp (mặc định theo hotelId)
+  // 🔹 Sắp xếp
   const sortedHotels = [...filteredHotels].sort((a, b) => {
     const fieldA = a.hotelId || 0;
     const fieldB = b.hotelId || 0;
     return sortOrder === "asc" ? fieldA - fieldB : fieldB - fieldA;
   });
 
-  // 🔹 Cắt danh sách theo trang
+  // 🔹 Phân trang
   const indexOfLast = page * hotelsPerPage;
   const indexOfFirst = indexOfLast - hotelsPerPage;
   const currentHotels = sortedHotels.slice(indexOfFirst, indexOfLast);
 
-  // 🔹 Dải số trang hiển thị
   const getPageNumbers = () => {
     const pages = [];
     const endPage = Math.min(totalPages, page + 2);
@@ -125,7 +130,6 @@ const HotelList = () => {
     return pages;
   };
 
-  // 🔹 Chuyển trang
   const handlePageChange = (newPage) => {
     const safePage = Math.min(Math.max(newPage, 1), totalPages);
     setPage(safePage);
@@ -134,19 +138,17 @@ const HotelList = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // 🔹 Đảo chiều sắp xếp
   const toggleSortOrder = () =>
     setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
 
-  // ------------------ JSX ------------------
   return (
     <div className="w-full px-6 md:px-12 py-10">
-      {/* Header */}
+      {/* HEADER */}
       <div className="flex justify-between items-center mb-8">
         <h2 className="text-2xl font-semibold">{t("hotelPage.title")}</h2>
 
         <div className="flex items-center gap-3">
-          {/* Search bar */}
+          {/* SEARCH */}
           <div className="relative">
             <FontAwesomeIcon
               icon={faMagnifyingGlass}
@@ -161,7 +163,7 @@ const HotelList = () => {
             />
           </div>
 
-          {/* Sort */}
+          {/* SORT BUTTON */}
           <button
             onClick={toggleSortOrder}
             className="border rounded-full p-2 hover:bg-gray-100 flex items-center justify-center"
@@ -176,18 +178,20 @@ const HotelList = () => {
             />
           </button>
 
-          {/* Filter */}
+          {/* FILTER BUTTON */}
           <button className="border rounded-full p-2 hover:bg-gray-100">
             <FontAwesomeIcon icon={faFilter} />
           </button>
         </div>
       </div>
 
-      {/* Content */}
+      {/* CONTENT */}
       {isLoading ? (
-        <p className="text-center text-gray-400 mt-10">
-          {t("hotelPage.loading") || "Đang tải..."}
-        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <HotelSkeleton key={i} />
+          ))}
+        </div>
       ) : currentHotels.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
           {currentHotels.map((hotel) => (
@@ -209,7 +213,7 @@ const HotelList = () => {
         </p>
       )}
 
-      {/* Pagination */}
+      {/* PAGINATION */}
       {totalPages > 1 && (
         <div className="mt-10 flex justify-center">
           <Pagination

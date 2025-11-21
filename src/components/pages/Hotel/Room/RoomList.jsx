@@ -9,7 +9,7 @@ import RoomCard from "./RoomCard";
 import Pagination from "@/utils/Pagination";
 
 const RoomList = () => {
-  const { hotelId } = useParams(); // ✅ lấy hotelId từ URL
+  const { hotelId } = useParams(); //  lấy hotelId từ URL
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [rooms, setRooms] = useState([]);
@@ -19,10 +19,10 @@ const RoomList = () => {
 
   const roomsPerPage = 6;
 
-  // ✅ đọc page từ query string
+  //  đọc page từ query string
   const currentPage = parseInt(searchParams.get("page")) || 1;
 
-  // 🔹 Fetch danh sách phòng theo hotelId
+  //  Fetch danh sách phòng theo hotelId
   useEffect(() => {
     if (!hotelId) return;
     setIsLoading(true);
@@ -47,21 +47,21 @@ const RoomList = () => {
       .finally(() => setIsLoading(false));
   }, [hotelId]);
 
-  // 🔹 Sắp xếp theo giá
+  //  Sắp xếp theo giá
   const sortedRooms = [...rooms].sort((a, b) =>
     sortOrder === "asc"
       ? (a.price || 0) - (b.price || 0)
       : (b.price || 0) - (a.price || 0)
   );
 
-  // 🔹 Phân trang
+  //  Phân trang
   const totalPages = Math.ceil(sortedRooms.length / roomsPerPage);
   const safePage = Math.max(1, Math.min(currentPage, totalPages || 1));
   const indexOfLast = safePage * roomsPerPage;
   const indexOfFirst = indexOfLast - roomsPerPage;
   const currentRooms = sortedRooms.slice(indexOfFirst, indexOfLast);
 
-  // 🔹 Khi chuyển trang, đổi URL (để SEO + reload vẫn đúng)
+  //  Khi chuyển trang, đổi URL (để SEO + reload vẫn đúng)
   const handlePageChange = (page) => {
     const nextPage = Math.max(1, Math.min(page, totalPages));
     setSearchParams(nextPage === 1 ? {} : { page: nextPage });
@@ -71,7 +71,7 @@ const RoomList = () => {
   const toggleSortOrder = () =>
     setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
 
-  // 🔹 Loading / Error / Empty
+  //  Loading / Error / Empty
   if (isLoading)
     return (
       <p className="text-center text-gray-400 mt-6 animate-pulse">

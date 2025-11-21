@@ -113,5 +113,6 @@ export const en = {
     hotline: "HotLine",
     bookNow: "Book Now",
     night: "night",
+    loading: "Loading...",
   },
 };
