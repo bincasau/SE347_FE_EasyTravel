@@ -114,5 +114,6 @@ export const vi = {
     bookNow: "Đặt ngay",
     night: "Đêm",
     loading: "Đang tải...",
+    allProvinces: "Tất cả tỉnh thành",
   },
 };

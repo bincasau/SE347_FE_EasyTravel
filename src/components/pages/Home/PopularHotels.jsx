@@ -5,6 +5,7 @@ import {
   faChevronLeft,
   faChevronRight,
 } from "@fortawesome/free-solid-svg-icons";
+import { getPopularHotels } from "@/apis/home";
 import { useLang } from "@/contexts/LangContext";
 
 const PopularHotels = () => {
@@ -17,21 +18,20 @@ const PopularHotels = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const itemsPerPage = 4;
 
-  // 🔥 Fetch hotels from backend
+  //  Fetch hotels from backend
   useEffect(() => {
-    fetch("http://localhost:8080/hotels")
-      .then((res) => res.json())
-      .then((data) => {
-        const list = data?._embedded?.hotels || [];
-        const limited = list.slice(0, 8); // ⭐ Chỉ lấy 8 khách sạn
-        setHotels(limited);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Lỗi khi tải danh sách khách sạn:", err);
+    const fetchHotels = async () => {
+      try {
+        const data = await getPopularHotels();
+        setHotels(data);
+      } catch (err) {
         setError("Không thể tải dữ liệu khách sạn.");
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+
+    fetchHotels();
   }, []);
 
   const handleNext = () => {

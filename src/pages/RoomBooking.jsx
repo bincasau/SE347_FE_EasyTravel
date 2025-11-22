@@ -14,7 +14,7 @@ export default function RoomBooking() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // ✅ Dữ liệu booking mặc định
+  //  Dữ liệu booking mặc định
   const [bookingData, setBookingData] = useState({
     date: "",
     time: "",

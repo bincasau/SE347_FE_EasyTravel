@@ -5,6 +5,7 @@ import {
   faChevronLeft,
   faChevronRight,
 } from "@fortawesome/free-solid-svg-icons";
+import { getPopularTours } from "@/apis/Home";
 import { useLang } from "@/contexts/LangContext";
 
 const PopularTours = () => {
@@ -17,37 +18,20 @@ const PopularTours = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const itemsPerPage = 4;
 
-  // 🔥 Fetch Tours
+  //  Fetch Tours
   useEffect(() => {
-    fetch("http://localhost:8080/tours")
-      .then((res) => res.json())
-      .then((data) => {
-        const list = data?._embedded?.tours || [];
-
-        // ⭐ Lấy 8 tour đầu tiên
-        const limited = list.slice(0, 8);
-
-        const mapped = limited.map((t) => ({
-          id: t.tourId, // Backend dùng tourId
-          tourId: t.tourId,
-          title: t.title,
-          priceAdult: t.priceAdult || 0,
-          percentDiscount: t.percentDiscount || 0,
-          startDate: t.startDate,
-          destination: t.destination,
-          description: t.shortDescription || t.description,
-          mainImage: t.mainImage, // Nếu TourCard fallback vẫn chạy
-          imagesHref: t._links?.images?.href || null,
-        }));
-
-        setTours(mapped);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Lỗi khi tải tour:", err);
+    const fetchTours = async () => {
+      try {
+        const data = await getPopularTours();
+        setTours(data);
+      } catch (err) {
         setError("Không thể tải danh sách tour.");
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+
+    fetchTours();
   }, []);
 
   const handleNext = () => {

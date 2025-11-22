@@ -17,7 +17,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     () => [
       { to: "/", key: "home" },
       { to: "/tours", key: "tours" },
-      { to: "/hotel", key: "hotel" },
+      { to: "/hotels", key: "hotel" },
       { to: "/blog", key: "blog" },
       { to: "/about-us", key: "about" },
       { to: "/contact-us", key: "contact" },

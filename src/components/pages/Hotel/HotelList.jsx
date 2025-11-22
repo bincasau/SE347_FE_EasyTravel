@@ -1,231 +1,301 @@
-import React, { useState, useEffect } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { useSearchParams } from "react-router-dom";
+import React, { useEffect, useState } from "react";
 import {
-  faMagnifyingGlass,
-  faFilter,
-  faSortAmountUp,
-  faSortAmountDown,
-} from "@fortawesome/free-solid-svg-icons";
-import { useLang } from "@/contexts/LangContext";
-import Pagination from "@/utils/Pagination";
-import HotelCard from "@/components/pages/Hotel/HotelCard";
+  FaFilter,
+  FaSearch,
+  FaSortAmountDownAlt,
+  FaSortAmountUpAlt,
+} from "react-icons/fa";
 
-// ⭐ Skeleton for loading
+import { useSearchParams } from "react-router-dom";
+import { useLang } from "@/contexts/LangContext";
+
+import HotelCard from "@/components/pages/Hotel/HotelCard";
+import Pagination from "@/utils/Pagination";
+
+import {
+  getHotels,
+  getHotelProvinces,
+  searchHotelsByNameOrAddress,
+  searchHotelsByProvince,
+} from "@/apis/Hotel";
+
+// Skeleton
 const HotelSkeleton = () => (
   <div className="w-full animate-pulse">
     <div className="h-56 bg-gray-300 rounded-2xl mb-4"></div>
-
     <div className="h-4 bg-gray-300 rounded w-3/4 mb-3"></div>
     <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
     <div className="h-4 bg-gray-200 rounded w-1/3 mb-4"></div>
-
     <div className="h-10 bg-gray-300 rounded-lg"></div>
   </div>
 );
 
-const HotelList = () => {
+export default function HotelList() {
   const { t } = useLang();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const initialPage = parseInt(searchParams.get("page")) || 1;
-  const [page, setPage] = useState(initialPage);
-
-  const [searchTerm, setSearchTerm] = useState("");
-  const [sortOrder, setSortOrder] = useState("asc");
-  const [hotelData, setHotelData] = useState([]);
-  const [nextPageUrl, setNextPageUrl] = useState(null);
-  const [totalElements, setTotalElements] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-
   const hotelsPerPage = 8;
 
-  // 🔹 Fetch lần đầu: lấy dữ liệu & tổng số trang
+  const [page, setPage] = useState(parseInt(searchParams.get("page")) || 1);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  const [sortOrder, setSortOrder] = useState(null);
+  const [province, setProvince] = useState("");
+  const [provinces, setProvinces] = useState([]);
+
+  const [hotels, setHotels] = useState([]);
+  const [totalPages, setTotalPages] = useState(1);
+
+  const [isLoading, setIsLoading] = useState(true);
+
+  const [showFilter, setShowFilter] = useState(false);
+  const [showSort, setShowSort] = useState(false);
+
+  // Debounce
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPage(1);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Fetch provinces
+  useEffect(() => {
+    getHotelProvinces().then((data) => setProvinces(data || []));
+  }, []);
+
+  // ======================= FIXED FETCH HOTELS ======================= //
   useEffect(() => {
     setIsLoading(true);
 
-    fetch("http://localhost:8080/hotels")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data._embedded?.hotels) {
-          setHotelData(data._embedded.hotels);
-          setTotalElements(data.page?.totalElements || 0);
-          setNextPageUrl(data._links?.next?.href || null);
-        }
-      })
-      .catch((err) => console.error("Error fetching hotels:", err))
-      .finally(() => setIsLoading(false));
-  }, []);
+    const fetchSort = sortOrder ? `minPrice,${sortOrder}` : undefined;
 
-  const totalPages = Math.max(1, Math.ceil(totalElements / hotelsPerPage));
+    const fetchData = async () => {
+      let data;
 
-  // 🔹 Đồng bộ page từ URL
+      // Search by name/address
+      if (debouncedSearch.trim() !== "") {
+        data = await searchHotelsByNameOrAddress(
+          debouncedSearch,
+          page - 1,
+          hotelsPerPage,
+          fetchSort
+        );
+        setHotels(data._embedded?.hotels || []);
+        setTotalPages(data.page?.totalPages || 1);
+        return;
+      }
+
+      // Filter by province
+      if (province.trim() !== "") {
+        data = await searchHotelsByProvince(
+          province,
+          page - 1,
+          hotelsPerPage,
+          fetchSort
+        );
+        setHotels(data._embedded?.hotels || []);
+        setTotalPages(data.page?.totalPages || 1);
+        return;
+      }
+
+      // Default
+      data = await getHotels({
+        page: page - 1,
+        size: hotelsPerPage,
+        sort: fetchSort,
+      });
+
+      setHotels(data._embedded?.hotels || []);
+      setTotalPages(data.page?.totalPages || 1);
+    };
+
+    fetchData().finally(() => setIsLoading(false));
+  }, [page, debouncedSearch, sortOrder, province]);
+  // ================================================================= //
+
+  // sync url
   useEffect(() => {
-    if (isLoading || totalPages === 0) return;
+    if (page === 1) setSearchParams({});
+    else setSearchParams({ page });
+  }, [page]);
 
-    const urlParam = searchParams.get("page");
-    let urlPage = parseInt(urlParam);
+  const toggleSortOrder = () => {
+    if (!sortOrder) setSortOrder("asc");
+    else setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    setPage(1);
+  };
 
-    if (isNaN(urlPage) || urlPage < 1) urlPage = 1;
-    if (urlPage > totalPages) urlPage = totalPages;
-
-    if (urlPage !== page) setPage(urlPage);
-
-    if (urlParam !== String(urlPage)) {
-      if (urlPage === 1) setSearchParams({});
-      else setSearchParams({ page: urlPage });
-    }
-  }, [searchParams, totalPages, isLoading]);
-
-  // 🔹 Load thêm nếu trang cần nhiều hơn dữ liệu hiện có
-  useEffect(() => {
-    const needHotels = page * hotelsPerPage;
-
-    if (!isLoading && hotelData.length < needHotels && nextPageUrl) {
-      const loadMore = (url) => {
-        fetch(url)
-          .then((res) => res.json())
-          .then((data) => {
-            if (data._embedded?.hotels?.length) {
-              setHotelData((prev) => [...prev, ...data._embedded.hotels]);
-              const newLength = hotelData.length + data._embedded.hotels.length;
-
-              if (data._links?.next?.href && newLength < needHotels) {
-                loadMore(data._links.next.href);
-              } else {
-                setNextPageUrl(data._links?.next?.href || null);
-              }
-            }
-          })
-          .catch((err) => console.error("Error fetching more hotels:", err));
-      };
-      loadMore(nextPageUrl);
-    }
-  }, [page, isLoading]);
-
-  // 🔹 Lọc
-  const filteredHotels = hotelData.filter(
-    (hotel) =>
-      hotel.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      hotel.address?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // 🔹 Sắp xếp
-  const sortedHotels = [...filteredHotels].sort((a, b) => {
-    const fieldA = a.hotelId || 0;
-    const fieldB = b.hotelId || 0;
-    return sortOrder === "asc" ? fieldA - fieldB : fieldB - fieldA;
-  });
-
-  // 🔹 Phân trang
-  const indexOfLast = page * hotelsPerPage;
-  const indexOfFirst = indexOfLast - hotelsPerPage;
-  const currentHotels = sortedHotels.slice(indexOfFirst, indexOfLast);
-
-  const getPageNumbers = () => {
+  const getVisiblePages = () => {
+    const start = Math.max(1, page - 2);
+    const end = Math.min(totalPages, page + 2);
     const pages = [];
-    const endPage = Math.min(totalPages, page + 2);
-    const startPage = Math.max(1, endPage - 3);
-    for (let i = startPage; i <= endPage; i++) pages.push(i);
+    for (let i = start; i <= end; i++) pages.push(i);
     return pages;
   };
 
-  const handlePageChange = (newPage) => {
-    const safePage = Math.min(Math.max(newPage, 1), totalPages);
-    setPage(safePage);
-    if (safePage === 1) setSearchParams({});
-    else setSearchParams({ page: safePage });
+  const onPageChange = (p) => {
+    setPage(p);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const toggleSortOrder = () =>
-    setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
-
   return (
-    <div className="w-full px-6 md:px-12 py-10">
-      {/* HEADER */}
-      <div className="flex justify-between items-center mb-8">
-        <h2 className="text-2xl font-semibold">{t("hotelPage.title")}</h2>
+    <div className="bg-gray-50 py-12 flex flex-col items-center min-h-screen">
+      <div className="w-full max-w-7xl mx-auto px-4 relative z-30">
+        <h2 className="text-4xl font-podcast text-gray-800 mb-6">
+          {t("hotelPage.title")}
+        </h2>
 
-        <div className="flex items-center gap-3">
-          {/* SEARCH */}
-          <div className="relative">
-            <FontAwesomeIcon
-              icon={faMagnifyingGlass}
-              className="absolute left-3 top-2.5 text-gray-400"
-            />
+        {/* TOP BAR */}
+        <div className="flex items-center justify-between gap-3 mb-10">
+          <div className="flex items-center flex-1 bg-white border border-gray-300 rounded-full px-5 py-2 shadow-sm">
             <input
               type="text"
               placeholder={t("hotelPage.searchPlaceholder")}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="border rounded-full pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
+              className="flex-1 text-sm outline-none"
             />
+            <FaSearch size={16} className="text-gray-600" />
           </div>
 
-          {/* SORT BUTTON */}
-          <button
-            onClick={toggleSortOrder}
-            className="border rounded-full p-2 hover:bg-gray-100 flex items-center justify-center"
-            title={
-              sortOrder === "asc"
-                ? t("hotelPage.sortAsc")
-                : t("hotelPage.sortDesc")
-            }
-          >
-            <FontAwesomeIcon
-              icon={sortOrder === "asc" ? faSortAmountUp : faSortAmountDown}
-            />
-          </button>
+          {/* Filter Province */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                setShowFilter(!showFilter);
+                setShowSort(false);
+              }}
+              className="bg-white border border-gray-300 rounded-lg w-10 h-10 flex justify-center items-center hover:bg-orange-50"
+            >
+              <FaFilter size={16} />
+            </button>
 
-          {/* FILTER BUTTON */}
-          <button className="border rounded-full p-2 hover:bg-gray-100">
-            <FontAwesomeIcon icon={faFilter} />
-          </button>
+            {showFilter && (
+              <div className="absolute right-0 mt-2 w-60 bg-white border rounded-lg shadow-lg p-4">
+                <p className="font-semibold mb-2">
+                  {t("hotelPage.filterByProvince")}
+                </p>
+
+                {["", ...provinces].map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => {
+                      setProvince(p);
+                      setPage(1);
+                      setShowFilter(false);
+                    }}
+                    className={`block w-full text-left px-3 py-1.5 rounded hover:bg-orange-100 ${
+                      province === p ? "bg-orange-200" : ""
+                    }`}
+                  >
+                    {p === "" ? t("hotelPage.allProvinces") : p}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Sort */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                setShowSort(!showSort);
+                setShowFilter(false);
+              }}
+              className="bg-white border border-gray-300 rounded-lg w-10 h-10 flex justify-center items-center hover:bg-orange-50"
+            >
+              {sortOrder === "asc" ? (
+                <FaSortAmountUpAlt size={16} />
+              ) : (
+                <FaSortAmountDownAlt size={16} />
+              )}
+            </button>
+
+            {showSort && (
+              <div className="absolute right-0 mt-2 w-52 bg-white border rounded-lg shadow-lg p-3">
+                <p className="font-semibold mb-2">{t("hotelPage.sortBy")}</p>
+
+                <button
+                  className={`block w-full text-left px-3 py-1.5 rounded hover:bg-orange-100 ${
+                    sortOrder === null ? "bg-orange-200" : ""
+                  }`}
+                  onClick={() => {
+                    setSortOrder(null);
+                    setPage(1);
+                    setShowSort(false);
+                  }}
+                >
+                  {t("hotelPage.defaultSort")}
+                </button>
+
+                <button
+                  className={`block w-full text-left px-3 py-1.5 rounded hover:bg-orange-100 ${
+                    sortOrder === "asc" ? "bg-orange-200" : ""
+                  }`}
+                  onClick={() => {
+                    setSortOrder("asc");
+                    setPage(1);
+                    setShowSort(false);
+                  }}
+                >
+                  {t("hotelPage.sortAsc")}
+                </button>
+
+                <button
+                  className={`block w-full text-left px-3 py-1.5 rounded hover:bg-orange-100 ${
+                    sortOrder === "desc" ? "bg-orange-200" : ""
+                  }`}
+                  onClick={() => {
+                    setSortOrder("desc");
+                    setPage(1);
+                    setShowSort(false);
+                  }}
+                >
+                  {t("hotelPage.sortDesc")}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* CONTENT */}
+        {isLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <HotelSkeleton key={i} />
+            ))}
+          </div>
+        ) : hotels.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {hotels.map((hotel) => (
+              <HotelCard
+                key={hotel.hotelId}
+                hotel_id={hotel.hotelId}
+                image={hotel.mainImage}
+                name={hotel.name}
+                price={hotel.minPrice}
+                hotline={hotel.phoneNumber}
+                address={hotel.address}
+                description={hotel.description}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="text-center text-gray-500 mt-10">
+            {t("hotelPage.noResult")}
+          </p>
+        )}
+
+        <Pagination
+          totalPages={totalPages}
+          currentPage={page}
+          visiblePages={getVisiblePages()}
+          onPageChange={onPageChange}
+        />
       </div>
-
-      {/* CONTENT */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <HotelSkeleton key={i} />
-          ))}
-        </div>
-      ) : currentHotels.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-          {currentHotels.map((hotel) => (
-            <HotelCard
-              key={hotel.hotelId}
-              hotel_id={hotel.hotelId}
-              image={hotel.mainImage}
-              name={hotel.name}
-              price={hotel.minPrice}
-              hotline={hotel.phoneNumber}
-              address={hotel.address}
-              description={hotel.description}
-            />
-          ))}
-        </div>
-      ) : (
-        <p className="text-center text-gray-500 mt-10">
-          {t("hotelPage.noResult")}
-        </p>
-      )}
-
-      {/* PAGINATION */}
-      {totalPages > 1 && (
-        <div className="mt-10 flex justify-center">
-          <Pagination
-            currentPage={page}
-            totalPages={totalPages}
-            onPageChange={handlePageChange}
-            visiblePages={getPageNumbers()}
-          />
-        </div>
-      )}
     </div>
   );
-};
-
-export default HotelList;
+}

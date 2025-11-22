@@ -5,6 +5,7 @@ import {
   faChevronLeft,
   faChevronRight,
 } from "@fortawesome/free-solid-svg-icons";
+import { getPopularBlogs } from "@/apis/Home";
 import { useLang } from "@/contexts/LangContext";
 
 const PopularTopics = () => {
@@ -17,33 +18,20 @@ const PopularTopics = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const itemsPerPage = 4;
 
-  // 🔥 Fetch Blogs From Backend
+  //  Fetch Blogs From Backend
   useEffect(() => {
-    fetch("http://localhost:8080/blogs")
-      .then((res) => res.json())
-      .then((data) => {
-        const list = data?._embedded?.blogs || [];
-
-        // ⭐ Chỉ hiển thị 8 bài nổi bật
-        const limited = list.slice(0, 8);
-
-        // Chuẩn hóa dữ liệu cho BlogCard
-        const mapped = limited.map((b) => ({
-          id: b.blogId,
-          image: `/images/blog/${b.mainImage}`,
-          date: b.createdAt?.split("T")[0],
-          title: b.title,
-          description: b.shortDescription || "",
-        }));
-
-        setBlogs(mapped);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Lỗi khi tải blogs:", err);
+    const fetchBlogs = async () => {
+      try {
+        const data = await getPopularBlogs();
+        setBlogs(data);
+      } catch (err) {
         setError("Không thể tải danh sách chủ đề.");
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+
+    fetchBlogs();
   }, []);
 
   const handleNext = () => {
