@@ -3,11 +3,11 @@ import { useParams } from "react-router-dom";
 import ShortInfor from "../components/pages/DetailTour/ShortInfor";
 import Detail from "../components/pages/DetailTour/Detail";
 import Gallery from "../components/pages/DetailTour/Gallery";
-import Itineraries from "../components/pages/DetailTour/Itineraries"; // ⬅️ mới thêm
-import Reviews from "../components/pages/DetailTour/Reviews"; // ⬅️ mới thêm
+import Itineraries from "../components/pages/DetailTour/Itineraries";
+import Reviews from "../components/pages/DetailTour/Reviews";
 
 export default function DetailTour() {
-  const { id } = useParams(); // ✅ Lấy id từ URL
+  const { id } = useParams(); // ✅ id từ URL
   const [tour, setTour] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -46,12 +46,11 @@ export default function DetailTour() {
 
   return (
     <div className="bg-gray-50 min-h-screen py-12">
-      {/* ✅ Truyền dữ liệu tour xuống các component con */}
       <ShortInfor tour={tour} />
       <Detail tour={tour} />
-      <Itineraries tourId={id} /> {/* 🧭 Phần lịch trình — nằm TRÊN Gallery */}
-      <Gallery tourId={id} /> 
-      <Reviews tourId={id} /> {/* 🌟 Phần đánh giá — nằm DƯỚI Gallery */}
+      <Itineraries tourId={id} />
+      <Gallery tourId={id} />
+      <Reviews tourId={id} />
     </div>
   );
 }

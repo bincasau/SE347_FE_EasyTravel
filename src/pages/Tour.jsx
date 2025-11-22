@@ -13,6 +13,7 @@ import {
   searchByDuration,
   searchByStartDate,
   getTours,
+  getDepartureLocations, // 👈 THÊM HÀM NÀY
 } from "../apis/Tour";
 
 import TourCard from "../components/pages/Tour/TourCard";
@@ -24,20 +25,8 @@ import Tour from "../models/Tour";
 export default function TourPage() {
   const [tours, setTours] = useState([]);
 
-  // Hard-coded locations
-  const [locations] = useState([
-    "",
-    "Đà Lạt",
-    "Phú Quốc",
-    "Sa Pa",
-    "Hội An",
-    "Nha Trang",
-    "Hạ Long",
-    "Đà Nẵng",
-    "Huế",
-    "Côn Đảo",
-  ]);
-
+  // Locations lấy từ backend
+  const [locations, setLocations] = useState([]);
   const [durations] = useState(["", 2, 3, 4, 5, 7, 10]);
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -58,6 +47,36 @@ export default function TourPage() {
 
   const [isLoading, setIsLoading] = useState(false);
   const pageSize = 8;
+
+  /** =============================
+   *  📍 Fetch departure locations
+   * ============================= */
+  useEffect(() => {
+    const loadLocations = async () => {
+      try {
+        const list = await getDepartureLocations(); // gọi API backend
+        // Thêm option rỗng cho "All"
+        setLocations(["", ...(Array.isArray(list) ? list : [])]);
+      } catch (error) {
+        console.error("Error fetching departure locations:", error);
+        // Nếu lỗi thì fallback về mấy giá trị mặc định cho đỡ trống
+        setLocations([
+          "",
+          "Đà Lạt",
+          "Phú Quốc",
+          "Sa Pa",
+          "Hội An",
+          "Nha Trang",
+          "Hạ Long",
+          "Đà Nẵng",
+          "Huế",
+          "Côn Đảo",
+        ]);
+      }
+    };
+
+    loadLocations();
+  }, []);
 
   /** =============================
    *  ⏳ Debounce 2 seconds
@@ -182,22 +201,10 @@ export default function TourPage() {
     sortOrder,
   ]);
 
-  /** FIRST LOAD */
+  /** FIRST LOAD + reload when filters change */
   useEffect(() => {
     fetchTours();
-  }, []);
-
-  /** Reload when filters change */
-  useEffect(() => {
-    fetchTours();
-  }, [
-    sortOrder,
-    debouncedSearchTerm,
-    selectedLocation,
-    selectedDuration,
-    selectedDate,
-    currentPage,
-  ]);
+  }, [fetchTours]);
 
   /** =============================
    *  Pagination slide effect
@@ -247,8 +254,7 @@ export default function TourPage() {
         </h2>
 
         {/* ================= TOP BAR ================= */}
-        <div className="flex items-center justify-between gap-3 mb-10">
-
+        <div className="flex items-center justify-between gap-3 mb-10 relative z-40">
           {/* 🔍 SEARCH */}
           <div className="flex items-center flex-1 bg-white border border-gray-300 rounded-full px-5 py-2 shadow-sm">
             <input
@@ -275,7 +281,7 @@ export default function TourPage() {
             </button>
 
             {showDatePicker && (
-              <div className="absolute right-0 mt-2 w-56 bg-white border rounded-lg shadow-lg p-3">
+              <div className="absolute right-0 mt-2 w-56 bg-white border rounded-lg shadow-lg p-3 z-50">
                 <p className="font-semibold mb-2">Start date (≥)</p>
 
                 <input
@@ -317,8 +323,7 @@ export default function TourPage() {
             </button>
 
             {showFilter && (
-              <div className="absolute right-0 mt-2 w-60 bg-white border rounded-lg shadow-lg p-4 grid grid-cols-2 gap-3">
-
+              <div className="absolute right-0 mt-2 w-60 bg-white border rounded-lg shadow-lg p-4 grid grid-cols-2 gap-3 z-50">
                 {/* LOCATION */}
                 <div>
                   <p className="font-semibold mb-2">Location</p>
@@ -380,7 +385,7 @@ export default function TourPage() {
             </button>
 
             {showSort && (
-              <div className="absolute right-0 mt-2 w-52 bg-white border rounded-lg shadow-lg p-3">
+              <div className="absolute right-0 mt-2 w-52 bg-white border rounded-lg shadow-lg p-3 z-50">
                 <p className="font-semibold mb-2">Sort by</p>
 
                 {[
@@ -414,7 +419,7 @@ export default function TourPage() {
             Loading tours...
           </div>
         ) : (
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4 relative z-10">
             {tours.map((t) => (
               <TourCard key={t.id} tour={t} />
             ))}

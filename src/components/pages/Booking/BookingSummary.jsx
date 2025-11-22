@@ -11,6 +11,7 @@ const formatVND = (n) =>
 export default function BookingSummary({ bookingData }) {
   const { tourId, tickets = {}, total, date, time } = bookingData || {};
   const { adult = 0, child = 0 } = tickets;
+
   const [tourInfo, setTourInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [mainImageUrl, setMainImageUrl] = useState(imgFallback);
@@ -45,7 +46,14 @@ export default function BookingSummary({ bookingData }) {
 
   if (!tourInfo) return null;
 
-  const { title, destination, priceAdult, priceChild } = tourInfo;
+  const { title, destination, priceAdult, priceChild, percentDiscount = 0 } =
+    tourInfo;
+
+  const discountFactor =
+    percentDiscount > 0 ? 1 - percentDiscount / 100 : 1;
+
+  const effectiveAdult = priceAdult * discountFactor;
+  const effectiveChild = priceChild * discountFactor;
 
   return (
     <aside className="rounded-2xl border bg-white shadow-sm p-5 h-fit sticky top-10">
@@ -88,9 +96,16 @@ export default function BookingSummary({ bookingData }) {
             <span>
               {adult} {adult > 1 ? "Adults" : "Adult"}
             </span>
-            <span className="font-medium">
-              {formatVND(adult * priceAdult)}
-            </span>
+            <div className="text-right">
+              {percentDiscount > 0 && (
+                <div className="text-xs text-gray-400 line-through">
+                  {formatVND(adult * priceAdult)}
+                </div>
+              )}
+              <div className="font-medium">
+                {formatVND(adult * effectiveAdult)}
+              </div>
+            </div>
           </div>
         )}
         {child > 0 && (
@@ -98,9 +113,16 @@ export default function BookingSummary({ bookingData }) {
             <span>
               {child} {child > 1 ? "Children" : "Child"}
             </span>
-            <span className="font-medium">
-              {formatVND(child * priceChild)}
-            </span>
+            <div className="text-right">
+              {percentDiscount > 0 && (
+                <div className="text-xs text-gray-400 line-through">
+                  {formatVND(child * priceChild)}
+                </div>
+              )}
+              <div className="font-medium">
+                {formatVND(child * effectiveChild)}
+              </div>
+            </div>
           </div>
         )}
       </div>

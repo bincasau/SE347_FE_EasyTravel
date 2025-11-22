@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 
 export default function BookingStepTour2({
   bookingData,
@@ -6,75 +6,97 @@ export default function BookingStepTour2({
   nextStep,
   prevStep,
 }) {
-  const { user = {} } = bookingData;
+  const [userInfo, setUserInfo] = useState({
+    name: bookingData.user.name || "",
+    surname: bookingData.user.surname || "",
+    phone: bookingData.user.phone || "",
+    email: bookingData.user.email || "",
+  });
 
   const handleChange = (field, value) => {
+    setUserInfo((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleContinue = () => {
+    if (!userInfo.name.trim()) return alert("Please enter your first name.");
+    if (!userInfo.surname.trim()) return alert("Please enter your last name.");
+    if (!userInfo.phone.trim() || userInfo.phone.length < 8)
+      return alert("Invalid phone number.");
+    if (!userInfo.email.includes("@")) return alert("Invalid email.");
+
     setBookingData((prev) => ({
       ...prev,
-      user: { ...prev.user, [field]: value },
+      user: { ...userInfo },
     }));
+
+    nextStep();
   };
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-podcast text-gray-800 mb-4">
-        Contact Information
+
+      <h2 className="text-2xl font-semibold text-gray-800">
+        Traveler Information
       </h2>
 
-      <div className="space-y-4">
-        <InputField
-          label="First Name"
-          value={user.name}
+      <div>
+        <label className="block text-sm text-gray-600 mb-1">First Name</label>
+        <input
+          type="text"
+          value={userInfo.name}
           onChange={(e) => handleChange("name", e.target.value)}
-        />
-        <InputField
-          label="Last Name"
-          value={user.surname}
-          onChange={(e) => handleChange("surname", e.target.value)}
-        />
-        <InputField
-          label="Phone Number"
-          type="tel"
-          value={user.phone}
-          onChange={(e) => handleChange("phone", e.target.value)}
-        />
-        <InputField
-          label="Email Address"
-          type="email"
-          value={user.email}
-          onChange={(e) => handleChange("email", e.target.value)}
+          className="w-full border rounded-lg px-4 py-2 text-gray-700"
         />
       </div>
 
-      <div className="flex gap-3 mt-6">
+      <div>
+        <label className="block text-sm text-gray-600 mb-1">Last Name</label>
+        <input
+          type="text"
+          value={userInfo.surname}
+          onChange={(e) => handleChange("surname", e.target.value)}
+          className="w-full border rounded-lg px-4 py-2 text-gray-700"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm text-gray-600 mb-1">Phone</label>
+        <input
+          type="tel"
+          value={userInfo.phone}
+          onChange={(e) => handleChange("phone", e.target.value)}
+          className="w-full border rounded-lg px-4 py-2 text-gray-700"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm text-gray-600 mb-1">Email</label>
+        <input
+          type="email"
+          value={userInfo.email}
+          onChange={(e) => handleChange("email", e.target.value)}
+          className="w-full border rounded-lg px-4 py-2 text-gray-700"
+        />
+      </div>
+
+      <div className="flex justify-between pt-4">
         <button
           onClick={prevStep}
-          className="px-6 py-3 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium transition-all"
+          className="px-4 py-2 border rounded-lg text-gray-600 hover:bg-gray-100"
         >
-          ← Back
+          Back
         </button>
+
         <button
-          onClick={nextStep}
-          className="px-6 py-3 rounded-full bg-orange-500 hover:bg-orange-600 text-white font-medium transition-all"
+          onClick={handleContinue}
+          className="px-5 py-2 rounded-lg bg-orange-500 text-white hover:bg-orange-600"
         >
-          Continue →
+          Continue
         </button>
       </div>
-    </div>
-  );
-}
-
-function InputField({ label, type = "text", value, onChange }) {
-  return (
-    <div>
-      <label className="block text-sm text-gray-600 mb-2">{label}</label>
-      <input
-        type={type}
-        value={value}
-        onChange={onChange}
-        placeholder={`Enter ${label.toLowerCase()}`}
-        className="w-full border rounded-lg px-4 py-2 text-gray-800 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
-      />
     </div>
   );
 }

@@ -73,3 +73,16 @@ export async function getTours(page, size, sort) {
   const res = await fetch(url);
   return res.json();
 }
+
+export async function getDepartureLocations() {
+  try {
+    const res = await fetch("http://localhost:8080/tours/departure-locations");
+    if (!res.ok) {
+      throw new Error("Failed to fetch departure locations");
+    }
+    return await res.json();
+  } catch (error) {
+    console.error("API getDepartureLocations error:", error);
+    return [];
+  }
+}
