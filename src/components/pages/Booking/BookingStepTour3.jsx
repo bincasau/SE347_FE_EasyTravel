@@ -19,19 +19,19 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
 
     const payload = {
       tourId: tourInfo.tourId,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      address: user.address,
       adultCount: tickets.adult,
       childCount: tickets.child,
-      fullName: `${user.name} ${user.surname}`,
-      phone: user.phone,
-      email: user.email,
-      travelDate: date,
-      travelTime: null,
       totalPrice: total,
+      travelDate: date,
       paymentMethod: payment,
     };
 
     try {
-      const res = await fetch("http://localhost:8080/book", {
+      const res = await fetch("http://localhost:8080/booking/tour", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -54,7 +54,6 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
 
   return (
     <div className="space-y-6">
-
       <h2 className="text-2xl font-semibold text-gray-800 mb-4">
         Payment & Confirmation
       </h2>
@@ -70,7 +69,7 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
         </p>
       </div>
 
-      {/* PAYMENT METHOD */}
+      {/* PAYMENT */}
       <div className="border rounded-lg p-4 space-y-2">
         <h3 className="font-semibold text-gray-800 mb-2">Payment Method</h3>
 
@@ -104,29 +103,6 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
           VNPay
         </label>
       </div>
-
-      {/* SHOW QR WHEN NEEDED */}
-      {payment === "momo" && (
-        <div className="text-center">
-          <h3 className="font-semibold mb-2">Scan MOMO QR</h3>
-          <img
-            src="/qr/momo.png"
-            className="w-64 mx-auto rounded-lg shadow"
-            alt="MOMO QR"
-          />
-        </div>
-      )}
-
-      {payment === "vnpay" && (
-        <div className="text-center">
-          <h3 className="font-semibold mb-2">Scan VNPay QR</h3>
-          <img
-            src="/qr/vnpay.png"
-            className="w-64 mx-auto rounded-lg shadow"
-            alt="VNPay QR"
-          />
-        </div>
-      )}
 
       <div className="flex justify-between pt-4">
         <button

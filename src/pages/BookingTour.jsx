@@ -21,12 +21,15 @@ export default function BookingPage() {
     tickets: { adult: 1, child: 0 },
     total: 0,
     tourInfo: null,
+
+    // UPDATED USER FIELDS
     user: {
       name: "",
-      surname: "",
-      phone: "",
       email: "",
+      phone: "",
+      address: "",
     },
+
     availableSeats: 0,
     limitSeats: 0,
   });
@@ -67,7 +70,7 @@ export default function BookingPage() {
    * =============================== */
   useEffect(() => {
     const token =
-      localStorage.getItem("jwt") || // FIXED
+      localStorage.getItem("jwt") ||
       localStorage.getItem("token") ||
       localStorage.getItem("accessToken");
 
@@ -75,7 +78,7 @@ export default function BookingPage() {
 
     const loadUser = async () => {
       try {
-        const res = await fetch("http://localhost:8080/accounts/me", {
+        const res = await fetch("http://localhost:8080/account/detail", {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -86,10 +89,10 @@ export default function BookingPage() {
         setBookingData((prev) => ({
           ...prev,
           user: {
-            name: data.firstName || "",
-            surname: data.lastName || "",
-            phone: data.phoneNumber || "",
+            name: data.name || "",
             email: data.email || "",
+            phone: data.phone || "",
+            address: data.address || "",
           },
         }));
       } catch (err) {
@@ -147,10 +150,7 @@ export default function BookingPage() {
           )}
 
           {step === 3 && (
-            <BookingStepTour3
-              bookingData={bookingData}
-              prevStep={prevStep}
-            />
+            <BookingStepTour3 bookingData={bookingData} prevStep={prevStep} />
           )}
         </div>
 
