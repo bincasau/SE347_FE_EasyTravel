@@ -51,7 +51,7 @@ export default function Blog() {
         description:
           b.details?.slice(0, 200) +
             (b.details?.length > 200 ? "..." : "") ||
-          "Không có mô tả.",
+          "Không mo ta",
         image: `/images/blog/blog_${b.blogId}_img_1.jpg`,
         createdAt: b.createdAt,
       }));
