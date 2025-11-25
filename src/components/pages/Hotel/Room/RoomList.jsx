@@ -3,14 +3,18 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faSortAmountUp,
   faSortAmountDown,
+  faArrowLeft,
 } from "@fortawesome/free-solid-svg-icons";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams, useNavigate } from "react-router-dom";
+
 import RoomCard from "./RoomCard";
 import Pagination from "@/utils/Pagination";
+import { getRoomsByHotel } from "@/apis/Room";
 
 const RoomList = () => {
-  const { hotelId } = useParams(); //  lấy hotelId từ URL
+  const { hotelId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   const [rooms, setRooms] = useState([]);
   const [sortOrder, setSortOrder] = useState("asc");
@@ -19,49 +23,39 @@ const RoomList = () => {
 
   const roomsPerPage = 6;
 
-  //  đọc page từ query string
+  // Lấy page từ URL
   const currentPage = parseInt(searchParams.get("page")) || 1;
 
-  //  Fetch danh sách phòng theo hotelId
+  // Fetch rooms
   useEffect(() => {
     if (!hotelId) return;
+
     setIsLoading(true);
     setError(null);
 
-    console.log("Fetching rooms for hotelId:", hotelId);
-
-    fetch(`http://localhost:8080/hotels/${hotelId}/rooms`)
-      .then((res) => {
-        if (!res.ok) throw new Error("Không thể tải danh sách phòng");
-        return res.json();
-      })
+    getRoomsByHotel(hotelId)
       .then((data) => {
-        const fetchedRooms = data._embedded?.rooms || [];
-        console.log("Fetched rooms:", fetchedRooms);
+        const fetchedRooms = data?._embedded?.rooms || [];
         setRooms(fetchedRooms);
       })
-      .catch((err) => {
-        console.error("Lỗi fetch rooms:", err);
-        setError("Không thể tải danh sách phòng.");
-      })
+      .catch(() => setError("Không thể tải danh sách phòng."))
       .finally(() => setIsLoading(false));
   }, [hotelId]);
 
-  //  Sắp xếp theo giá
+  // Sort
   const sortedRooms = [...rooms].sort((a, b) =>
     sortOrder === "asc"
       ? (a.price || 0) - (b.price || 0)
       : (b.price || 0) - (a.price || 0)
   );
 
-  //  Phân trang
+  // Pagination
   const totalPages = Math.ceil(sortedRooms.length / roomsPerPage);
   const safePage = Math.max(1, Math.min(currentPage, totalPages || 1));
   const indexOfLast = safePage * roomsPerPage;
   const indexOfFirst = indexOfLast - roomsPerPage;
   const currentRooms = sortedRooms.slice(indexOfFirst, indexOfLast);
 
-  //  Khi chuyển trang, đổi URL (để SEO + reload vẫn đúng)
   const handlePageChange = (page) => {
     const nextPage = Math.max(1, Math.min(page, totalPages));
     setSearchParams(nextPage === 1 ? {} : { page: nextPage });
@@ -71,7 +65,13 @@ const RoomList = () => {
   const toggleSortOrder = () =>
     setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
 
-  //  Loading / Error / Empty
+  //  BACK: Quay về đúng trang hotel trước đó
+  const handleBack = () => {
+    const prevHotelPage = sessionStorage.getItem("hotelPrevPage") || 1;
+    navigate(`/hotels?page=${prevHotelPage}`);
+  };
+
+  // UI state
   if (isLoading)
     return (
       <p className="text-center text-gray-400 mt-6 animate-pulse">
@@ -90,20 +90,28 @@ const RoomList = () => {
 
   return (
     <div className="w-full py-8">
-      {/* Header điều khiển */}
+      {/* Header */}
       <div className="flex justify-between items-center mb-6">
+        <button
+          className="flex items-center gap-2 
+            border border-orange-500 text-orange-500 
+            bg-white text-[15px] font-medium 
+            px-4 py-1.5 rounded-md
+            hover:bg-orange-500 hover:text-white 
+            transition-all duration-200 shadow-sm"
+          onClick={handleBack}
+        >
+          <FontAwesomeIcon icon={faArrowLeft} />
+          Trở về
+        </button>
+
         <h2 className="text-xl font-semibold text-gray-800">
           Danh sách phòng ({rooms.length})
         </h2>
 
         <button
           onClick={toggleSortOrder}
-          className="border rounded-full p-2 hover:bg-gray-100 flex items-center justify-center"
-          title={
-            sortOrder === "asc"
-              ? "Sắp xếp giá tăng dần"
-              : "Sắp xếp giá giảm dần"
-          }
+          className="border rounded-full p-2 hover:bg-gray-100"
         >
           <FontAwesomeIcon
             icon={sortOrder === "asc" ? faSortAmountUp : faSortAmountDown}
@@ -111,7 +119,7 @@ const RoomList = () => {
         </button>
       </div>
 
-      {/* Danh sách phòng */}
+      {/* Rooms */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {currentRooms.map((room) => (
           <RoomCard key={room.roomId} room={room} hotelId={hotelId} />

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   FaFilter,
   FaSearch,
@@ -52,30 +52,58 @@ export default function HotelList() {
   const [showFilter, setShowFilter] = useState(false);
   const [showSort, setShowSort] = useState(false);
 
-  // Debounce
+  // 🔥 ADD: refs to close dropdown when clicking outside
+  const filterRef = useRef(null);
+  const sortRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (
+        filterRef.current &&
+        !filterRef.current.contains(e.target) &&
+        sortRef.current &&
+        !sortRef.current.contains(e.target)
+      ) {
+        setShowFilter(false);
+        setShowSort(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedSearch(searchTerm);
-      setPage(1);
-    }, 1000);
+      if (debouncedSearch !== searchTerm) {
+        setDebouncedSearch(searchTerm);
+        setPage(1);
+      }
+    }, 600);
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Fetch provinces
+  // Đồng bộ page từ URL khi Back
+  useEffect(() => {
+    const urlPage = parseInt(searchParams.get("page")) || 1;
+    if (urlPage !== page) setPage(urlPage);
+  }, [searchParams]);
+
+  // Load provinces
   useEffect(() => {
     getHotelProvinces().then((data) => setProvinces(data || []));
   }, []);
 
-  // ======================= FIXED FETCH HOTELS ======================= //
+  // Fetch hotels
   useEffect(() => {
     setIsLoading(true);
 
     const fetchSort = sortOrder ? `minPrice,${sortOrder}` : undefined;
 
-    const fetchData = async () => {
+    const load = async () => {
       let data;
 
-      // Search by name/address
       if (debouncedSearch.trim() !== "") {
         data = await searchHotelsByNameOrAddress(
           debouncedSearch,
@@ -83,62 +111,43 @@ export default function HotelList() {
           hotelsPerPage,
           fetchSort
         );
-        setHotels(data._embedded?.hotels || []);
-        setTotalPages(data.page?.totalPages || 1);
-        return;
-      }
-
-      // Filter by province
-      if (province.trim() !== "") {
+      } else if (province.trim() !== "") {
         data = await searchHotelsByProvince(
           province,
           page - 1,
           hotelsPerPage,
           fetchSort
         );
-        setHotels(data._embedded?.hotels || []);
-        setTotalPages(data.page?.totalPages || 1);
-        return;
+      } else {
+        data = await getHotels({
+          page: page - 1,
+          size: hotelsPerPage,
+          sort: fetchSort,
+        });
       }
-
-      // Default
-      data = await getHotels({
-        page: page - 1,
-        size: hotelsPerPage,
-        sort: fetchSort,
-      });
 
       setHotels(data._embedded?.hotels || []);
       setTotalPages(data.page?.totalPages || 1);
     };
 
-    fetchData().finally(() => setIsLoading(false));
+    load().finally(() => setIsLoading(false));
   }, [page, debouncedSearch, sortOrder, province]);
-  // ================================================================= //
 
-  // sync url
+  // Sync URL
   useEffect(() => {
     if (page === 1) setSearchParams({});
     else setSearchParams({ page });
   }, [page]);
 
-  const toggleSortOrder = () => {
-    if (!sortOrder) setSortOrder("asc");
-    else setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    setPage(1);
+  const onPageChange = (p) => {
+    setPage(p);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const getVisiblePages = () => {
     const start = Math.max(1, page - 2);
     const end = Math.min(totalPages, page + 2);
-    const pages = [];
-    for (let i = start; i <= end; i++) pages.push(i);
-    return pages;
-  };
-
-  const onPageChange = (p) => {
-    setPage(p);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
   };
 
   return (
@@ -148,7 +157,7 @@ export default function HotelList() {
           {t("hotelPage.title")}
         </h2>
 
-        {/* TOP BAR */}
+        {/* SEARCH / FILTER / SORT */}
         <div className="flex items-center justify-between gap-3 mb-10">
           <div className="flex items-center flex-1 bg-white border border-gray-300 rounded-full px-5 py-2 shadow-sm">
             <input
@@ -161,8 +170,8 @@ export default function HotelList() {
             <FaSearch size={16} className="text-gray-600" />
           </div>
 
-          {/* Filter Province */}
-          <div className="relative">
+          {/* FILTER */}
+          <div className="relative" ref={filterRef}>
             <button
               onClick={() => {
                 setShowFilter(!showFilter);
@@ -174,7 +183,7 @@ export default function HotelList() {
             </button>
 
             {showFilter && (
-              <div className="absolute right-0 mt-2 w-60 bg-white border rounded-lg shadow-lg p-4">
+              <div className="absolute right-0 mt-2 w-60 bg-white border rounded-lg shadow-xl p-4 z-50 pointer-events-auto">
                 <p className="font-semibold mb-2">
                   {t("hotelPage.filterByProvince")}
                 </p>
@@ -183,8 +192,10 @@ export default function HotelList() {
                   <button
                     key={p}
                     onClick={() => {
-                      setProvince(p);
-                      setPage(1);
+                      if (province !== p) {
+                        setProvince(p);
+                        setPage(1);
+                      }
                       setShowFilter(false);
                     }}
                     className={`block w-full text-left px-3 py-1.5 rounded hover:bg-orange-100 ${
@@ -198,8 +209,8 @@ export default function HotelList() {
             )}
           </div>
 
-          {/* Sort */}
-          <div className="relative">
+          {/* SORT */}
+          <div className="relative" ref={sortRef}>
             <button
               onClick={() => {
                 setShowSort(!showSort);
@@ -215,7 +226,7 @@ export default function HotelList() {
             </button>
 
             {showSort && (
-              <div className="absolute right-0 mt-2 w-52 bg-white border rounded-lg shadow-lg p-3">
+              <div className="absolute right-0 mt-2 w-52 bg-white border rounded-lg shadow-xl p-3 z-50 pointer-events-auto">
                 <p className="font-semibold mb-2">{t("hotelPage.sortBy")}</p>
 
                 <button
@@ -223,8 +234,10 @@ export default function HotelList() {
                     sortOrder === null ? "bg-orange-200" : ""
                   }`}
                   onClick={() => {
-                    setSortOrder(null);
-                    setPage(1);
+                    if (sortOrder !== null) {
+                      setSortOrder(null);
+                      setPage(1);
+                    }
                     setShowSort(false);
                   }}
                 >
@@ -236,8 +249,10 @@ export default function HotelList() {
                     sortOrder === "asc" ? "bg-orange-200" : ""
                   }`}
                   onClick={() => {
-                    setSortOrder("asc");
-                    setPage(1);
+                    if (sortOrder !== "asc") {
+                      setSortOrder("asc");
+                      setPage(1);
+                    }
                     setShowSort(false);
                   }}
                 >
@@ -249,8 +264,10 @@ export default function HotelList() {
                     sortOrder === "desc" ? "bg-orange-200" : ""
                   }`}
                   onClick={() => {
-                    setSortOrder("desc");
-                    setPage(1);
+                    if (sortOrder !== "desc") {
+                      setSortOrder("desc");
+                      setPage(1);
+                    }
                     setShowSort(false);
                   }}
                 >

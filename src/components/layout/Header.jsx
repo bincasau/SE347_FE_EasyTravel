@@ -56,6 +56,17 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     return () => window.removeEventListener("jwt-changed", handle);
   }, []);
 
+  useEffect(() => {
+    const openLoginHandler = () => {
+      if (typeof onOpenLogin === "function") {
+        onOpenLogin();
+      }
+    };
+
+    window.addEventListener("open-login", openLoginHandler);
+    return () => window.removeEventListener("open-login", openLoginHandler);
+  }, [onOpenLogin]);
+
   const handleLogout = () => {
     if (!confirm("Bạn có chắc chắn muốn đăng xuất?")) return;
     logout();
