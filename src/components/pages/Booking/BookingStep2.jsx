@@ -24,6 +24,7 @@ export default function BookingStep2({
     if (parts.length === 1) {
       return { name: parts[0], surname: "" };
     }
+    z;
 
     return {
       surname: parts.slice(0, -1).join(" "),

@@ -2,7 +2,7 @@
 const API_BASE = "http://localhost:8080";
 
 export const getRoomBookedDates = async (hotelId, roomId) => {
-  const url = `http://${API_BASE}/hotel-bookings/search/findByHotelHotelIdAndRoomRoomId?hotelId=${hotelId}&roomId=${roomId}`;
+  const url = `${API_BASE}/hotel-bookings/search/findByHotelHotelIdAndRoomRoomId?hotelId=${hotelId}&roomId=${roomId}`;
 
   try {
     const res = await fetch(url);
@@ -38,7 +38,7 @@ export const getRoomBookedDates = async (hotelId, roomId) => {
 export async function createHotelBooking(payload) {
   const token = localStorage.getItem("jwt");
   console.log(payload);
-  const res = await fetch(`${API_BASE}/booking/hotels`, {
+  const res = await fetch(`${API_BASE}/booking/hotel`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
