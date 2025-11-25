@@ -1,247 +1,228 @@
-import React, { useState } from "react";
-import { FaCalendarAlt, FaClock } from "react-icons/fa";
+import React, { useState, useEffect } from "react";
+import { FaCalendarAlt } from "react-icons/fa";
 import DatePicker from "react-datepicker";
-import Select from "react-select";
 import "react-datepicker/dist/react-datepicker.css";
-import imgMain from "../../../assets/images/Tour/Booking.jpg";
 
-// format €
-const formatEUR = (n) =>
-  new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(
-    n
-  );
+import { getRoomBookedDates } from "@/apis/booking";
 
-function QtyControl({ value, onChange, disabled }) {
-  return (
-    <div className="flex items-center gap-2">
-      <button
-        onClick={() => onChange(Math.max(0, value - 1))}
-        className="w-8 h-8 rounded bg-gray-100 hover:bg-gray-200 text-gray-600 disabled:opacity-40"
-        disabled={disabled || value === 0}
-      >
-        –
-      </button>
-      <div className="w-8 h-8 rounded bg-gray-100 grid place-items-center text-gray-800">
-        {value}
-      </div>
-      <button
-        onClick={() => onChange(value + 1)}
-        className="w-8 h-8 rounded bg-gray-100 hover:bg-gray-200 text-gray-600 disabled:opacity-40"
-        disabled={disabled}
-      >
-        +
-      </button>
-    </div>
-  );
-}
+// format VND
+const formatVND = (n) => `${Number(n || 0).toLocaleString("vi-VN")}₫`;
 
 export default function BookingStep1({
   bookingData,
   setBookingData,
   nextStep,
 }) {
-  const isRoomBooking = !!bookingData.room?.type; // nếu có room => đang đặt phòng
-  const PRICES = { adult: 34, child: 22, infant: 0 };
+  const { room = {}, hotel = {} } = bookingData;
 
-  // giữ date là kiểu Date thật
-  const [localDate, setLocalDate] = useState(
-    bookingData.date ? new Date(bookingData.date) : null
+  const realHotelId = hotel.hotelId || hotel.id;
+  const realRoomId = room.roomId || room.id;
+
+  // === STATE ===
+  const [checkInLocal, setCheckInLocal] = useState(
+    bookingData.checkInDate ? new Date(bookingData.checkInDate) : null
+  );
+  const [checkOutLocal, setCheckOutLocal] = useState(
+    bookingData.checkOutDate ? new Date(bookingData.checkOutDate) : null
   );
 
-  const handleDateChange = (d) => {
-    setLocalDate(d);
-    setBookingData({
-      ...bookingData,
-      date: d ? d.toISOString().split("T")[0] : "",
+  const [disabledDates, setDisabledDates] = useState([]);
+
+  // === FETCH BLOCKED DATES ===
+  useEffect(() => {
+    if (!realHotelId || !realRoomId) return;
+
+    getRoomBookedDates(realHotelId, realRoomId).then((dates) => {
+      setDisabledDates(dates);
     });
+  }, [realHotelId, realRoomId]);
+
+  // Check if picking a range overlaps disabled dates
+  const isRangeBlocked = (start, end) => {
+    if (!start || !end) return false;
+    return disabledDates.some((d) => d >= start && d <= end);
   };
 
-  const setTime = (v) => setBookingData({ ...bookingData, time: v.value });
-  const setQty = (name, v) =>
-    setBookingData({
-      ...bookingData,
-      tickets: { ...bookingData.tickets, [name]: v },
-    });
+  // === TÍNH SỐ ĐÊM ===
+  let nights = 0;
+  if (checkInLocal && checkOutLocal) {
+    const diff = checkOutLocal - checkInLocal;
+    nights = Math.max(0, Math.round(diff / (1000 * 60 * 60 * 24)));
+  }
 
-  const { date, time, tickets = {}, room = {} } = bookingData;
-  const { adult = 0, child = 0, infant = 0 } = tickets;
+  // === HANDLERS ===
+  const handleCheckInChange = (d) => {
+    setCheckInLocal(d);
 
-  const lineItems = isRoomBooking
-    ? [
-        {
-          label: `${room.type} Room`,
-          key: "room",
-          qty: 1,
-          price: room.price || 0,
-        },
-      ]
-    : [
-        { label: "Adult (18+)", key: "adult", qty: adult, price: PRICES.adult },
-        {
-          label: "Child (6–17)",
-          key: "child",
-          qty: child,
-          price: PRICES.child,
-        },
-        {
-          label: "Infant (0–5)",
-          key: "infant",
-          qty: infant,
-          price: PRICES.infant,
-        },
-      ];
+    setBookingData((prev) => ({
+      ...prev,
+      checkInDate: d ? d.toISOString().split("T")[0] : "",
+    }));
+
+    // Reset checkout nếu overlap
+    if (checkOutLocal && isRangeBlocked(d, checkOutLocal)) {
+      setCheckOutLocal(null);
+      setBookingData((prev) => ({ ...prev, checkOutDate: "" }));
+    }
+  };
+
+  const handleCheckOutChange = (d) => {
+    if (!d) return;
+
+    const start = checkInLocal;
+    const end = d;
+
+    if (isRangeBlocked(start, end)) {
+      alert("Khoảng ngày bạn chọn nằm trong thời gian đã có người đặt.");
+      return;
+    }
+
+    setCheckOutLocal(d);
+
+    setBookingData((prev) => ({
+      ...prev,
+      checkOutDate: d.toISOString().split("T")[0],
+    }));
+  };
+
+  const handleNext = () => {
+    if (!checkInLocal || !checkOutLocal) {
+      alert(
+        "❌ Vui lòng chọn ngày nhận phòng và ngày trả phòng trước khi tiếp tục!"
+      );
+      return;
+    }
+
+    setBookingData((prev) => ({
+      ...prev,
+      total: room.price * (nights || 1),
+      nights,
+    }));
+
+    nextStep();
+  };
+  // Highlight ngày blocked
+  const dayClassName = (date) => {
+    const isBlocked = disabledDates.some(
+      (d) => d.toDateString() === date.toDateString()
+    );
+
+    return isBlocked ? "blocked-day" : "";
+  };
+
+  // === LINE ITEMS ===
+  const lineItems = [
+    {
+      label: `${room.type} Room`,
+      qty: nights || 1,
+      price: room.price || 0,
+    },
+  ];
 
   const total = lineItems.reduce((s, it) => s + it.qty * it.price, 0);
-  if (bookingData.total !== total) setBookingData({ ...bookingData, total });
-
-  const timeOptions = ["09:00", "11:00", "13:00", "15:00", "17:00"].map(
-    (t) => ({
-      value: t,
-      label: t,
-    })
-  );
 
   return (
     <section className="grid md:grid-cols-5 gap-8">
-      {/* LEFT FORM */}
+      {/* LEFT */}
       <div className="md:col-span-3 space-y-6">
-        {/* Date */}
-        <div>
-          <label className="block text-sm text-gray-600 mb-2">
-            {isRoomBooking ? "Ngày nhận phòng" : "When will you visit?"}
-          </label>
-          <div className="relative flex items-center border rounded-lg px-3 py-2 bg-white shadow-sm focus-within:ring-2 focus-within:ring-orange-400">
-            <FaCalendarAlt className="text-gray-500 mr-2" />
-            <DatePicker
-              selected={localDate}
-              onChange={handleDateChange}
-              dateFormat="dd/MM/yyyy"
-              minDate={new Date()}
-              placeholderText={
-                isRoomBooking ? "Chọn ngày nhận phòng" : "Select a date"
-              }
-              showPopperArrow={false}
-              className="w-full text-sm text-gray-800 focus:outline-none"
-            />
-          </div>
+        <h2 className="text-lg font-semibold text-gray-800">
+          Thông tin đặt phòng
+        </h2>
+
+        {/* HOTEL INFO */}
+        <div className="border rounded-xl p-4 bg-gray-50">
+          <div className="font-semibold text-gray-800">{hotel.name}</div>
+          <div className="text-sm text-gray-600">📍 {hotel.address}</div>
         </div>
 
-        {/* Time */}
-        {!isRoomBooking && (
+        {/* DATES */}
+        <div className="grid md:grid-cols-2 gap-4">
+          {/* Check-in */}
           <div>
-            <label className="block text-sm text-gray-600 mb-2">
-              Which time?
+            <label className="text-sm text-gray-600 mb-2 block">
+              Ngày nhận phòng
             </label>
-            <div className="relative flex items-center border rounded-lg px-3 py-2 bg-white shadow-sm focus-within:ring-2 focus-within:ring-orange-400">
-              <FaClock className="text-gray-500 mr-2" />
-              <Select
-                options={timeOptions}
-                value={timeOptions.find((t) => t.value === time) || null}
-                onChange={setTime}
-                className="flex-1 text-sm"
-                styles={{
-                  control: (base) => ({
-                    ...base,
-                    border: "none",
-                    boxShadow: "none",
-                  }),
-                  dropdownIndicator: (base) => ({
-                    ...base,
-                    color: "#fb923c",
-                  }),
-                }}
+            <div className="relative flex items-center border rounded-lg px-3 py-2 bg-white shadow-sm">
+              <FaCalendarAlt className="text-gray-500 mr-2" />
+              <DatePicker
+                selected={checkInLocal}
+                onChange={handleCheckInChange}
+                dateFormat="dd/MM/yyyy"
+                minDate={new Date()}
+                excludeDates={disabledDates}
+                dayClassName={dayClassName}
+                placeholderText="Chọn ngày nhận phòng"
+                className="w-full text-sm"
               />
             </div>
           </div>
-        )}
 
-        {/* Notes */}
-        {!isRoomBooking && (
-          <div className="bg-gray-50 rounded-lg border text-sm text-gray-600 p-4 space-y-2">
-            <div>• Free for kids under 6 and disabled visitors (74%+)</div>
-            <div>
-              • Pregnant women, strollers, or visitors on crutches can buy
-              priority tickets at the venue
+          {/* Check-out */}
+          <div>
+            <label className="text-sm text-gray-600 mb-2 block">
+              Ngày trả phòng
+            </label>
+            <div className="relative flex items-center border rounded-lg px-3 py-2 bg-white shadow-sm">
+              <FaCalendarAlt className="text-gray-500 mr-2" />
+              <DatePicker
+                selected={checkOutLocal}
+                onChange={handleCheckOutChange}
+                dateFormat="dd/MM/yyyy"
+                minDate={checkInLocal || new Date()}
+                excludeDates={disabledDates}
+                dayClassName={dayClassName}
+                placeholderText="Chọn ngày trả phòng"
+                className="w-full text-sm"
+                disabled={!checkInLocal}
+              />
             </div>
           </div>
-        )}
-
-        {/* Tickets or Room */}
-        <div className="space-y-4">
-          {lineItems.map((it) => (
-            <div
-              key={it.key}
-              className="border rounded-lg p-4 flex items-center justify-between"
-            >
-              <div>
-                <div className="font-semibold text-gray-800">{it.label}</div>
-                <div className="text-orange-500 text-sm font-semibold">
-                  {isRoomBooking
-                    ? `${it.price.toLocaleString("vi-VN")}₫ / đêm`
-                    : formatEUR(it.price)}
-                </div>
-              </div>
-
-              {!isRoomBooking && (
-                <QtyControl
-                  value={it.qty}
-                  onChange={(v) => setQty(it.key, v)}
-                  disabled={it.key !== "adult" && adult === 0}
-                />
-              )}
-            </div>
-          ))}
         </div>
+
+        {/* Nights display */}
+        {nights > 0 ? (
+          <div className="p-3 bg-orange-100 border border-orange-300 text-orange-800 rounded-lg font-semibold">
+            Đang đặt phòng – {room.type}( {room.guests} khách) • {nights} đêm
+          </div>
+        ) : (
+          <p className="text-sm text-gray-600">
+            Vui lòng chọn ngày nhận và trả phòng.
+          </p>
+        )}
       </div>
 
-      {/* RIGHT SUMMARY */}
+      {/* SUMMARY */}
       <aside className="md:col-span-2">
         <div className="rounded-2xl border bg-white shadow-sm p-5">
           <h3 className="font-semibold text-gray-800 mb-4">
-            {isRoomBooking ? "Booking Summary" : "Your Tickets Overview"}
+            Tóm tắt đặt phòng
           </h3>
 
           <div className="flex gap-3 mb-4">
             <img
-              src={
-                isRoomBooking
-                  ? `/images/room/${room.image_bed || "standard.jpg"}`
-                  : imgMain
-              }
-              alt={isRoomBooking ? room.type : "tour"}
+              src={`/images/room/${room.image_bed || "standard.jpg"}`}
+              alt={room.type}
               className="w-20 h-16 rounded-md object-cover"
             />
-            <div>
+
+            <div className="text-sm">
               <div className="font-medium text-gray-800">
-                {isRoomBooking
-                  ? `${room.type} (${room.guests} khách)`
-                  : "Wine tasting In Tuscany"}
+                {hotel.name} – {room.type} ({room.guests} khách)
               </div>
-              <div className="text-xs text-gray-500">📅 {date || "--"}</div>
-              {!isRoomBooking && (
-                <div className="text-xs text-gray-500">🕒 {time || "--"}</div>
-              )}
+              <div className="text-xs text-gray-500">📍 {hotel.address}</div>
             </div>
           </div>
 
           <hr className="my-3" />
 
-          <div className="space-y-2 text-sm">
-            {lineItems.map((it) => (
-              <div key={it.key} className="flex justify-between text-gray-700">
+          <div className="text-sm space-y-2 text-gray-700">
+            {lineItems.map((it, i) => (
+              <div key={i} className="flex justify-between">
                 <span>
-                  {it.qty} {it.label}{" "}
-                  {it.price > 0 &&
-                    (isRoomBooking ? (
-                      <span>({it.price.toLocaleString("vi-VN")}₫)</span>
-                    ) : (
-                      <span>({formatEUR(it.price)})</span>
-                    ))}
+                  {it.qty} đêm · {it.label}
                 </span>
-                <span className="text-gray-800 font-medium">
-                  {isRoomBooking
-                    ? `${(it.qty * it.price).toLocaleString("vi-VN")}₫`
-                    : formatEUR(it.qty * it.price)}
+                <span className="font-medium">
+                  {formatVND(it.qty * it.price)}
                 </span>
               </div>
             ))}
@@ -249,20 +230,18 @@ export default function BookingStep1({
 
           <hr className="my-4" />
 
-          <div className="flex justify-between items-center mb-4">
-            <span className="text-gray-700 font-semibold">Total Price</span>
+          <div className="flex justify-between text-gray-700 font-semibold mb-4">
+            <span>Tổng tiền</span>
             <span className="text-orange-500 font-bold">
-              {isRoomBooking
-                ? `${total.toLocaleString("vi-VN")}₫`
-                : formatEUR(total)}
+              {formatVND(total)}
             </span>
           </div>
 
           <button
-            onClick={nextStep}
+            onClick={handleNext}
             className="w-full rounded-full bg-orange-500 hover:bg-orange-600 text-white py-3 font-medium mt-2"
           >
-            Go to the Next Step
+            Tiếp tục
           </button>
         </div>
       </aside>

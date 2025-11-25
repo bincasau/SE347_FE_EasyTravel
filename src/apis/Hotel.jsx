@@ -63,3 +63,18 @@ export async function getHotelProvinces() {
   const res = await fetch(url);
   return res.json();
 }
+
+export async function getHotelById(hotelId) {
+  const url = `${API_BASE}/hotels/${hotelId}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Không thể tải thông tin khách sạn");
+  return res.json();
+}
+
+// Lấy phòng theo ID
+export async function getRoomById(roomId) {
+  const url = `${API_BASE}/rooms/${roomId}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Không thể tải thông tin phòng");
+  return res.json();
+}

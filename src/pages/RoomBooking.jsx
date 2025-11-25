@@ -14,10 +14,16 @@ export default function RoomBooking() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  //  Dữ liệu booking mặc định
+  // Dữ liệu booking mặc định
   const [bookingData, setBookingData] = useState({
     date: "",
     time: "",
+    hotel: {
+      id: null,
+      name: "",
+      address: "",
+      main_image: "",
+    },
     room: {
       id: null,
       type: "",
@@ -35,7 +41,7 @@ export default function RoomBooking() {
     },
   });
 
-  // ✅ Fetch dữ liệu phòng
+  // Fetch dữ liệu phòng + khách sạn
   useEffect(() => {
     if (!hotelId || !roomId) {
       setError("Thiếu thông tin phòng hoặc khách sạn.");
@@ -46,14 +52,29 @@ export default function RoomBooking() {
     setIsLoading(true);
     setError(null);
 
-    fetch(`http://localhost:8080/hotels/${hotelId}/rooms/${roomId}`)
-      .then((res) => {
-        if (!res.ok) throw new Error("Không thể tải dữ liệu phòng");
-        return res.json();
-      })
-      .then((room) => {
+    async function loadData() {
+      try {
+        // Fetch room
+        const roomRes = await fetch(
+          `http://localhost:8080/hotels/${hotelId}/rooms/${roomId}`
+        );
+        if (!roomRes.ok) throw new Error("Không thể tải dữ liệu phòng");
+        const room = await roomRes.json();
+
+        // Fetch hotel
+        const hotelRes = await fetch(`http://localhost:8080/hotels/${hotelId}`);
+        if (!hotelRes.ok) throw new Error("Không thể tải dữ liệu khách sạn");
+        const hotel = await hotelRes.json();
+
+        // Update bookingData
         setBookingData((prev) => ({
           ...prev,
+          hotel: {
+            id: hotel.hotelId,
+            name: hotel.name,
+            address: hotel.address,
+            main_image: hotel.mainImage,
+          },
           room: {
             id: room.roomId,
             type: room.roomType,
@@ -64,19 +85,22 @@ export default function RoomBooking() {
           },
           total: room.price,
         }));
-      })
-      .catch((err) => {
-        console.error("Error fetching room:", err);
-        setError("Không thể tải thông tin phòng, vui lòng thử lại.");
-      })
-      .finally(() => setIsLoading(false));
+      } catch (err) {
+        console.error(err);
+        setError("Không thể tải dữ liệu đặt phòng.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadData();
   }, [hotelId, roomId]);
 
-  // ✅ Điều hướng giữa các bước
+  // Điều hướng giữa các bước
   const nextStep = () => setStep((s) => Math.min(3, s + 1));
   const prevStep = () => setStep((s) => Math.max(1, s - 1));
 
-  // ✅ UI hiển thị tiến trình (stepper)
+  // Hiển thị Stepper
   const Stepper = () => (
     <div className="flex items-center justify-center gap-10 mb-10 text-sm">
       {[
@@ -109,7 +133,7 @@ export default function RoomBooking() {
     </div>
   );
 
-  // ✅ Render từng bước
+  // Render từng bước
   const renderStep = () => {
     if (isLoading)
       return (
