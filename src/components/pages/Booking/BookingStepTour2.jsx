@@ -2,9 +2,6 @@ import React, { useState, useEffect } from "react";
 
 export default function BookingStepTour2({ bookingData, setBookingData, nextStep, prevStep }) {
 
-  const JWT_TOKEN =
-    "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJtaW5oZ2lhbmcxIiwiaWF0IjoxNzYzODk4Mjc3LCJleHAiOjE3NjM5MDE4Nzd9.nfJVT4Hcf63zcrKSEGEoOnczhSSELqkK22A_OVsFgmw";
-
   const [userInfo, setUserInfo] = useState({
     name: "",
     email: "",
@@ -12,16 +9,30 @@ export default function BookingStepTour2({ bookingData, setBookingData, nextStep
     address: "",
   });
 
-  // 🔥 Fetch API with JWT
+  // 🔥 Lấy token đúng cách từ localStorage (KHÔNG HARD CODE)
+  const getToken = () =>
+    localStorage.getItem("jwt") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("accessToken");
+
+  // 🔥 Fetch user info with JWT
   useEffect(() => {
+    const token = getToken();
+    if (!token) {
+      console.warn("⚠ No JWT token found!");
+      return; // Không crash
+    }
+
     fetch("http://localhost:8080/account/detail", {
       method: "GET",
       headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${JWT_TOKEN}`,
+        Authorization: `Bearer ${token}`,
       },
     })
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error("Unauthorized");
+        return res.json();
+      })
       .then((data) => {
         setUserInfo({
           name: data.name || "",
@@ -30,7 +41,7 @@ export default function BookingStepTour2({ bookingData, setBookingData, nextStep
           address: data.address || "",
         });
       })
-      .catch((err) => console.error("Error fetching user:", err));
+      .catch((err) => console.error("❌ Error fetching user:", err));
   }, []);
 
   const handleChange = (field, value) => {
