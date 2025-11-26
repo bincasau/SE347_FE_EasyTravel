@@ -23,27 +23,23 @@ export default function BookingStep3({ bookingData, prevStep }) {
   };
 
   // ---------- Handle Confirm ----------
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     // Chưa chọn phương thức
     if (!method) {
       return alert("❌ Vui lòng chọn phương thức thanh toán!");
     }
 
-    // Nếu là thẻ → validate
-    if (method === "card") {
-      if (!validateCard()) {
-        return alert("❌ Vui lòng nhập thông tin thẻ hợp lệ!");
-      }
+    // Validate thẻ
+    if (method === "card" && !validateCard()) {
+      return alert("❌ Vui lòng nhập thông tin thẻ hợp lệ!");
     }
 
-    // OK → Show modal
-    setShowModal(true);
+    // Nếu hợp lệ → tiến hành thanh toán
+    await finishPayment();
   };
 
   // ---------- Finish Payment ----------
   const finishPayment = async () => {
-    setShowModal(false);
-
     try {
       const payload = {
         checkInDate: bookingData.checkInDate,
@@ -54,9 +50,13 @@ export default function BookingStep3({ bookingData, prevStep }) {
         gmail: bookingData.user.email,
       };
 
-      await createHotelBooking(payload);
-      navigate("/hotels");
+      // gọi API
+      const res = await createHotelBooking(payload);
+
+      //  nếu API trả về success → mở popup
+      setShowModal(true);
     } catch (err) {
+      // ❌ lỗi → KHÔNG mở popup, chỉ báo lỗi
       alert("❌ Lỗi khi lưu booking: " + err.message);
     }
   };
@@ -223,7 +223,7 @@ export default function BookingStep3({ bookingData, prevStep }) {
             </p>
 
             <button
-              onClick={finishPayment}
+              onClick={() => navigate("/hotels")}
               className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-full"
             >
               Hoàn tất

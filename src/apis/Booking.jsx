@@ -37,7 +37,6 @@ export const getRoomBookedDates = async (hotelId, roomId) => {
 
 export async function createHotelBooking(payload) {
   const token = localStorage.getItem("jwt");
-  console.log(payload);
   const res = await fetch(`${API_BASE}/booking/hotel`, {
     method: "POST",
     headers: {
@@ -52,5 +51,5 @@ export async function createHotelBooking(payload) {
     throw new Error(msg || "Failed to create booking");
   }
 
-  return res.json();
+  return res.text();
 }
