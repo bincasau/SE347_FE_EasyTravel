@@ -16,6 +16,9 @@ import Booking from "./pages/BookingTour";
 import Verify from "./pages/Verify";
 import Profile from "./pages/Profile";
 
+import RequireRole from "./pages/TourGuide/RequireRole";
+import PastTours from "./pages/TourGuide/PastTours";
+
 import ScrollToTop from "./utils/ScrollToTop";
 import LoginModal from "./pages/Login";
 import { useEffect, useState } from "react";
@@ -25,20 +28,22 @@ export default function App() {
   const [openLogin, setOpenLogin] = useState(false);
   const [openSignup, setOpenSignup] = useState(false);
 
+  // Khóa scroll khi mở modal
   useEffect(() => {
-    const hasModal = openLogin || openSignup;
-    document.body.style.overflow = hasModal ? "hidden" : "";
-    return () => (document.body.style.overflow = "");
+    document.body.style.overflow = openLogin || openSignup ? "hidden" : "";
   }, [openLogin, openSignup]);
 
   return (
     <LangProvider>
       <BrowserRouter>
         <ScrollToTop />
+
+        {/* Luôn dùng 1 Header, nó tự đổi menu theo role */}
         <Header
           onOpenLogin={() => setOpenLogin(true)}
           onOpenSignup={() => setOpenSignup(true)}
         />
+
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/about-us" element={<AboutUs />} />
@@ -54,16 +59,25 @@ export default function App() {
           <Route path="/home" element={<Navigate to="/" replace />} />
           <Route path="/verify" element={<Verify />} />
           <Route path="/profile" element={<Profile />} />
+
+          {/* Route dành cho TourGuide */}
+          <Route
+            path="/guide/past-tours"
+            element={
+              <RequireRole role="TourGuide">
+                <PastTours />
+              </RequireRole>
+            }
+          />
         </Routes>
+
         <Footer />
 
-        {/* Login Modal */}
+        {/* LOGIN MODAL */}
         {openLogin && (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-            onClick={(e) => {
-              if (e.target === e.currentTarget) setOpenLogin(false);
-            }}
+            onClick={(e) => e.target === e.currentTarget && setOpenLogin(false)}
           >
             <LoginModal
               onClose={() => setOpenLogin(false)}
@@ -75,13 +89,13 @@ export default function App() {
           </div>
         )}
 
-        {/* Signup Modal */}
+        {/* SIGNUP MODAL */}
         {openSignup && (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-            onClick={(e) => {
-              if (e.target === e.currentTarget) setOpenSignup(false);
-            }}
+            onClick={(e) =>
+              e.target === e.currentTarget && setOpenSignup(false)
+            }
           >
             <SignupModal
               onClose={() => setOpenSignup(false)}

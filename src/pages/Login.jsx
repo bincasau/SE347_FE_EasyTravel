@@ -1,20 +1,40 @@
 import { useState } from "react";
 import { loginApi } from "@/apis/AccountAPI";
+import { getUserFromToken } from "@/utils/auth"; // ⭐ thêm import
+import { useNavigate } from "react-router-dom";   // ⭐ thêm import
 
 export default function LoginModal({ onClose, onOpenSignup }) {
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const navigate = useNavigate(); // ⭐ thêm navigate
+
   async function handleSubmit(e) {
     e.preventDefault();
     setErr("");
+
     const fd = new FormData(e.currentTarget);
     const payload = Object.fromEntries(fd.entries()); // { username, password }
 
     setLoading(true);
     try {
-      await loginApi(payload); // -> đã lưu token + dispatch sự kiện
-      onClose?.(); // -> đóng modal, Header sẽ tự cập nhật
+      // ⭐ LOGIN — backend trả JWT → FE lưu localStorage
+      const token = await loginApi(payload);
+
+      // ⭐ Decode JWT → lấy role + username
+      const user = getUserFromToken(); 
+      console.log("Decoded user:", user);
+
+      // ⭐ Đóng modal login
+      onClose?.();
+
+      // ⭐ Redirect theo role
+      if (user?.role === "TourGuide") {
+        navigate("/guide/dashboard");
+      } else {
+        navigate("/");
+      }
+
     } catch (error) {
       setErr(error.message || "Đăng nhập thất bại!");
     } finally {
