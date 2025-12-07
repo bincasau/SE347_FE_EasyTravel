@@ -18,6 +18,10 @@ import Profile from "./pages/Profile";
 
 import RequireRole from "./pages/TourGuide/RequireRole";
 import PastTours from "./pages/TourGuide/PastTours";
+import SchedulePage from "./pages/TourGuide/SchedulePage";
+import ReviewsPage from "./pages/TourGuide/ReviewsPage";
+import GuideProfile from "./pages/TourGuide/GuideProfile";
+import TourScheduleDetail from "./pages/TourGuide/TourScheduleDetail";
 
 import ScrollToTop from "./utils/ScrollToTop";
 import LoginModal from "./pages/Login";
@@ -66,6 +70,42 @@ export default function App() {
             element={
               <RequireRole role="TourGuide">
                 <PastTours />
+              </RequireRole>
+            }
+          />
+
+          <Route
+            path="/guide/schedule"
+            element={
+              <RequireRole role="TourGuide">
+                <SchedulePage />
+              </RequireRole>
+            }
+          />
+
+          <Route
+            path="/guide/reviews"
+            element={
+              <RequireRole role="TourGuide">
+                <ReviewsPage />
+              </RequireRole>
+            }
+          />
+
+          <Route
+            path="/guide/profile"
+            element={
+              <RequireRole role="TourGuide">
+                <GuideProfile />
+              </RequireRole>
+            }
+          />
+
+          <Route
+            path="/guide/tour/:tourId/schedule"
+            element={
+              <RequireRole role="TourGuide">
+                <TourScheduleDetail />
               </RequireRole>
             }
           />

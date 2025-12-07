@@ -1,93 +1,95 @@
-import React from "react";
+import { useState } from "react";
+import { Link } from "react-router-dom";
 
-const tours = [
+const toursData = [
   {
     id: 1,
     title: "Lucca Bike Tour",
     image: "https://images.unsplash.com/photo-1600359753839-ed4f6a9bd86c",
-    date: "Tuesday, 02 Oct 2022",
-    time: "15:00 PM",
-    group: "15-30",
-    transportation: "Bus",
-    duration: "15 hours and 45 minutes",
-    guideService: "Included",
-    language: "English, Italian",
-    entryFees: "lorem ipsum"
+    date: "2022-10-02",
+    duration: "15h 45m",
   },
   {
     id: 2,
-    title: "Lucca Bike Tour",
+    title: "City Walking Tour",
     image: "https://images.unsplash.com/photo-1501785888041-af3ef285b470",
-    date: "Tuesday, 02 Oct 2022",
-    time: "15:00 PM",
-    group: "15-30",
-    transportation: "Bus",
-    duration: "15 hours and 45 minutes",
-    guideService: "Included",
-    language: "English, Italian",
-    entryFees: "lorem ipsum"
+    date: "2022-10-05",
+    duration: "8h 20m",
   },
   {
     id: 3,
-    title: "Lucca Bike Tour",
+    title: "Wine Tasting Tour",
     image: "https://images.unsplash.com/photo-1479057000319-7f6a6d7cd3a5",
-    date: "Tuesday, 02 Oct 2022",
-    time: "15:00 PM",
-    group: "15-30",
-    transportation: "Bus",
-    duration: "15 hours and 45 minutes",
-    guideService: "Included",
-    language: "English, Italian",
-    entryFees: "lorem ipsum"
+    date: "2022-10-10",
+    duration: "6h 40m",
   },
 ];
 
 export default function PastTours() {
-  return (
-    <div className="w-full py-12 max-w-7xl mx-auto">
-      <h2 className="text-3xl font-semibold mb-10">Past Tours</h2>
+  const [sortOrder, setSortOrder] = useState("newest");
 
-      <div className="flex flex-col gap-8">
-        {tours.map((tour) => (
+  // Sort theo ngày
+  const sortedTours = [...toursData].sort((a, b) => {
+    if (sortOrder === "newest") {
+      return new Date(b.date) - new Date(a.date);
+    } else {
+      return new Date(a.date) - new Date(b.date);
+    }
+  });
+
+  return (
+    <div className="w-full py-10 max-w-6xl mx-auto px-4">
+
+      {/* ⭐ TITLE ĐẸP NHƯ GUIDE PROFILE */}
+      <h2 className="text-3xl font-bold text-center text-orange-500 mb-12">
+        Past Tours
+      </h2>
+
+      {/* SORT CONTROLS */}
+      <div className="flex justify-end mb-6">
+        <select
+          className="border rounded-full px-4 py-2 text-sm cursor-pointer shadow-sm"
+          value={sortOrder}
+          onChange={(e) => setSortOrder(e.target.value)}
+        >
+          <option value="newest">Gần nhất → Xa nhất</option>
+          <option value="oldest">Xa nhất → Gần nhất</option>
+        </select>
+      </div>
+
+      {/* LIST */}
+      <div className="flex flex-col gap-6">
+        {sortedTours.map((tour) => (
           <div
             key={tour.id}
-            className="flex flex-col md:flex-row bg-white rounded-xl shadow-md overflow-hidden p-4"
+            className="bg-white shadow rounded-xl p-4 flex items-center gap-6 hover:shadow-lg transition"
           >
-            {/* Image */}
-            <div className="w-full md:w-1/3">
-              <img
-                src={tour.image}
-                alt={tour.title}
-                className="w-full h-60 md:h-full object-cover rounded-lg"
-              />
-            </div>
+            {/* IMAGE */}
+            <img
+              src={tour.image}
+              alt={tour.title}
+              className="w-40 h-32 rounded-lg object-cover flex-shrink-0"
+            />
 
-            {/* Content */}
-            <div className="w-full md:w-2/3 flex flex-col justify-between px-6 py-4">
-              <h3 className="text-2xl font-semibold mb-4">{tour.title}</h3>
+            {/* INFO */}
+            <div className="flex-1">
+              <h3 className="text-xl font-semibold text-gray-800">
+                {tour.title}
+              </h3>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 text-gray-700 text-sm">
-
-                <p>📅 <strong>Date:</strong> {tour.date}</p>
+              <div className="mt-2 text-gray-600 text-sm">
+                <p>📅 <strong>Date:</strong> {new Date(tour.date).toDateString()}</p>
                 <p>⏳ <strong>Duration:</strong> {tour.duration}</p>
-
-                <p>⏰ <strong>Time:</strong> {tour.time}</p>
-                <p>🧑‍🏫 <strong>Guide service:</strong> {tour.guideService}</p>
-
-                <p>👥 <strong>Number of group:</strong> {tour.group}</p>
-                <p>🌐 <strong>Language:</strong> {tour.language}</p>
-
-                <p>🚌 <strong>Transportation:</strong> {tour.transportation}</p>
-                <p>🎫 <strong>Entry Fees:</strong> {tour.entryFees}</p>
-              </div>
-
-              {/* Button */}
-              <div className="mt-6">
-                <button className="px-5 py-2 border border-orange-400 text-orange-500 rounded-full hover:bg-orange-100 transition">
-                  View tour
-                </button>
               </div>
             </div>
+
+            {/* BUTTON */}
+            <Link
+              to={`/guide/tour/${tour.id}/schedule`}
+              className="px-5 py-2 border border-orange-400 text-orange-500 rounded-full hover:bg-orange-100 transition"
+            >
+              View Tour
+            </Link>
           </div>
         ))}
       </div>
