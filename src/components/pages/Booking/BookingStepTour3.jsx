@@ -17,21 +17,18 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
       localStorage.getItem("token") ||
       localStorage.getItem("accessToken");
 
+    // ✅ Payload đúng DTO BookingTourRequest
     const payload = {
       tourId: tourInfo.tourId,
-      name: user.name,
-      email: user.email,
-      phone: user.phone,
-      address: user.address,
-      adultCount: tickets.adult,
-      childCount: tickets.child,
+      adults: tickets.adult,
+      children: tickets.child,
       totalPrice: total,
-      travelDate: date,
-      paymentMethod: payment,
+      email: user.email,
     };
 
     try {
-      const res = await fetch("http://localhost:8080/booking/tour", {
+      // 1️⃣ Gửi booking tour
+      const bookingRes = await fetch("http://localhost:8080/booking/tour", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -40,12 +37,63 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Booking failed");
+      if (!bookingRes.ok) throw new Error(await bookingRes.text());
+
+      const bookingData = await bookingRes.json();
+      console.log("📌 Booking response:", bookingData);
+
+      const bookingId =
+        bookingData.bookingId || bookingData.id || bookingData?.data?.bookingId;
+
+      if (!bookingId) {
+        alert("❌ Booking failed: missing bookingId!");
+        return;
       }
 
-      alert("🎉 Booking successfully!");
+      // 2️⃣ Nếu chọn thanh toán CASH → xong luôn
+      if (payment === "cash") {
+        alert("🎉 Booking successfully! Please pay at departure.");
+        return;
+      }
+
+      // 3️⃣ Nếu chọn VNPay → gọi /payment/vn-pay
+      if (payment === "vnpay") {
+        const params = new URLSearchParams();
+        params.append("amount", total);          // số tiền
+        params.append("bankCode", "NCB");        // bankCode demo
+        params.append("bookingId", bookingId);   // id booking mới tạo
+        params.append("bookingType", "TOUR");    // nếu BE yêu cầu HOTEL thì đổi lại
+
+        const vnpApi = `http://localhost:8080/payment/vn-pay?${params.toString()}`;
+        console.log("📌 VNPay request URL:", vnpApi);
+
+        const payRes = await fetch(vnpApi, {
+          method: "GET",
+          headers: {
+            // 💥 QUAN TRỌNG: gửi kèm JWT, nếu không Spring Security sẽ 403
+            Authorization: token ? `Bearer ${token}` : "",
+          },
+        });
+
+        if (!payRes.ok) {
+          console.error("❌ VNPay API Error:", payRes.status);
+          alert("VNPay request failed: " + payRes.status);
+          return;
+        }
+
+        const payData = await payRes.json();
+        console.log("📌 VNPay response:", payData);
+
+        const paymentUrl = payData?.data?.paymentUrl;
+        if (!paymentUrl) {
+          alert("❌ Cannot get VNPay payment URL!");
+          return;
+        }
+
+        alert("Redirecting to VNPay...");
+        window.location.href = paymentUrl;
+        return;
+      }
     } catch (err) {
       console.error("❌ Booking error:", err);
       alert("Booking failed!");
@@ -81,16 +129,6 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
             onChange={() => setPayment("cash")}
           />
           Cash (Pay at departure)
-        </label>
-
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="radio"
-            name="payment"
-            checked={payment === "momo"}
-            onChange={() => setPayment("momo")}
-          />
-          MOMO Wallet
         </label>
 
         <label className="flex items-center gap-2 cursor-pointer">
