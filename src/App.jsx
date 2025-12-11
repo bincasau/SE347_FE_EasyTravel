@@ -23,6 +23,10 @@ import ReviewsPage from "./pages/TourGuide/ReviewsPage";
 import GuideProfile from "./pages/TourGuide/GuideProfile";
 import TourScheduleDetail from "./pages/TourGuide/TourScheduleDetail";
 
+import AdminTourManagementPage from "./pages/Admin/TourManagementPage";
+import AdminHotelManagementPage from "./pages/Admin/HotelManagementPage"; 
+import AdminBlogManagementPage from "./pages/Admin/BlogManagementPage";
+
 import ScrollToTop from "./utils/ScrollToTop";
 import LoginModal from "./pages/Login";
 import { useEffect, useState } from "react";
@@ -106,6 +110,32 @@ export default function App() {
             element={
               <RequireRole role="TourGuide">
                 <TourScheduleDetail />
+              </RequireRole>
+            }
+          />
+          {/* Route cho Admin */}
+
+          <Route
+            path="/Admin/Tours"
+            element={
+              <RequireRole role="Admin">
+                <AdminTourManagementPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/Admin/hotels"
+            element={
+              <RequireRole role="Admin">
+                <AdminHotelManagementPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/Admin/blogs"
+            element={
+              <RequireRole role="Admin">
+                <AdminBlogManagementPage />
               </RequireRole>
             }
           />

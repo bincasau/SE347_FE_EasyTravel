@@ -9,6 +9,9 @@ export const en = {
     contact: "Contact",
     login: "Login",
     signup: "Sign Up",
+    logout: "Log out",
+    tourguide: "Tour Guide",
+    dashboard: "Dashboard",
   },
 
   // ===== FOOTER =====

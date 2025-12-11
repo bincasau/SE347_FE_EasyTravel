@@ -78,3 +78,17 @@ export async function getRoomById(roomId) {
   if (!res.ok) throw new Error("Không thể tải thông tin phòng");
   return res.json();
 }
+
+export async function getAllHotels(sort = "hotelId,asc") {
+  const params = new URLSearchParams();
+  params.append("page", 0);
+  params.append("size", 9999);
+  params.append("sort", sort);
+
+  const url = `${API_BASE}/hotels?${params.toString()}`;
+
+  const res = await fetch(url);
+  const data = await res.json();
+
+  return data._embedded?.hotels ?? [];
+}

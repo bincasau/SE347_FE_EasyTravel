@@ -1,3 +1,5 @@
+import Tour from "../models/Tour";
+
 export const vi = {
   // ===== HEADER =====
   header: {
@@ -9,6 +11,9 @@ export const vi = {
     contact: "Liên hệ",
     login: "Đăng nhập",
     signup: "Đăng ký",
+    logout: "Đăng xuất",
+    tourguide: "Hướng dẫn viên",
+    dashboard: "Bảng điều khiển",
   },
 
   // ===== FOOTER =====

@@ -12,7 +12,7 @@ export default function BookingStep2({
   const isRoomBooking = !!bookingData.room?.type;
 
   const [isLocked, setIsLocked] = useState(false);
-  const [showLoginPopup, setShowLoginPopup] = useState(false); // 👉 popup login
+  const [showLoginPopup, setShowLoginPopup] = useState(false); //  popup login
 
   function splitFullName(fullName = "") {
     if (!fullName || typeof fullName !== "string") {

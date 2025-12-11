@@ -14,7 +14,6 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
   const location = useLocation();
   const navigate = useNavigate();
 
-  /** ⭐ MENU USER */
   const userMenu = [
     { to: "/", key: "home" },
     { to: "/tours", key: "tours" },
@@ -24,7 +23,6 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     { to: "/contact-us", key: "contact" },
   ];
 
-  /** ⭐ MENU TOUR GUIDE */
   const guideMenu = [
     { to: "/guide/schedule", label: "Schedule" },
     { to: "/guide/reviews", label: "Guest Reviews" },
@@ -32,11 +30,18 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     { to: "/guide/profile", label: "Guide's Profile" },
   ];
 
-  /** FETCH USER + ROLE */
-  const fetchUserWithRole = async () => {
-    setLoadingUser(true);
+    const adminMenu = [
+      { to: "/admin/dashboard", key: "dashboard" },
+      { to: "/admin/tours", key: "tours" },
+      { to: "/admin/guides", key:"tourguide" },
+      { to: "/admin/hotels", key:"hotel" },
+      { to: "/admin/blogs", key: "blog" },
+    ];
 
-    const jwtUser = getUserFromToken(); // chứa role + username
+
+  const fetchUser = async () => {
+    setLoadingUser(true);
+    const jwtUser = getUserFromToken();
 
     try {
       const apiUser = await getAccountDetail();
@@ -56,13 +61,33 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
   };
 
   useEffect(() => {
-    fetchUserWithRole();
-    const h = () => fetchUserWithRole();
-    window.addEventListener("jwt-changed", h);
-    return () => window.removeEventListener("jwt-changed", h);
-  }, []);
+    fetchUser();
 
-  /** LOGOUT */
+    const handleJWT = () => fetchUser();
+    window.addEventListener("jwt-changed", handleJWT);
+    window.addEventListener("storage", (e) => {
+      if (e.key === "jwt") fetchUser();
+    });
+
+    return () => window.removeEventListener("jwt-changed", handleJWT);
+  }, []);
+  useEffect(() => {
+    if (user?.role === "Admin") {
+      if (!location.pathname.startsWith("/admin")) {
+        navigate("/admin/dashboard");
+      }
+    }
+  }, [user, location.pathname, navigate]);
+
+  useEffect(() => {
+    const openLoginHandler = () => {
+      if (typeof onOpenLogin === "function") onOpenLogin();
+    };
+
+    window.addEventListener("open-login", openLoginHandler);
+    return () => window.removeEventListener("open-login", openLoginHandler);
+  }, [onOpenLogin]);
+
   const handleLogout = () => {
     if (!confirm("Bạn có chắc muốn đăng xuất?")) return;
     logout();
@@ -70,18 +95,44 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     navigate("/");
   };
 
+  const Flag = ({ code }) => (
+    <div className="flex items-center gap-1 text-sm">
+      {" "}
+      <span>{code === "vi" ? "🇻🇳" : "🇺🇸"}</span>{" "}
+      <span className="uppercase">{code}</span>{" "}
+    </div>
+  );
+
   const baseLink =
     "text-gray-700 hover:text-orange-500 transition-colors relative after:absolute after:left-0 after:-bottom-2 after:h-[2px] after:w-0 after:bg-orange-500 hover:after:w-full after:transition-all";
 
   const activeLink =
     "text-orange-500 font-semibold relative after:absolute after:left-0 after:-bottom-2 after:h-[2px] after:w-full after:bg-orange-500";
 
+  const isToursActive =
+    location.pathname.startsWith("/tours") ||
+    location.pathname.startsWith("/detailtour");
+
+  const isHotelActive =
+    location.pathname.startsWith("/hotels") ||
+    location.pathname.startsWith("/rooms");
+
+  const isBlogActive =
+    location.pathname.startsWith("/blog") ||
+    location.pathname.startsWith("/detailblog");
+
+  const renderNavClass = (it, isActive) => {
+    if (it.to === "/tours" && isToursActive) return activeLink;
+    if (it.to === "/hotels" && isHotelActive) return activeLink;
+    if (it.to === "/blog" && isBlogActive) return activeLink;
+
+    return isActive ? activeLink : baseLink;
+  };
+
   return (
     <header className="sticky top-0 bg-white/90 backdrop-blur border-b border-gray-100 z-50">
       <div className="max-w-7xl mx-auto px-6">
         <div className="h-16 flex items-center justify-between">
-
-          {/* ⭐ LOGO */}
           <Link to="/" className="flex items-center gap-2 shrink-0">
             <img src={Logo} className="h-9" />
             <span className="text-2xl font-semibold text-orange-500">Easy</span>
@@ -90,18 +141,28 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
             </span>
           </Link>
 
-          {/* ⭐ MENU Ở GIỮA */}
           <nav className="hidden md:flex flex-1 justify-center">
             <ul className="flex gap-9">
-
-              {/* Nếu là tourguide → dùng menu guide */}
-              {user?.role === "TourGuide"
+              {user?.role === "Admin"
+                ? adminMenu.map((it) => (
+                    <li key={it.to}>
+                      <NavLink
+                        to={it.to}
+                        className={({ isActive }) =>
+                          renderNavClass(it, isActive)
+                        }
+                      >
+                        {t(`header.${it.key}`)}
+                      </NavLink>
+                    </li>
+                  ))
+                : user?.role === "TourGuide"
                 ? guideMenu.map((it) => (
                     <li key={it.to}>
                       <NavLink
                         to={it.to}
                         className={({ isActive }) =>
-                          isActive ? activeLink : baseLink
+                          renderNavClass(it, isActive)
                         }
                       >
                         {it.label}
@@ -114,7 +175,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
                         to={it.to}
                         end={it.to === "/"}
                         className={({ isActive }) =>
-                          isActive ? activeLink : baseLink
+                          renderNavClass(it, isActive)
                         }
                       >
                         {t(`header.${it.key}`)}
@@ -124,15 +185,52 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
             </ul>
           </nav>
 
-          {/* ⭐ USER INFO / AUTH */}
           <div className="hidden md:flex items-center gap-4">
+            <div className="relative">
+              <button
+                className="flex items-center gap-2 border px-3 py-2 rounded-xl bg-gray-50 hover:bg-gray-100"
+                onClick={() => setOpenLang(!openLang)}
+              >
+                <Flag code={lang} />
+              </button>
+
+              {openLang && (
+                <div className="absolute right-0 mt-2 bg-white border w-32 rounded-xl shadow">
+                  <button
+                    className="flex w-full px-3 py-2 hover:bg-gray-50"
+                    onClick={() => {
+                      setLang("vi");
+                      setOpenLang(false);
+                    }}
+                  >
+                    <Flag code="vi" />
+                  </button>
+                  <button
+                    className="flex w-full px-3 py-2 hover:bg-gray-50"
+                    onClick={() => {
+                      setLang("en");
+                      setOpenLang(false);
+                    }}
+                  >
+                    <Flag code="en" />
+                  </button>
+                </div>
+              )}
+            </div>
+
             {loadingUser ? (
               <div className="text-gray-400">Loading...</div>
             ) : user ? (
               <div className="flex items-center gap-3">
                 <button
                   onClick={() =>
-                    navigate(user.role === "TourGuide" ? "/guide/profile" : "/profile")
+                    navigate(
+                      user.role === "Admin"
+                        ? "/admin/dashboard"
+                        : user.role === "TourGuide"
+                        ? "/guide/profile"
+                        : "/profile"
+                    )
                   }
                   className="flex items-center gap-2 group"
                 >
@@ -147,21 +245,21 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
 
                 <button
                   onClick={handleLogout}
-                  className="border border-red-400 text-red-500 px-3 py-1.5 rounded-full hover:bg-red-50"
+                  className="min-w-[110px] border border-red-400 text-red-500 px-3 py-1.5 rounded-full hover:bg-red-50"
                 >
-                  Logout
+                  {t("header.logout")}
                 </button>
               </div>
             ) : (
               <>
                 <button
-                  onClick={onOpenLogin}
+                  onClick={() => onOpenLogin()}
                   className="border border-orange-500 text-orange-600 px-4 py-2 rounded-full hover:bg-orange-50"
                 >
                   {t("header.login")}
                 </button>
                 <button
-                  onClick={onOpenSignup}
+                  onClick={() => onOpenSignup()}
                   className="bg-orange-500 text-white px-5 py-2 rounded-full hover:bg-orange-400 shadow"
                 >
                   {t("header.signup")}

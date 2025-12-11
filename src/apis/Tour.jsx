@@ -86,3 +86,40 @@ export async function getDepartureLocations() {
     return [];
   }
 }
+
+// =====================================
+// 6. Lấy toàn bộ tour (dùng cho admin list)
+// API gốc: /tours (Spring Data REST, có phân trang)
+// Hàm này sẽ tự động đi qua các trang và gom tất cả tour
+// =====================================
+export async function getAllTours() {
+  let allTours = [];
+  let url = `${API_BASE}/tours`;
+
+  try {
+    while (url) {
+      const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error("Failed to fetch tours");
+      }
+
+      const data = await res.json();
+
+      const toursInPage = data._embedded?.tours || [];
+      allTours = allTours.concat(toursInPage);
+
+      const nextLink = data._links?.next?.href;
+      if (nextLink) {
+        // Nếu backend trả relative link thì thêm API_BASE
+        url = nextLink.startsWith("http") ? nextLink : `${API_BASE}${nextLink}`;
+      } else {
+        url = null;
+      }
+    }
+
+    return allTours;
+  } catch (error) {
+    console.error("API getAllTours error:", error);
+    return [];
+  }
+}
