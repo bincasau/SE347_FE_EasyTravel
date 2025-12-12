@@ -19,12 +19,13 @@ import Profile from "./pages/Profile";
 import RequireRole from "./pages/TourGuide/RequireRole";
 import PastTours from "./pages/TourGuide/PastTours";
 import SchedulePage from "./pages/TourGuide/SchedulePage";
-import ReviewsPage from "./pages/TourGuide/ReviewsPage";
+import DaysAvailable from "./pages/TourGuide/DaysAvailable";
 import GuideProfile from "./pages/TourGuide/GuideProfile";
 import TourScheduleDetail from "./pages/TourGuide/TourScheduleDetail";
 
+
 import AdminTourManagementPage from "./pages/Admin/TourManagementPage";
-import AdminHotelManagementPage from "./pages/Admin/HotelManagementPage"; 
+import AdminHotelManagementPage from "./pages/Admin/HotelManagementPage";
 import AdminBlogManagementPage from "./pages/Admin/BlogManagementPage";
 
 import ScrollToTop from "./utils/ScrollToTop";
@@ -88,10 +89,10 @@ export default function App() {
           />
 
           <Route
-            path="/guide/reviews"
+            path="/guide/available-days"
             element={
               <RequireRole role="TourGuide">
-                <ReviewsPage />
+                <DaysAvailable />
               </RequireRole>
             }
           />

@@ -25,19 +25,17 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
 
   const guideMenu = [
     { to: "/guide/schedule", label: "Schedule" },
-    { to: "/guide/reviews", label: "Guest Reviews" },
+    { to: "/guide/available-days", label: "Days Available" },
     { to: "/guide/past-tours", label: "Past Tours" },
-    { to: "/guide/profile", label: "Guide's Profile" },
   ];
 
-    const adminMenu = [
-      { to: "/admin/dashboard", key: "dashboard" },
-      { to: "/admin/tours", key: "tours" },
-      { to: "/admin/guides", key:"tourguide" },
-      { to: "/admin/hotels", key:"hotel" },
-      { to: "/admin/blogs", key: "blog" },
-    ];
-
+  const adminMenu = [
+    { to: "/admin/dashboard", key: "dashboard" },
+    { to: "/admin/tours", key: "tours" },
+    { to: "/admin/guides", key: "tourguide" },
+    { to: "/admin/hotels", key: "hotel" },
+    { to: "/admin/blogs", key: "blog" },
+  ];
 
   const fetchUser = async () => {
     setLoadingUser(true);

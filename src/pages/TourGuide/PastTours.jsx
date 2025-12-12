@@ -28,27 +28,23 @@ const toursData = [
 export default function PastTours() {
   const [sortOrder, setSortOrder] = useState("newest");
 
-  // Sort theo ngày
-  const sortedTours = [...toursData].sort((a, b) => {
-    if (sortOrder === "newest") {
-      return new Date(b.date) - new Date(a.date);
-    } else {
-      return new Date(a.date) - new Date(b.date);
-    }
-  });
+  const sortedTours = [...toursData].sort((a, b) =>
+    sortOrder === "newest"
+      ? new Date(b.date) - new Date(a.date)
+      : new Date(a.date) - new Date(b.date)
+  );
 
   return (
-    <div className="w-full py-10 max-w-6xl mx-auto px-4">
+    <div className="max-w-6xl mx-auto px-6 py-10">
 
-      {/* ⭐ TITLE ĐẸP NHƯ GUIDE PROFILE */}
       <h2 className="text-3xl font-bold text-center text-orange-500 mb-12">
         Past Tours
       </h2>
 
-      {/* SORT CONTROLS */}
+      {/* SORT */}
       <div className="flex justify-end mb-6">
         <select
-          className="border rounded-full px-4 py-2 text-sm cursor-pointer shadow-sm"
+          className="border rounded-full px-4 py-2 text-sm"
           value={sortOrder}
           onChange={(e) => setSortOrder(e.target.value)}
         >
@@ -58,35 +54,33 @@ export default function PastTours() {
       </div>
 
       {/* LIST */}
-      <div className="flex flex-col gap-6">
+      <div className="space-y-6">
         {sortedTours.map((tour) => (
           <div
             key={tour.id}
             className="bg-white shadow rounded-xl p-4 flex items-center gap-6 hover:shadow-lg transition"
           >
-            {/* IMAGE */}
             <img
               src={tour.image}
               alt={tour.title}
-              className="w-40 h-32 rounded-lg object-cover flex-shrink-0"
+              className="w-40 h-32 rounded-lg object-cover"
             />
 
-            {/* INFO */}
             <div className="flex-1">
-              <h3 className="text-xl font-semibold text-gray-800">
-                {tour.title}
-              </h3>
-
-              <div className="mt-2 text-gray-600 text-sm">
-                <p>📅 <strong>Date:</strong> {new Date(tour.date).toDateString()}</p>
-                <p>⏳ <strong>Duration:</strong> {tour.duration}</p>
-              </div>
+              <h3 className="text-xl font-semibold">{tour.title}</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                📅 {new Date(tour.date).toDateString()}
+              </p>
+              <p className="text-sm text-gray-500">
+                ⏳ {tour.duration}
+              </p>
             </div>
 
-            {/* BUTTON */}
+            {/* 👉 TRỎ SANG DETAIL TOUR + ẨN BOOK NOW */}
             <Link
-              to={`/guide/tour/${tour.id}/schedule`}
-              className="px-5 py-2 border border-orange-400 text-orange-500 rounded-full hover:bg-orange-100 transition"
+              to={`/detailtour/3`}
+              state={{ hideBookNow: true }}
+              className="px-5 py-2 border border-orange-400 text-orange-500 rounded-full hover:bg-orange-100"
             >
               View Tour
             </Link>
