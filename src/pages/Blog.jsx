@@ -10,12 +10,18 @@ export default function Blog() {
   const [totalPages, setTotalPages] = useState(1);
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState(""); // <- debounce
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterDate, setFilterDate] = useState("");
 
   const [loading, setLoading] = useState(true);
 
   const blogsPerPage = 5;
+
+  // ✅ S3 base for blog images
+  const S3_BLOG_BASE =
+    "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/blog";
+
+  const getBlogImage = (blogId) => `${S3_BLOG_BASE}/blog_${blogId}.jpg`;
 
   /* ----------------------------------------------
    *  DEBOUNCE SEARCH (0.7s)
@@ -37,11 +43,9 @@ export default function Blog() {
       const res = await fetch(
         `http://localhost:8080/blogs?page=${page - 1}&size=${blogsPerPage}`
       );
-
       if (!res.ok) throw new Error("Không thể tải danh sách blog");
 
       const data = await res.json();
-
       const items = data._embedded?.blogs || [];
 
       const formatted = items.map((b, index) => ({
@@ -49,17 +53,16 @@ export default function Blog() {
         title: b.title,
         date: new Date(b.createdAt).toLocaleDateString("vi-VN"),
         description:
-          b.details?.slice(0, 200) +
-            (b.details?.length > 200 ? "..." : "") ||
+          (b.details?.slice(0, 200) || "") + (b.details?.length > 200 ? "..." : "") ||
           "Không mo ta",
-        image: `/images/blog/blog_${b.blogId}_img_1.jpg`,
+        // ✅ đổi sang AWS S3
+        image: getBlogImage(b.blogId),
         createdAt: b.createdAt,
       }));
 
       setBlogs(formatted);
       setFilteredBlogs(formatted);
       setTotalPages(data.page?.totalPages || 1);
-
     } catch (err) {
       console.error("❌ Lỗi fetch blogs:", err);
     } finally {
@@ -71,6 +74,7 @@ export default function Blog() {
   useEffect(() => {
     if (debouncedSearch !== "" || filterDate !== "") return;
     fetchBlogs(currentPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage]);
 
   /* ----------------------------------------------
@@ -83,20 +87,13 @@ export default function Blog() {
 
         let url = "";
 
-        // BOTH search + date
         if (debouncedSearch.trim() !== "" && filterDate !== "") {
           url = `http://localhost:8080/blogs/search/findByTitleContainingIgnoreCaseAndCreatedAtGreaterThanEqual?keyword=${debouncedSearch}&startDate=${filterDate}&sort=createdAt,asc`;
-        }
-        // ONLY search
-        else if (debouncedSearch.trim() !== "") {
+        } else if (debouncedSearch.trim() !== "") {
           url = `http://localhost:8080/blogs/search/findByTitleContainingIgnoreCase?keyword=${debouncedSearch}`;
-        }
-        // ONLY date
-        else if (filterDate !== "") {
+        } else if (filterDate !== "") {
           url = `http://localhost:8080/blogs/search/findByCreatedAtGreaterThanEqual?startDate=${filterDate}`;
-        }
-        // No filter → load default
-        else {
+        } else {
           fetchBlogs(1);
           return;
         }
@@ -112,17 +109,16 @@ export default function Blog() {
           title: b.title,
           date: new Date(b.createdAt).toLocaleDateString("vi-VN"),
           description:
-            b.details?.slice(0, 200) +
-              (b.details?.length > 200 ? "..." : "") ||
+            (b.details?.slice(0, 200) || "") + (b.details?.length > 200 ? "..." : "") ||
             "Không có mô tả.",
-          image: `/images/blog/blog_${b.blogId}_img_1.jpg`,
+          // ✅ đổi sang AWS S3
+          image: getBlogImage(b.blogId),
           createdAt: b.createdAt,
         }));
 
         setFilteredBlogs(formatted);
         setTotalPages(1);
         setCurrentPage(1);
-
       } catch (err) {
         console.error("❌ Filter error:", err);
       } finally {
@@ -131,6 +127,7 @@ export default function Blog() {
     };
 
     fetchFiltered();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch, filterDate]);
 
   /* ----------------------------------------------
@@ -173,20 +170,16 @@ export default function Blog() {
     return pages;
   };
 
-  /* ---------------------------------------------- */
-
   return (
     <div className="max-w-[1150px] mx-auto px-[70px] py-12 lg:flex gap-8">
-
       {/* LEFT: LIST */}
       <div className="lg:w-[68%] w-full">
-        
         {loading ? (
-          <div className="text-center py-10 text-gray-500">Đang tải bài viết...</div>
+          <div className="text-center py-10 text-gray-500">
+            Đang tải bài viết...
+          </div>
         ) : filteredBlogs.length > 0 ? (
-          filteredBlogs.map((blog) => (
-            <BlogCard key={blog.id} {...blog} />
-          ))
+          filteredBlogs.map((blog) => <BlogCard key={blog.id} {...blog} />)
         ) : (
           <p className="text-gray-500 text-center py-8">
             Không tìm thấy bài viết nào.
@@ -196,7 +189,6 @@ export default function Blog() {
         {/* PAGINATION only for default listing */}
         {debouncedSearch === "" && filterDate === "" && totalPages > 1 && (
           <div className="flex justify-center items-center gap-2 mt-10">
-
             {/* Prev */}
             <button
               onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
@@ -227,9 +219,7 @@ export default function Blog() {
 
             {/* Next */}
             <button
-              onClick={() =>
-                setCurrentPage(Math.min(totalPages, currentPage + 1))
-              }
+              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
               disabled={currentPage === totalPages}
               className={`px-5 py-2 rounded-full text-sm font-semibold border ${
                 currentPage === totalPages
@@ -239,7 +229,6 @@ export default function Blog() {
             >
               Next ›
             </button>
-
           </div>
         )}
       </div>

@@ -21,8 +21,11 @@ export default function TourDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [tour, setTour] = useState(null);
-  const [images, setImages] = useState([]);
+  const [images, setImages] = useState([]); // ✅ sẽ là 5 ảnh S3
   const [loading, setLoading] = useState(true);
+
+  const S3_TOUR_IMG_BASE =
+    "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/image";
 
   useEffect(() => {
     const fetchTour = async () => {
@@ -32,20 +35,12 @@ export default function TourDetail() {
         const data = await res.json();
         setTour(data);
 
-        const imagesHref = data._links?.images?.href;
-        if (imagesHref) {
-          const imgRes = await fetch(imagesHref);
-          if (!imgRes.ok) throw new Error("Không thể tải ảnh");
-          const imgData = await imgRes.json();
-
-          const list = imgData._embedded?.images || [];
-          const formatted = list.map((img) => {
-            const url = img.url || img.imageUrl || img.name || img.path;
-            return /^https?:\/\//i.test(url) ? url : `/images/tour/${url}`;
-          });
-
-          setImages(formatted);
-        }
+        // ✅ Build 5 ảnh theo format: tour_<id>_img_<n>.jpg
+        const s3Images = Array.from({ length: 5 }, (_, idx) => {
+          const n = idx + 1;
+          return `${S3_TOUR_IMG_BASE}/tour_${id}_img_${n}.jpg`;
+        });
+        setImages(s3Images);
       } catch (err) {
         console.error("❌ Lỗi khi fetch tour:", err);
       } finally {
@@ -78,7 +73,6 @@ export default function TourDetail() {
     startDate,
     endDate,
     destination,
-    mainImage,
   } = tour;
 
   const formatCurrency = (val) =>
@@ -165,15 +159,15 @@ export default function TourDetail() {
     return <div>{rows}</div>;
   };
 
-  const mainImg =
-    images[0] || (mainImage ? `/images/tour/${mainImage}` : travel1);
+  // ✅ Ảnh chính: img_1
+  const mainImg = images[0] || travel1;
 
-  const previewImages =
-    images.length > 1 ? images.slice(1, 4) : [travel2, travel3, travel4];
+  // ✅ preview: img_2, img_3, img_4 (nếu thiếu thì fallback)
+  const previewImages = images.length >= 4 ? images.slice(1, 4) : [travel2, travel3, travel4];
 
   const handleBuyNow = () => {
     navigate(`/booking/${id}`, {
-      state: { tour, images },
+      state: { tour, images }, // ✅ images là 5 ảnh S3
     });
   };
 
@@ -224,7 +218,7 @@ export default function TourDetail() {
 
           <p className="text-sm text-gray-500 mb-1">{destination}</p>
 
-          {/* ⭐ PRICE + DISCOUNT ⭐ */}
+          {/* PRICE + DISCOUNT */}
           <div className="mb-4">
             {percentDiscount > 0 ? (
               <div className="flex flex-col gap-1">

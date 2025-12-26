@@ -16,10 +16,13 @@ export default function BlogDetailContent() {
   const navigate = useNavigate();
   const [blog, setBlog] = useState(null);
   const [allBlogs, setAllBlogs] = useState([]);
-  const [related, setRelated] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Fetch blog detail + tất cả blog (để xác định prev/next + related)
+  const S3_BLOG_BASE =
+    "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/blog";
+  const blogImg = (blogId) => `${S3_BLOG_BASE}/blog_${blogId}.jpg`;
+
+  // ✅ Fetch blog detail + tất cả blog (để xác định prev/next)
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -27,6 +30,9 @@ export default function BlogDetailContent() {
           fetch(`http://localhost:8080/blogs/${id}`),
           fetch("http://localhost:8080/blogs?page=0&size=9999"),
         ]);
+
+        if (!detailRes.ok) throw new Error("Không thể tải blog detail");
+        if (!allRes.ok) throw new Error("Không thể tải list blogs");
 
         const detailData = await detailRes.json();
         const allData = await allRes.json();
@@ -36,20 +42,13 @@ export default function BlogDetailContent() {
         const current = {
           id: detailData.blogId,
           title: detailData.title,
-          details: detailData.details,
-          // ✅ Dùng ảnh tĩnh từ thư mục /images/blog/
-          thumbnail: `/images/blog/blog_${detailData.blogId}_img_1.jpg`,
+          details: detailData.details || "",
+          thumbnail: blogImg(detailData.blogId),
           createdAt: new Date(detailData.createdAt).toLocaleDateString("vi-VN"),
         };
 
         setBlog(current);
         setAllBlogs(blogs);
-
-        // ✅ Random 3 bài liên quan khác
-        const others = blogs
-          .filter((b) => b.blogId !== detailData.blogId)
-          .slice(0, 3);
-        setRelated(others);
       } catch (err) {
         console.error("❌ Lỗi fetch blog:", err);
       } finally {
@@ -75,8 +74,9 @@ export default function BlogDetailContent() {
     );
 
   const index = allBlogs.findIndex((b) => String(b.blogId) === String(id));
-  const prevBlog = allBlogs[index - 1];
-  const nextBlog = allBlogs[index + 1];
+  const prevBlog = index > 0 ? allBlogs[index - 1] : null;
+  const nextBlog =
+    index >= 0 && index < allBlogs.length - 1 ? allBlogs[index + 1] : null;
 
   const currentUrl = encodeURIComponent(window.location.href);
   const shareText = encodeURIComponent(blog.title);
@@ -104,6 +104,10 @@ export default function BlogDetailContent() {
         src={blog.thumbnail}
         alt={blog.title}
         className="w-full h-[420px] object-cover rounded-2xl"
+        onError={(e) => {
+          e.currentTarget.src =
+            "https://via.placeholder.com/1200x600?text=No+Image";
+        }}
       />
 
       <div className="mt-6 text-sm text-gray-500">
@@ -119,7 +123,7 @@ export default function BlogDetailContent() {
       <div
         className="prose prose-lg max-w-none mt-6 text-gray-700 leading-relaxed"
         dangerouslySetInnerHTML={{
-          __html: blog.details.replace(/\n/g, "<br/>"),
+          __html: (blog.details || "").replace(/\n/g, "<br/>"),
         }}
       ></div>
 
@@ -155,9 +159,7 @@ export default function BlogDetailContent() {
               </a>
             ))}
             <button
-              onClick={() =>
-                navigator.clipboard.writeText(window.location.href)
-              }
+              onClick={() => navigator.clipboard.writeText(window.location.href)}
               className="hover:text-gray-800"
             >
               <FaLink />
@@ -183,50 +185,109 @@ export default function BlogDetailContent() {
         </div>
       </div>
 
-      {/* ---------- RELATED POSTS ---------- */}
-      {related.length > 0 && (
-        <div className="mt-14 border-t border-gray-100 pt-8">
-          <h3 className="text-xl font-semibold text-gray-800 mb-5">
-            Bài viết liên quan
-          </h3>
-          <div className="grid sm:grid-cols-3 gap-6">
-            {related.map((r) => (
+      {/* ---------- RELATED POSTS (PREV / NEXT 2 BÊN) ---------- */}
+      <div className="mt-14 border-t border-gray-100 pt-8">
+        <h3 className="text-xl font-semibold text-gray-800 mb-5">
+          Bài viết liên quan
+        </h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
+          {/* PREV */}
+          <div className={`${!prevBlog ? "opacity-50 pointer-events-none" : ""}`}>
+            <div className="text-sm font-semibold text-orange-600 mb-2 flex items-center gap-2">
+              
+            </div>
+
+            {prevBlog ? (
               <div
-                key={r.blogId}
-                onClick={() => navigate(`/detailblog/${r.blogId}`)}
-                className="cursor-pointer group"
+                onClick={() => navigate(`/detailblog/${prevBlog.blogId}`)}
+                className="cursor-pointer group bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col h-full"
               >
-                <div className="w-full h-44 overflow-hidden rounded-lg">
+                <div className="w-full h-44 overflow-hidden">
                   <img
-                    src={`/images/blog/blog_${r.blogId}_img_1.jpg`}
-                    alt={r.title}
-                    onError={(e) =>
-                      (e.currentTarget.src =
-                        "https://via.placeholder.com/300x200?text=No+Image")
-                    }
+                    src={blogImg(prevBlog.blogId)}
+                    alt={prevBlog.title}
+                    onError={(e) => {
+                      e.currentTarget.src =
+                        "https://via.placeholder.com/300x200?text=No+Image";
+                    }}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                 </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  {new Date(r.createdAt).toLocaleDateString("vi-VN")} • Admin
-                </p>
-                <p className="font-medium text-gray-800 group-hover:text-orange-500 line-clamp-2">
-                  {r.title}
-                </p>
+
+                <div className="p-4 flex flex-col flex-1">
+                  <p className="text-xs text-gray-500">
+                    {new Date(prevBlog.createdAt).toLocaleDateString("vi-VN")} •
+                    Admin
+                  </p>
+                  <p className="mt-2 font-medium text-gray-800 group-hover:text-orange-500 line-clamp-2">
+                    {prevBlog.title}
+                  </p>
+                  <div className="flex-1" />
+                  <p className="mt-3 text-sm text-orange-500 font-semibold">
+                    Xem thêm →
+                  </p>
+                </div>
               </div>
-            ))}
+            ) : (
+              <div className="bg-gray-50 rounded-xl p-6 text-gray-500 text-sm">
+                Không có bài trước
+              </div>
+            )}
+          </div>
+
+          {/* NEXT */}
+          <div className={`${!nextBlog ? "opacity-50 pointer-events-none" : ""}`}>
+            <div className="text-sm font-semibold text-orange-600 mb-2 flex items-center justify-end gap-2">
+              
+            </div>
+
+            {nextBlog ? (
+              <div
+                onClick={() => navigate(`/detailblog/${nextBlog.blogId}`)}
+                className="cursor-pointer group bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col h-full"
+              >
+                <div className="w-full h-44 overflow-hidden">
+                  <img
+                    src={blogImg(nextBlog.blogId)}
+                    alt={nextBlog.title}
+                    onError={(e) => {
+                      e.currentTarget.src =
+                        "https://via.placeholder.com/300x200?text=No+Image";
+                    }}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                </div>
+
+                <div className="p-4 flex flex-col flex-1">
+                  <p className="text-xs text-gray-500">
+                    {new Date(nextBlog.createdAt).toLocaleDateString("vi-VN")} •
+                    Admin
+                  </p>
+                  <p className="mt-2 font-medium text-gray-800 group-hover:text-orange-500 line-clamp-2">
+                    {nextBlog.title}
+                  </p>
+                  <div className="flex-1" />
+                  <p className="mt-3 text-sm text-orange-500 font-semibold">
+                    Xem thêm →
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-gray-50 rounded-xl p-6 text-gray-500 text-sm text-right">
+                Không có bài sau
+              </div>
+            )}
           </div>
         </div>
-      )}
+      </div>
 
-      {/* ---------- PREV / NEXT ---------- */}
+      {/* ---------- PREV / NEXT BUTTONS (GIỮ NGUYÊN NẾU BẠN MUỐN) ---------- */}
       <div className="mt-12 border-t border-gray-100 pt-8">
         <div className="flex justify-between text-sm font-medium text-orange-600 mb-5">
           <button
             disabled={!prevBlog}
-            onClick={() =>
-              prevBlog && navigate(`/detailblog/${prevBlog.blogId}`)
-            }
+            onClick={() => prevBlog && navigate(`/detailblog/${prevBlog.blogId}`)}
             className={`flex items-center gap-1 transition ${
               !prevBlog
                 ? "opacity-50 cursor-not-allowed"
@@ -238,9 +299,7 @@ export default function BlogDetailContent() {
 
           <button
             disabled={!nextBlog}
-            onClick={() =>
-              nextBlog && navigate(`/detailblog/${nextBlog.blogId}`)
-            }
+            onClick={() => nextBlog && navigate(`/detailblog/${nextBlog.blogId}`)}
             className={`flex items-center gap-1 transition ${
               !nextBlog
                 ? "opacity-50 cursor-not-allowed"
@@ -253,6 +312,7 @@ export default function BlogDetailContent() {
       </div>
 
       {/* ---------- COMMENTS ---------- */}
+      {/* <BlogComments /> */}
     </div>
   );
 }

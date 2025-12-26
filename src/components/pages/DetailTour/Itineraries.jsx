@@ -20,175 +20,123 @@ export default function Itineraries({ tourId }) {
         if (!res.ok) throw new Error("Failed to fetch itineraries");
         const data = await res.json();
 
-        console.log("✅ Raw itineraries:", data);
+        const items =
+          data?._embedded?.itineraries ||
+          data?.itineraries ||
+          (Array.isArray(data) ? data : []) ||
+          [];
 
-        const items = data._embedded?.itineraries || data.itineraries || data || [];
+        const normalized = items.map((i, index) => {
+          const raw = (i.activities ?? "").toString();
 
-        const normalized = items.map((i, index) => ({
-          id: i.itinerary_id || i.id || index,
-          title:
-            i.title?.trim() ||
-            `Day ${i.day_number || index + 1}`,
-          activities: i.activities || "",
-          dayNumber: i.day_number || i.dayNumber || index + 1,
-        }));
+          // ✅ tách theo dấu chấm, gom thành list câu
+          const lines = raw
+            .split(".")
+            .map((s) => s.trim())
+            .filter(Boolean);
+
+          return {
+            id: i.itinerary_id || i.id || index,
+            title: i.title?.trim() || `Day ${i.day_number || index + 1}`,
+            lines, // ✅ mảng câu
+          };
+        });
 
         setItineraries(normalized);
       } catch (err) {
         console.error("❌ Error fetching itineraries:", err);
+        setItineraries([]);
       }
     };
 
-    fetchItineraries();
+    if (tourId) fetchItineraries();
   }, [tourId]);
 
-  const toggleCard = (index) => setOpenIndex((prev) => (prev === index ? null : index));
+  const toggleCard = (index) =>
+    setOpenIndex((prev) => (prev === index ? null : index));
 
-  const parseActivities = (activities) => {
-    const lines = activities.split("\n").filter((l) => l.trim() !== "");
-    return lines.map((line) => {
-      const timeMatch = line.match(/^(\d{1,2}[:.]\d{2})/);
-      const time = timeMatch ? timeMatch[1] : "";
-      const text = time ? line.replace(time, "").trim() : line.trim();
-      const hour = parseInt(time.split(":")[0]);
-      return { time, text, hour: !isNaN(hour) ? hour : null };
-    });
+  // ✅ helper: chia list thành 2 cột (nửa đầu / nửa sau)
+  const splitIntoTwoColumns = (arr) => {
+    const mid = Math.ceil(arr.length / 2);
+    return [arr.slice(0, mid), arr.slice(mid)];
   };
 
   if (!itineraries.length)
     return (
       <section className="max-w-6xl mx-auto px-6 py-10 text-gray-500">
-        <h2 className="text-5xl font-podcast text-gray-800 mb-6">
-          Itineraries
-        </h2>
+        <h2 className="text-5xl font-podcast text-gray-800 mb-6">Itineraries</h2>
         <p>No itinerary available for this tour.</p>
       </section>
     );
 
   return (
     <section className="max-w-6xl mx-auto px-6 py-10">
-      {/* ✅ Giữ font-podcast, bỏ font-semibold */}
-      <h2 className="text-4xl font-podcast text-gray-800 mb-8">
-        Itineraries
-      </h2>
+      <h2 className="text-4xl font-podcast text-gray-800 mb-8">Itineraries</h2>
 
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-5 pr-2">
         {itineraries.map((item, index) => {
           const isOpen = openIndex === index;
           const theme = colorThemes[index % colorThemes.length];
-          const parsed = parseActivities(item.activities);
 
-          const morning = parsed.filter((a) => a.hour >= 5 && a.hour < 12);
-          const afternoon = parsed.filter((a) => a.hour >= 12 && a.hour < 18);
-          const evening = parsed.filter((a) => a.hour >= 18);
+          const [col1, col2] = splitIntoTwoColumns(item.lines);
 
           return (
             <div
               key={item.id}
-              className={`rounded-xl border ${theme} shadow-sm hover:shadow-md transition-all overflow-hidden w-fit`}
+              className={`rounded-xl border ${theme} shadow-sm hover:shadow-md transition-all overflow-hidden w-full max-w-3xl mr-2`}
             >
               {/* Header */}
               <button
                 onClick={() => toggleCard(index)}
                 className="flex justify-between items-center w-full p-3 text-left"
+                type="button"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div className="bg-orange-500 text-white rounded-full p-2 shadow-sm">
                     <FaCalendarDay size={18} />
                   </div>
-                  {/* ✅ Giữ font-podcast, không dùng semibold */}
-                  <h3 className="text-2xl font-podcast text-gray-800">
+                  <h3 className="text-2xl font-podcast text-gray-800 truncate">
                     {item.title}
                   </h3>
                 </div>
+
                 {isOpen ? (
-                  <FaChevronUp className="text-orange-500" />
+                  <FaChevronUp className="text-orange-500 shrink-0" />
                 ) : (
-                  <FaChevronDown className="text-orange-500" />
+                  <FaChevronDown className="text-orange-500 shrink-0" />
                 )}
               </button>
 
-              {/* Nội dung */}
+              {/* ✅ Nội dung: 2 cột, mỗi cột list dọc */}
               <div
                 className={`px-6 pb-5 transition-all duration-300 overflow-hidden ${
-                  isOpen ? "max-h-[700px] opacity-100" : "max-h-0 opacity-0"
+                  isOpen ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
                 }`}
               >
-                <div className="mt-3 grid sm:grid-cols-2 gap-x-10 gap-y-3">
-                  {/* Morning */}
-                  <div>
-                    {morning.length > 0 && (
-                      <>
-                        <p className="text-xs text-gray-500 uppercase mb-1">
-                          Morning
-                        </p>
-                        <div className="flex flex-col gap-2">
-                          {morning.map((a, i) => (
-                            <div key={i} className="flex items-start gap-3">
-                              {a.time && (
-                                <span className="font-bold text-orange-500 min-w-[50px] text-right">
-                                  {a.time}
-                                </span>
-                              )}
-                              <p className="text-gray-700 text-sm leading-relaxed">
-                                {a.text}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
+                <div className="mt-3">
+                  {item.lines.length ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4">
+                      {/* Cột 1 */}
+                      <div className="flex flex-col gap-2">
+                        {col1.map((line, i) => (
+                          <p key={i} className="text-gray-700 text-sm leading-relaxed">
+                            {line}.
+                          </p>
+                        ))}
+                      </div>
 
-                  {/* Afternoon + Evening */}
-                  <div>
-                    {(afternoon.length > 0 || evening.length > 0) && (
-                      <>
-                        {afternoon.length > 0 && (
-                          <>
-                            <p className="text-xs text-gray-500 uppercase mb-1">
-                              Afternoon
-                            </p>
-                            <div className="flex flex-col gap-2 mb-3">
-                              {afternoon.map((a, i) => (
-                                <div key={i} className="flex items-start gap-3">
-                                  {a.time && (
-                                    <span className="font-bold text-orange-500 min-w-[50px] text-right">
-                                      {a.time}
-                                    </span>
-                                  )}
-                                  <p className="text-gray-700 text-sm leading-relaxed">
-                                    {a.text}
-                                  </p>
-                                </div>
-                              ))}
-                            </div>
-                          </>
-                        )}
-                        {evening.length > 0 && (
-                          <>
-                            <p className="text-xs text-gray-500 uppercase mb-1">
-                              Evening
-                            </p>
-                            <div className="flex flex-col gap-2">
-                              {evening.map((a, i) => (
-                                <div key={i} className="flex items-start gap-3">
-                                  {a.time && (
-                                    <span className="font-bold text-orange-500 min-w-[50px] text-right">
-                                      {a.time}
-                                    </span>
-                                  )}
-                                  <p className="text-gray-700 text-sm leading-relaxed">
-                                    {a.text}
-                                  </p>
-                                </div>
-                              ))}
-                            </div>
-                          </>
-                        )}
-                      </>
-                    )}
-                  </div>
+                      {/* Cột 2 */}
+                      <div className="flex flex-col gap-2">
+                        {col2.map((line, i) => (
+                          <p key={i} className="text-gray-700 text-sm leading-relaxed">
+                            {line}.
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 text-sm">No details.</p>
+                  )}
                 </div>
               </div>
             </div>

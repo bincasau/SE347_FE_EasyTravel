@@ -1,46 +1,22 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
 import { FaMapMarkerAlt } from "react-icons/fa";
 
 export default function TourCard({ tour }) {
   const navigate = useNavigate();
-  const [imageUrl, setImageUrl] = useState(null);
 
   const id = tour.id ?? tour.tourId;
   const title = tour.title;
-  const price = tour.priceAdult ?? 0;  // ⭐ FIX Ở ĐÂY
+  const price = tour.priceAdult ?? 0;
   const percentDiscount = tour.percentDiscount ?? 0;
   const startDate = tour.startDate ?? "";
   const destination = tour.destination;
   const description = tour.description ?? "";
-  const imagesHref = tour.imagesHref ?? null;
 
-  useEffect(() => {
-    if (!imagesHref) return;
-    fetch(imagesHref)
-      .then((res) => res.json())
-      .then((data) => {
-        let imgList = [];
-        if (data._embedded?.images) imgList = data._embedded.images;
-        else if (Array.isArray(data)) imgList = data;
-
-        if (imgList.length > 0) {
-          const first = imgList[0];
-          const link =
-            first.url ||
-            first.imageUrl ||
-            first.name ||
-            first.path ||
-            first;
-          setImageUrl(
-            /^https?:\/\//i.test(link)
-              ? link
-              : `http://localhost:8080/uploads/${link}`
-          );
-        }
-      })
-      .catch((err) => console.error("Lỗi khi tải ảnh tour:", err));
-  }, [imagesHref]);
+  // ✅ AWS S3: mỗi tour 1 ảnh theo id
+  const S3_BASE =
+    "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/tour";
+  const s3ImageUrl = id != null ? `${S3_BASE}/tour_${id}.jpg` : "";
 
   const formatCurrency = (val) =>
     Number(val ?? 0).toLocaleString("vi-VN", {
@@ -62,15 +38,12 @@ export default function TourCard({ tour }) {
     >
       <div className="relative">
         <img
-          src={
-            imageUrl
-              ? imageUrl
-              : `/images/tour/${tour.mainImage || `tour_${id}_img_1.jpg`}`
-          }
+          src={s3ImageUrl}
           alt={title}
           className="w-full h-[280px] object-cover rounded-2xl group-hover:scale-[1.03] transition-transform"
           onError={(e) => {
-            e.currentTarget.src = `/images/tour/tour_${id}_img_1.jpg`;
+            // ✅ fallback nếu thiếu ảnh trên S3
+            e.currentTarget.src = "/images/tour/fallback.jpg";
           }}
         />
 
