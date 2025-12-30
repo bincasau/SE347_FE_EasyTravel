@@ -1,0 +1,109 @@
+import React, { useState, useEffect } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faSortAmountUp,
+  faSortAmountDown,
+  faArrowLeft,
+} from "@fortawesome/free-solid-svg-icons";
+import { useSearchParams, useNavigate } from "react-router-dom";
+
+import RoomCard from "./RoomCard";
+import Pagination from "@/utils/Pagination";
+import { getRoomsByHotel } from "@/apis/Room";
+
+const RoomList = ({ hotelId }) => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  const [rooms, setRooms] = useState([]);
+  const [sortOrder, setSortOrder] = useState("asc");
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const roomsPerPage = 6;
+  const currentPage = parseInt(searchParams.get("page")) || 1;
+
+  useEffect(() => {
+    if (!hotelId) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    getRoomsByHotel(hotelId)
+      .then((data) => {
+        const fetchedRooms = data?._embedded?.rooms || [];
+        setRooms(fetchedRooms);
+      })
+      .catch(() => setError("Không thể tải danh sách phòng."))
+      .finally(() => setIsLoading(false));
+  }, [hotelId]);
+
+  const sortedRooms = [...rooms].sort((a, b) =>
+    sortOrder === "asc"
+      ? (a.price || 0) - (b.price || 0)
+      : (b.price || 0) - (a.price || 0)
+  );
+
+  const totalPages = Math.ceil(sortedRooms.length / roomsPerPage);
+  const safePage = Math.max(1, Math.min(currentPage, totalPages || 1));
+  const indexOfLast = safePage * roomsPerPage;
+  const indexOfFirst = indexOfLast - roomsPerPage;
+  const currentRooms = sortedRooms.slice(indexOfFirst, indexOfLast);
+
+  const handlePageChange = (page) => {
+    const nextPage = Math.max(1, Math.min(page, totalPages));
+    setSearchParams(nextPage === 1 ? {} : { page: nextPage });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const toggleSortOrder = () =>
+    setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+
+  const handleBack = () => {
+    const prevHotelPage = sessionStorage.getItem("hotelPrevPage") || 1;
+    navigate(`/hotels?page=${prevHotelPage}`);
+  };
+
+  if (isLoading)
+    return <p className="text-center mt-6 animate-pulse">Đang tải...</p>;
+
+  if (error) return <p className="text-center text-red-500 mt-6">{error}</p>;
+
+  if (rooms.length === 0)
+    return <p className="text-center mt-6">Không có phòng nào.</p>;
+
+  return (
+    <div className="w-full py-8">
+      <div className="flex justify-between items-center mb-6">
+        
+
+        <h2 className="text-xl font-semibold">
+          Danh sách phòng ({rooms.length})
+        </h2>
+
+        <button onClick={toggleSortOrder} className="border rounded-full p-2">
+          <FontAwesomeIcon
+            icon={sortOrder === "asc" ? faSortAmountUp : faSortAmountDown}
+          />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {currentRooms.map((room) => (
+          <RoomCard key={room.roomId} room={room} hotelId={hotelId} />
+        ))}
+      </div>
+
+      {totalPages > 1 && (
+        <div className="mt-10 flex justify-center">
+          <Pagination
+            currentPage={safePage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+          />
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default RoomList;

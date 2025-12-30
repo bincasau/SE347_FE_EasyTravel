@@ -2,8 +2,11 @@ import React, { useState, useEffect } from "react";
 import { FaCalendarAlt } from "react-icons/fa";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-
 import { getRoomBookedDates } from "@/apis/booking";
+
+// ===== AWS IMAGE BASE =====
+const AWS_ROOM_IMAGE_BASE =
+  "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/room";
 
 // format VND
 const formatVND = (n) => `${Number(n || 0).toLocaleString("vi-VN")}₫`;
@@ -17,7 +20,8 @@ export default function BookingStep1({
 
   const realHotelId = hotel.hotelId || hotel.id;
   const realRoomId = room.roomId || room.id;
-
+  const imageBed = room.image_bed;
+  
   // === STATE ===
   const [checkInLocal, setCheckInLocal] = useState(
     bookingData.checkInDate ? new Date(bookingData.checkInDate) : null
@@ -33,7 +37,7 @@ export default function BookingStep1({
     if (!realHotelId || !realRoomId) return;
 
     getRoomBookedDates(realHotelId, realRoomId).then((dates) => {
-      setDisabledDates(dates);
+      setDisabledDates(dates || []);
     });
   }, [realHotelId, realRoomId]);
 
@@ -59,7 +63,6 @@ export default function BookingStep1({
       checkInDate: d ? d.toISOString().split("T")[0] : "",
     }));
 
-    // Reset checkout nếu overlap
     if (checkOutLocal && isRangeBlocked(d, checkOutLocal)) {
       setCheckOutLocal(null);
       setBookingData((prev) => ({ ...prev, checkOutDate: "" }));
@@ -69,10 +72,7 @@ export default function BookingStep1({
   const handleCheckOutChange = (d) => {
     if (!d) return;
 
-    const start = checkInLocal;
-    const end = d;
-
-    if (isRangeBlocked(start, end)) {
+    if (isRangeBlocked(checkInLocal, d)) {
       alert("Khoảng ngày bạn chọn nằm trong thời gian đã có người đặt.");
       return;
     }
@@ -87,30 +87,28 @@ export default function BookingStep1({
 
   const handleNext = () => {
     if (!checkInLocal || !checkOutLocal) {
-      alert(
-        "❌ Vui lòng chọn ngày nhận phòng và ngày trả phòng trước khi tiếp tục!"
-      );
+      alert("❌ Vui lòng chọn ngày nhận phòng và ngày trả phòng!");
       return;
     }
 
     setBookingData((prev) => ({
       ...prev,
-      total: room.price * (nights || 1),
       nights,
+      total: room.price * (nights || 1),
     }));
 
     nextStep();
   };
+
   // Highlight ngày blocked
   const dayClassName = (date) => {
     const isBlocked = disabledDates.some(
       (d) => d.toDateString() === date.toDateString()
     );
-
     return isBlocked ? "blocked-day" : "";
   };
 
-  // === LINE ITEMS ===
+  // === SUMMARY ITEMS ===
   const lineItems = [
     {
       label: `${room.type} Room`,
@@ -142,7 +140,7 @@ export default function BookingStep1({
             <label className="text-sm text-gray-600 mb-2 block">
               Ngày nhận phòng
             </label>
-            <div className="relative flex items-center border rounded-lg px-3 py-2 bg-white shadow-sm">
+            <div className="flex items-center border rounded-lg px-3 py-2 bg-white shadow-sm">
               <FaCalendarAlt className="text-gray-500 mr-2" />
               <DatePicker
                 selected={checkInLocal}
@@ -162,7 +160,7 @@ export default function BookingStep1({
             <label className="text-sm text-gray-600 mb-2 block">
               Ngày trả phòng
             </label>
-            <div className="relative flex items-center border rounded-lg px-3 py-2 bg-white shadow-sm">
+            <div className="flex items-center border rounded-lg px-3 py-2 bg-white shadow-sm">
               <FaCalendarAlt className="text-gray-500 mr-2" />
               <DatePicker
                 selected={checkOutLocal}
@@ -179,10 +177,10 @@ export default function BookingStep1({
           </div>
         </div>
 
-        {/* Nights display */}
+        {/* Nights info */}
         {nights > 0 ? (
           <div className="p-3 bg-orange-100 border border-orange-300 text-orange-800 rounded-lg font-semibold">
-            Đang đặt phòng – {room.type}( {room.guests} khách) • {nights} đêm
+            {room.type} · {room.guests} khách · {nights} đêm
           </div>
         ) : (
           <p className="text-sm text-gray-600">
@@ -191,7 +189,7 @@ export default function BookingStep1({
         )}
       </div>
 
-      {/* SUMMARY */}
+      {/* RIGHT SUMMARY */}
       <aside className="md:col-span-2">
         <div className="rounded-2xl border bg-white shadow-sm p-5">
           <h3 className="font-semibold text-gray-800 mb-4">
@@ -200,9 +198,12 @@ export default function BookingStep1({
 
           <div className="flex gap-3 mb-4">
             <img
-              src={`/images/room/${room.image_bed || "standard.jpg"}`}
+              src={`${AWS_ROOM_IMAGE_BASE}/${imageBed}`}
               alt={room.type}
               className="w-20 h-16 rounded-md object-cover"
+              onError={(e) => {
+                e.currentTarget.src = `${AWS_ROOM_IMAGE_BASE}/standard_bed.jpg`;
+              }}
             />
 
             <div className="text-sm">
@@ -230,16 +231,14 @@ export default function BookingStep1({
 
           <hr className="my-4" />
 
-          <div className="flex justify-between text-gray-700 font-semibold mb-4">
+          <div className="flex justify-between font-semibold mb-4">
             <span>Tổng tiền</span>
-            <span className="text-orange-500 font-bold">
-              {formatVND(total)}
-            </span>
+            <span className="text-orange-500">{formatVND(total)}</span>
           </div>
 
           <button
             onClick={handleNext}
-            className="w-full rounded-full bg-orange-500 hover:bg-orange-600 text-white py-3 font-medium mt-2"
+            className="w-full rounded-full bg-orange-500 hover:bg-orange-600 text-white py-3 font-medium"
           >
             Tiếp tục
           </button>

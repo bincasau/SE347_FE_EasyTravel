@@ -20,7 +20,7 @@ const HotelCard = ({
   const { t } = useLang();
   const [searchParams] = useSearchParams();
 
-  // ✅ default: theo hotel_id (đúng như link bạn đưa)
+  //  default: theo hotel_id (đúng như link bạn đưa)
   const [imageUrl, setImageUrl] = useState(
     hotel_id != null ? `${S3_HOTEL_BASE}/hotel_${hotel_id}.jpg` : null
   );
@@ -31,13 +31,13 @@ const HotelCard = ({
     sessionStorage.setItem("hotelPrevPage", currentPage);
   };
 
-  // ✅ Khi hotel_id đổi, reset ảnh về theo hotel_id
+  //  Khi hotel_id đổi, reset ảnh về theo hotel_id
   useEffect(() => {
     setImageUrl(hotel_id != null ? `${S3_HOTEL_BASE}/hotel_${hotel_id}.jpg` : null);
     setTriedFetchFallback(false);
   }, [hotel_id]);
 
-  // ✅ fallback kiểu tour: fetch images -> lấy imageId -> build S3 hotel_<imageId>.jpg
+  //  fallback kiểu tour: fetch images -> lấy imageId -> build S3 hotel_<imageId>.jpg
   const fetchFallbackImage = async () => {
     if (!hotel_id) return;
     if (triedFetchFallback) return;
@@ -69,46 +69,49 @@ const HotelCard = ({
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-md overflow-hidden w-72 flex flex-col hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-      <img
-        src={imageUrl || "/images/hotel/fallback.jpg"}
-        alt={name}
-        className="w-full h-56 object-cover rounded-t-2xl"
-        onError={() => {
-          // ✅ Nếu ảnh theo hotel_id không tồn tại -> thử fetch fallback kiểu tour
-          fetchFallbackImage();
-        }}
-      />
+    <Link
+      to={`/hotel/${hotel_id}`}
+      onClick={handleSavePage}
+      className="block w-72"
+    >
+      <div
+        className="bg-white rounded-2xl shadow-md overflow-hidden flex flex-col 
+  hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer"
+      >
+        <img
+          src={imageUrl || "/images/hotel/fallback.jpg"}
+          alt={name}
+          className="w-full h-56 object-cover rounded-t-2xl"
+          onError={fetchFallbackImage}
+        />
 
-      <div className="p-5 flex flex-col flex-grow">
-        <h3 className="text-lg font-semibold text-gray-800 mb-1">{name}</h3>
+        <div className="p-5 flex flex-col flex-grow">
+          <h3 className="text-lg font-semibold text-gray-800 mb-1">{name}</h3>
 
-        <p className="text-sm text-gray-500 mb-2">
-          {t("hotelPage.only")}{" "}
-          <span className="text-orange-500 font-bold text-base">
-            {formatPrice(price, "VND")} VNĐ / {t("hotelPage.night")}
+          <p className="text-sm text-gray-500 mb-2">
+            {t("hotelPage.only")}{" "}
+            <span className="text-orange-500 font-bold text-base">
+              {formatPrice(price, "VND")} VNĐ / {t("hotelPage.night")}
+            </span>
+          </p>
+
+          <p className="text-sm text-orange-500 mb-1 flex items-center gap-2">
+            <FontAwesomeIcon icon={faPhone} />
+            {t("hotelPage.hotline")}: {hotline}
+          </p>
+
+          <p className="text-sm text-gray-500 mb-3 min-h-[40px]">{address}</p>
+
+          <p className="text-sm text-gray-600 flex-grow">
+            {description || "Hiện chưa có mô tả."}
+          </p>
+
+          <span className="mt-4 text-orange-500 font-semibold text-sm">
+            {t("hotelPage.bookNow")} →
           </span>
-        </p>
-
-        <p className="text-sm text-orange-500 mb-1 flex items-center gap-2">
-          <FontAwesomeIcon icon={faPhone} />
-          {t("hotelPage.hotline")}: {hotline}
-        </p>
-
-        <p className="text-sm text-gray-500 mb-3">{address}</p>
-        <p className="text-sm text-gray-600 flex-grow">
-          {description || "Hiện chưa có mô tả."}
-        </p>
-
-        <Link
-          to={`/hotels/${hotel_id}/rooms`}
-          onClick={handleSavePage}
-          className="mt-4 text-orange-500 font-semibold text-sm hover:underline flex items-center gap-1"
-        >
-          {t("hotelPage.bookNow")} →
-        </Link>
+        </div>
       </div>
-    </div>
+    </Link>
   );
 };
 

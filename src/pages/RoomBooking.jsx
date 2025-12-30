@@ -81,7 +81,7 @@ export default function RoomBooking() {
             price: room.price,
             desc: room.desc,
             guests: room.numberOfGuest,
-            image_bed: room.image_bed || "standard.jpg",
+            image_bed: room.imageBed,
           },
           total: room.price,
         }));

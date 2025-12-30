@@ -2,7 +2,7 @@ import { Home } from "./pages/Home";
 import { AboutUs } from "./pages/AboutUs";
 import { ContactUs } from "./pages/ContactUs";
 import Hotel from "./pages/Hotel";
-import { Room } from "./pages/Room";
+import HotelDetailPage from "./pages/HotelDetail";
 import RoomBooking from "./pages/RoomBooking";
 import Blog from "./pages/Blog";
 import BlogDetail from "./pages/BlogDetail";
@@ -64,7 +64,7 @@ export default function App() {
           <Route path="/tours" element={<Tour />} />
           <Route path="/booking/:tourId" element={<Booking />} />
           <Route path="/hotels" element={<Hotel />} />
-          <Route path="/hotels/:hotelId/rooms" element={<Room />} />
+          <Route path="/hotel/:id" element={<HotelDetailPage />} />
           <Route path="/booking-room" element={<RoomBooking />} />
           <Route path="/blog" element={<Blog />} />
           <Route path="/detailblog/:id" element={<BlogDetail />} />

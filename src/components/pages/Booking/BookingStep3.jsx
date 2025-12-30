@@ -2,6 +2,14 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createHotelBooking } from "@/apis/Booking";
 
+const getRoomImage = (imageBed) => {
+  if (!imageBed) {
+    return "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/room/standard_bed.jpg";
+  }
+
+  return `https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/room/${imageBed}`;
+};
+
 export default function BookingStep3({ bookingData, prevStep }) {
   const navigate = useNavigate();
 
@@ -24,17 +32,14 @@ export default function BookingStep3({ bookingData, prevStep }) {
 
   // ---------- Handle Confirm ----------
   const handleConfirm = async () => {
-    // Chưa chọn phương thức
     if (!method) {
       return alert("❌ Vui lòng chọn phương thức thanh toán!");
     }
 
-    // Validate thẻ
     if (method === "card" && !validateCard()) {
       return alert("❌ Vui lòng nhập thông tin thẻ hợp lệ!");
     }
 
-    // Nếu hợp lệ → tiến hành thanh toán
     await finishPayment();
   };
 
@@ -50,13 +55,9 @@ export default function BookingStep3({ bookingData, prevStep }) {
         gmail: bookingData.user.email,
       };
 
-      // gọi API
-      const res = await createHotelBooking(payload);
-
-      //  nếu API trả về success → mở popup
+      await createHotelBooking(payload);
       setShowModal(true);
     } catch (err) {
-      // ❌ lỗi → KHÔNG mở popup, chỉ báo lỗi
       alert("❌ Lỗi khi lưu booking: " + err.message);
     }
   };
@@ -79,12 +80,7 @@ export default function BookingStep3({ bookingData, prevStep }) {
               onClick={() => setMethod("paypal")}
             >
               <label className="flex items-center gap-3">
-                <input
-                  type="radio"
-                  name="payment"
-                  checked={method === "paypal"}
-                  readOnly
-                />
+                <input type="radio" checked={method === "paypal"} readOnly />
                 <span className="font-medium">PayPal</span>
               </label>
               <p className="text-xs text-gray-500 ml-6">
@@ -100,12 +96,7 @@ export default function BookingStep3({ bookingData, prevStep }) {
               onClick={() => setMethod("card")}
             >
               <label className="flex items-center gap-3">
-                <input
-                  type="radio"
-                  name="payment"
-                  checked={method === "card"}
-                  readOnly
-                />
+                <input type="radio" checked={method === "card"} readOnly />
                 <span className="font-semibold text-orange-600">
                   Thanh toán bằng thẻ tín dụng
                 </span>
@@ -113,8 +104,8 @@ export default function BookingStep3({ bookingData, prevStep }) {
 
               {method === "card" && (
                 <div className="grid grid-cols-2 gap-3 mt-3">
-                  <div className="col-span-2 flex flex-col">
-                    <label className="text-xs text-gray-600 mb-1">
+                  <div className="col-span-2">
+                    <label className="text-xs text-gray-600 mb-1 block">
                       Card Number
                     </label>
                     <input
@@ -122,14 +113,13 @@ export default function BookingStep3({ bookingData, prevStep }) {
                       onChange={(e) =>
                         setCard({ ...card, number: e.target.value })
                       }
-                      placeholder="1111222233334444"
                       maxLength={16}
                       className="border rounded-lg px-3 py-2 text-sm w-full"
                     />
                   </div>
 
-                  <div className="flex flex-col">
-                    <label className="text-xs text-gray-600 mb-1">
+                  <div>
+                    <label className="text-xs text-gray-600 mb-1 block">
                       Expiration MM/YY
                     </label>
                     <input
@@ -137,19 +127,19 @@ export default function BookingStep3({ bookingData, prevStep }) {
                       onChange={(e) =>
                         setCard({ ...card, expiry: e.target.value })
                       }
-                      placeholder="09/26"
                       className="border rounded-lg px-3 py-2 text-sm w-full"
                     />
                   </div>
 
-                  <div className="flex flex-col">
-                    <label className="text-xs text-gray-600 mb-1">CVV</label>
+                  <div>
+                    <label className="text-xs text-gray-600 mb-1 block">
+                      CVV
+                    </label>
                     <input
                       value={card.cvv}
                       onChange={(e) =>
                         setCard({ ...card, cvv: e.target.value })
                       }
-                      placeholder="123"
                       maxLength={3}
                       className="border rounded-lg px-3 py-2 text-sm w-full"
                     />
@@ -176,9 +166,8 @@ export default function BookingStep3({ bookingData, prevStep }) {
 
             <div className="flex gap-3 mb-4">
               <img
-                src={`/images/room/${
-                  bookingData.room.image_bed || "standard.jpg"
-                }`}
+                src={getRoomImage(bookingData.room.imageBed)}
+                alt={bookingData.room.type}
                 className="w-20 h-16 rounded-md object-cover"
               />
               <div>
