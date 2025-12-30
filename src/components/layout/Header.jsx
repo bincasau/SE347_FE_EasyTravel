@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, Link, useLocation, useNavigate } from "react-router-dom";
 import { useLang } from "@/contexts/LangContext";
 import Logo from "@/assets/images/logo.png";
@@ -13,6 +13,9 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
 
   const location = useLocation();
   const navigate = useNavigate();
+
+  // ✅ prevent redirect loop
+  const didRedirectRef = useRef(false);
 
   const userMenu = [
     { to: "/", key: "home" },
@@ -35,6 +38,14 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     { to: "/admin/guides", key: "tourguide" },
     { to: "/admin/hotels", key: "hotel" },
     { to: "/admin/blogs", key: "blog" },
+  ];
+
+  // ✅ HOTEL_MANAGER menu (English)
+  const hotelManagerMenu = [
+    { to: "/hotel-manager/rooms/new", label: "Add Room" },
+    { to: "/hotel-manager/hotels", label: "My Hotels" },
+    { to: "/hotel-manager/revenue", label: "Hotel Revenue" },
+    { to: "/hotel-manager/reports/revenue", label: "Revenue Reports" },
   ];
 
   const fetchUser = async () => {
@@ -69,11 +80,29 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
 
     return () => window.removeEventListener("jwt-changed", handleJWT);
   }, []);
+
+  // ✅ auto redirect by role
   useEffect(() => {
-    if (user?.role === "Admin") {
+    if (!user?.role) return;
+
+    if (user.role === "ADMIN") {
       if (!location.pathname.startsWith("/admin")) {
-        navigate("/admin/dashboard");
+        navigate("/admin/dashboard", { replace: true });
       }
+      return;
+    }
+
+    if (user.role === "HOTEL_MANAGER") {
+      if (didRedirectRef.current) return;
+
+      // ✅ go straight to Add Room
+      if (location.pathname !== "/hotel-manager/rooms/new") {
+        didRedirectRef.current = true;
+        navigate("/hotel-manager/rooms/new", { replace: true });
+        return;
+      }
+
+      didRedirectRef.current = true;
     }
   }, [user, location.pathname, navigate]);
 
@@ -90,14 +119,14 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     if (!confirm("Bạn có chắc muốn đăng xuất?")) return;
     logout();
     setUser(null);
+    didRedirectRef.current = false;
     navigate("/");
   };
 
   const Flag = ({ code }) => (
     <div className="flex items-center gap-1 text-sm">
-      {" "}
-      <span>{code === "vi" ? "🇻🇳" : "🇺🇸"}</span>{" "}
-      <span className="uppercase">{code}</span>{" "}
+      <span>{code === "vi" ? "🇻🇳" : "🇺🇸"}</span>
+      <span className="uppercase">{code}</span>
     </div>
   );
 
@@ -123,8 +152,75 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     if (it.to === "/tours" && isToursActive) return activeLink;
     if (it.to === "/hotels" && isHotelActive) return activeLink;
     if (it.to === "/blog" && isBlogActive) return activeLink;
-
     return isActive ? activeLink : baseLink;
+  };
+
+  const renderMenu = () => {
+    if (user?.role === "ADMIN") {
+      return adminMenu.map((it) => (
+        <li key={it.to}>
+          <NavLink
+            to={it.to}
+            end
+            className={({ isActive }) => renderNavClass(it, isActive)}
+          >
+            {t(`header.${it.key}`)}
+          </NavLink>
+        </li>
+      ));
+    }
+
+    if (user?.role === "HOTEL_MANAGER") {
+      return hotelManagerMenu.map((it) => (
+        <li key={it.to}>
+          <NavLink
+            to={it.to}
+            end
+            className={({ isActive }) => (isActive ? activeLink : baseLink)}
+          >
+            {it.label}
+          </NavLink>
+        </li>
+      ));
+    }
+
+    if (user?.role === "TOUR_GUIDE") {
+      return guideMenu.map((it) => (
+        <li key={it.to}>
+          <NavLink
+            to={it.to}
+            end
+            className={({ isActive }) => (isActive ? activeLink : baseLink)}
+          >
+            {it.label}
+          </NavLink>
+        </li>
+      ));
+    }
+
+    return userMenu.map((it) => (
+      <li key={it.key}>
+        <NavLink
+          to={it.to}
+          end={it.to === "/"}
+          className={({ isActive }) => renderNavClass(it, isActive)}
+        >
+          {t(`header.${it.key}`)}
+        </NavLink>
+      </li>
+    ));
+  };
+
+  const goToProfileByRole = () => {
+    navigate(
+      user.role === "ADMIN"
+        ? "/admin/dashboard"
+        : user.role === "HOTEL_MANAGER"
+        ? "/hotel-manager/rooms/new"
+        : user.role === "TOUR_GUIDE"
+        ? "/guide/profile"
+        : "/profile"
+    );
   };
 
   return (
@@ -132,7 +228,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
       <div className="max-w-7xl mx-auto px-6">
         <div className="h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 shrink-0">
-            <img src={Logo} className="h-9" />
+            <img src={Logo} className="h-9" alt="logo" />
             <span className="text-2xl font-semibold text-orange-500">Easy</span>
             <span className="text-2xl font-semibold text-gray-900 -ml-2">
               Travel
@@ -140,47 +236,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
           </Link>
 
           <nav className="hidden md:flex flex-1 justify-center">
-            <ul className="flex gap-9">
-              {user?.role === "Admin"
-                ? adminMenu.map((it) => (
-                    <li key={it.to}>
-                      <NavLink
-                        to={it.to}
-                        className={({ isActive }) =>
-                          renderNavClass(it, isActive)
-                        }
-                      >
-                        {t(`header.${it.key}`)}
-                      </NavLink>
-                    </li>
-                  ))
-                : user?.role === "TourGuide"
-                ? guideMenu.map((it) => (
-                    <li key={it.to}>
-                      <NavLink
-                        to={it.to}
-                        className={({ isActive }) =>
-                          renderNavClass(it, isActive)
-                        }
-                      >
-                        {it.label}
-                      </NavLink>
-                    </li>
-                  ))
-                : userMenu.map((it) => (
-                    <li key={it.key}>
-                      <NavLink
-                        to={it.to}
-                        end={it.to === "/"}
-                        className={({ isActive }) =>
-                          renderNavClass(it, isActive)
-                        }
-                      >
-                        {t(`header.${it.key}`)}
-                      </NavLink>
-                    </li>
-                  ))}
-            </ul>
+            <ul className="flex gap-9">{renderMenu()}</ul>
           </nav>
 
           <div className="hidden md:flex items-center gap-4">
@@ -221,20 +277,13 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
             ) : user ? (
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() =>
-                    navigate(
-                      user.role === "Admin"
-                        ? "/admin/dashboard"
-                        : user.role === "TourGuide"
-                        ? "/guide/profile"
-                        : "/profile"
-                    )
-                  }
+                  onClick={goToProfileByRole}
                   className="flex items-center gap-2 group"
                 >
                   <img
                     src={user.avatar}
                     className="w-9 h-9 rounded-full border"
+                    alt="avatar"
                   />
                   <span className="font-medium group-hover:text-orange-500">
                     {user.name}

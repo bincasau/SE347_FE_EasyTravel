@@ -23,10 +23,13 @@ import DaysAvailable from "./pages/TourGuide/DaysAvailable";
 import GuideProfile from "./pages/TourGuide/GuideProfile";
 import TourScheduleDetail from "./pages/TourGuide/TourScheduleDetail";
 
-
 import AdminTourManagementPage from "./pages/Admin/TourManagementPage";
 import AdminHotelManagementPage from "./pages/Admin/HotelManagementPage";
 import AdminBlogManagementPage from "./pages/Admin/BlogManagementPage";
+
+// ✅ HOTEL MANAGER
+import AddRoom from "./pages/HotelManager/AddRoom";
+import MyHotels from "./pages/HotelManager/MyHotels";
 
 import ScrollToTop from "./utils/ScrollToTop";
 import LoginModal from "./pages/Login";
@@ -68,58 +71,74 @@ export default function App() {
           <Route path="/home" element={<Navigate to="/" replace />} />
           <Route path="/verify" element={<Verify />} />
           <Route path="/profile" element={<Profile />} />
-
           {/* Route dành cho TourGuide */}
           <Route
             path="/guide/past-tours"
             element={
-              <RequireRole role="TourGuide">
+              <RequireRole role="TOUR_GUIDE">
                 <PastTours />
               </RequireRole>
             }
           />
-
           <Route
             path="/guide/schedule"
             element={
-              <RequireRole role="TourGuide">
+              <RequireRole role="TOUR_GUIDE">
                 <SchedulePage />
               </RequireRole>
             }
           />
-
           <Route
             path="/guide/available-days"
             element={
-              <RequireRole role="TourGuide">
+              <RequireRole role="TOUR_GUIDE">
                 <DaysAvailable />
               </RequireRole>
             }
           />
-
           <Route
             path="/guide/profile"
             element={
-              <RequireRole role="TourGuide">
+              <RequireRole role="TOUR_GUIDE">
                 <GuideProfile />
               </RequireRole>
             }
           />
-
           <Route
             path="/guide/tour/:tourId/schedule"
             element={
-              <RequireRole role="TourGuide">
+              <RequireRole role="TOUR_GUIDE">
                 <TourScheduleDetail />
               </RequireRole>
             }
           />
+          {/* ✅ Route cho Hotel Manager */}
+          <Route
+            path="/hotel-manager"
+            element={<Navigate to="/hotel-manager/hotels/new" replace />}
+          />
+          <Route
+            path="/hotel-manager/rooms/new"
+            element={
+              <RequireRole role="HOTEL_MANAGER">
+                <AddRoom />
+              </RequireRole>
+            }
+          />
+          
+          <Route
+            path="/hotel-manager/hotels"
+            element={
+              <RequireRole role="HOTEL_MANAGER">
+                <MyHotels />
+              </RequireRole>
+            }
+          />
           {/* Route cho Admin */}
-
           <Route
             path="/Admin/Tours"
             element={
-              <RequireRole role="Admin">
+              <RequireRole role="ADMIN">
                 <AdminTourManagementPage />
               </RequireRole>
             }
@@ -127,7 +146,7 @@ export default function App() {
           <Route
             path="/Admin/hotels"
             element={
-              <RequireRole role="Admin">
+              <RequireRole role="ADMIN">
                 <AdminHotelManagementPage />
               </RequireRole>
             }
@@ -135,7 +154,7 @@ export default function App() {
           <Route
             path="/Admin/blogs"
             element={
-              <RequireRole role="Admin">
+              <RequireRole role="ADMIN">
                 <AdminBlogManagementPage />
               </RequireRole>
             }

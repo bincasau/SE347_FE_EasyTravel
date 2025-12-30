@@ -30,7 +30,7 @@ export default function LoginModal({ onClose, onOpenSignup }) {
       onClose?.();
 
       // ⭐ Điều hướng theo role
-      if (user?.role === "TourGuide") {
+      if (user?.role === "TOUR_GUIDE") {
         navigate("/guide/schedule"); // ✔ Dẫn vào trang lịch trình
       } else {
         navigate("/"); // ✔ User bình thường về Home
