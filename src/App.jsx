@@ -32,6 +32,8 @@ import AddRoom from "./pages/HotelManager/AddRoom";
 import MyHotels from "./pages/HotelManager/MyHotels";
 import HotelRevenue from "./pages/HotelManager/HotelRevenue";
 import ReportRevenue from "./pages/HotelManager/ReportRevenue";
+import RoomEdit from "@/pages/HotelManager/RoomEdit";
+import RoomView from "@/pages/HotelManager/RoomView";
 
 import ScrollToTop from "./utils/ScrollToTop";
 import LoginModal from "./pages/Login";
@@ -42,7 +44,6 @@ export default function App() {
   const [openLogin, setOpenLogin] = useState(false);
   const [openSignup, setOpenSignup] = useState(false);
 
-  // Khóa scroll khi mở modal
   useEffect(() => {
     document.body.style.overflow = openLogin || openSignup ? "hidden" : "";
   }, [openLogin, openSignup]);
@@ -52,7 +53,6 @@ export default function App() {
       <BrowserRouter>
         <ScrollToTop />
 
-        {/* Luôn dùng 1 Header, nó tự đổi menu theo role */}
         <Header
           onOpenLogin={() => setOpenLogin(true)}
           onOpenSignup={() => setOpenSignup(true)}
@@ -73,7 +73,8 @@ export default function App() {
           <Route path="/home" element={<Navigate to="/" replace />} />
           <Route path="/verify" element={<Verify />} />
           <Route path="/profile" element={<Profile />} />
-          {/* Route dành cho TourGuide */}
+
+          {/* TourGuide */}
           <Route
             path="/guide/past-tours"
             element={
@@ -114,11 +115,13 @@ export default function App() {
               </RequireRole>
             }
           />
-          {/* ✅ Route cho Hotel Manager */}
+
+          {/* ✅ Hotel Manager (FIXED) */}
           <Route
             path="/hotel-manager"
-            element={<Navigate to="/hotel-manager/hotels/new" replace />}
+            element={<Navigate to="/hotel-manager/hotels" replace />}
           />
+
           <Route
             path="/hotel-manager/rooms/new"
             element={
@@ -127,7 +130,7 @@ export default function App() {
               </RequireRole>
             }
           />
-          
+
           <Route
             path="/hotel-manager/hotels"
             element={
@@ -137,7 +140,7 @@ export default function App() {
             }
           />
 
-            <Route
+          <Route
             path="/hotel-manager/revenue"
             element={
               <RequireRole role="HOTEL_MANAGER">
@@ -155,7 +158,25 @@ export default function App() {
             }
           />
 
-          {/* Route cho Admin */}
+          <Route
+            path="/hotel-manager/rooms/edit"
+            element={
+              <RequireRole role="HOTEL_MANAGER">
+                <RoomEdit />
+              </RequireRole>
+            }
+          />
+
+          <Route
+            path="/hotel-manager/rooms/view"
+            element={
+              <RequireRole role="HOTEL_MANAGER">
+                <RoomView />
+              </RequireRole>
+            }
+          />
+
+          {/* Admin */}
           <Route
             path="/Admin/Tours"
             element={

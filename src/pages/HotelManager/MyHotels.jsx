@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import RoomCard from "@/components/pages/HotelManager/MyRoom/Card.jsx";
 
 export default function MyRooms() {
+  const navigate = useNavigate();
+
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState("price_asc");
@@ -30,6 +33,11 @@ export default function MyRooms() {
     }, 300);
   }, []);
 
+  // ✅ Edit route (no id) => pass room via state
+  const goEditRoom = (room) => {
+    navigate("/hotel-manager/rooms/edit", { state: { room } });
+  };
+
   // 🔽 Sort logic
   const sortedRooms = useMemo(() => {
     const data = [...rooms];
@@ -57,14 +65,21 @@ export default function MyRooms() {
       {/* ===== HEADER ===== */}
       <div className="bg-white border-b">
         <div className="max-w-6xl mx-auto px-6 py-6 relative">
+          {/* ✅ Left: Add Room button */}
+          <div className="absolute left-6 top-1/2 -translate-y-1/2">
+            <button
+              onClick={() => navigate("/hotel-manager/rooms/new")}
+              className="px-4 py-2 rounded-lg bg-orange-500 text-white text-sm font-semibold
+                         hover:bg-orange-600 transition hover:-translate-y-[1px] active:scale-95"
+            >
+              + Add Room
+            </button>
+          </div>
+
           {/* Center title */}
           <div className="text-center">
-            <h1 className="text-2xl font-semibold text-gray-900">
-              My Rooms
-            </h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Rooms you have added
-            </p>
+            <h1 className="text-2xl font-semibold text-gray-900">My Rooms</h1>
+            <p className="text-sm text-gray-500 mt-1">Rooms you have added</p>
           </div>
 
           {/* Sort (right) */}
@@ -73,7 +88,7 @@ export default function MyRooms() {
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
               className="border rounded-md px-3 py-2 text-sm bg-white
-                         focus:outline-none focus:ring-2 focus:ring-blue-500"
+                         focus:outline-none focus:ring-2 focus:ring-orange-200"
             >
               <option value="price_asc">Price: Low → High</option>
               <option value="price_desc">Price: High → Low</option>
@@ -93,7 +108,11 @@ export default function MyRooms() {
         ) : (
           <div className="flex flex-col gap-4">
             {sortedRooms.map((room) => (
-              <RoomCard key={room.room_id} room={room} />
+              <RoomCard
+                key={room.room_id}
+                room={room}
+                onEdit={() => goEditRoom(room)}
+              />
             ))}
           </div>
         )}

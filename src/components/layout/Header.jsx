@@ -95,8 +95,12 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     if (user.role === "HOTEL_MANAGER") {
       if (didRedirectRef.current) return;
 
-      // ✅ go straight to Add Room
-      if (location.pathname !== "/hotel-manager/rooms/new") {
+      // ✅ chỉ redirect khi đang ở đúng "/hotel-manager" hoặc "/hotel-manager/"
+      const isHotelManagerRoot =
+        location.pathname === "/hotel-manager" ||
+        location.pathname === "/hotel-manager/";
+
+      if (isHotelManagerRoot) {
         didRedirectRef.current = true;
         navigate("/hotel-manager/rooms/new", { replace: true });
         return;
@@ -148,6 +152,22 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     location.pathname.startsWith("/blog") ||
     location.pathname.startsWith("/detailblog");
 
+  // ✅ GIỮ ACTIVE "Schedule" KHI Ở DETAIL:
+  const isGuideScheduleActive =
+    location.pathname.startsWith("/guide/schedule") ||
+    /^\/guide\/tour\/[^/]+\/schedule\/?$/.test(location.pathname);
+
+  // ✅ GIỮ ACTIVE "Past Tours" KHI VIEW DETAIL TOUR:
+  const isGuidePastToursActive =
+    location.pathname.startsWith("/guide/past-tours") ||
+    location.pathname.startsWith("/detailtour");
+
+  // ✅ HOTEL_MANAGER: GIỮ ACTIVE "My Hotels" khi đang ở rooms view/edit
+  const isHotelManagerHotelsActive =
+    location.pathname.startsWith("/hotel-manager/hotels") ||
+    location.pathname.startsWith("/hotel-manager/rooms/view") ||
+    location.pathname.startsWith("/hotel-manager/rooms/edit");
+
   const renderNavClass = (it, isActive) => {
     if (it.to === "/tours" && isToursActive) return activeLink;
     if (it.to === "/hotels" && isHotelActive) return activeLink;
@@ -176,7 +196,13 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
           <NavLink
             to={it.to}
             end
-            className={({ isActive }) => (isActive ? activeLink : baseLink)}
+            className={({ isActive }) => {
+              // ✅ giữ cam cho "My Hotels" khi view/edit room
+              if (it.to === "/hotel-manager/hotels" && isHotelManagerHotelsActive)
+                return activeLink;
+
+              return isActive ? activeLink : baseLink;
+            }}
           >
             {it.label}
           </NavLink>
@@ -190,7 +216,15 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
           <NavLink
             to={it.to}
             end
-            className={({ isActive }) => (isActive ? activeLink : baseLink)}
+            className={({ isActive }) => {
+              if (it.to === "/guide/schedule" && isGuideScheduleActive)
+                return activeLink;
+
+              if (it.to === "/guide/past-tours" && isGuidePastToursActive)
+                return activeLink;
+
+              return isActive ? activeLink : baseLink;
+            }}
           >
             {it.label}
           </NavLink>

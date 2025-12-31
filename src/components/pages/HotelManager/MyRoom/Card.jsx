@@ -5,8 +5,6 @@ export default function RoomCard({ room }) {
   const navigate = useNavigate();
 
   const {
-    room_id, // keep for navigation only (not displayed)
-    hotel_id, // keep for navigation only (not displayed)
     room_number,
     room_type,
     number_of_guests,
@@ -14,10 +12,8 @@ export default function RoomCard({ room }) {
     description,
     image_bed,
     image_wc,
-
-    // ✅ NEW fields
     floor,
-    status, // e.g. AVAILABLE / BOOKED / MAINTENANCE / INACTIVE
+    status, // AVAILABLE / BOOKED / MAINTENANCE / INACTIVE
   } = room;
 
   const imageUrl = useMemo(() => {
@@ -56,6 +52,16 @@ export default function RoomCard({ room }) {
     };
   }, [status]);
 
+  const goView = () => {
+    // ✅ route basic + pass data
+    navigate("/hotel-manager/rooms/view", { state: { room } });
+  };
+
+  const goEdit = () => {
+    // ✅ route basic + pass data
+    navigate("/hotel-manager/rooms/edit", { state: { room } });
+  };
+
   return (
     <div className="bg-white border rounded-xl shadow-sm hover:shadow-md transition overflow-hidden">
       <div className="flex">
@@ -82,7 +88,7 @@ export default function RoomCard({ room }) {
                     </span>
                   </h3>
 
-                  {/* ✅ Status badge */}
+                  {/* Status badge */}
                   <span
                     className={[
                       "text-xs px-2 py-1 rounded-full border font-semibold",
@@ -101,7 +107,7 @@ export default function RoomCard({ room }) {
                 </div>
               </div>
 
-              {/* ✅ bigger price */}
+              {/* price */}
               <span className="text-orange-600 font-bold text-xl whitespace-nowrap">
                 {price !== null && price !== undefined && price !== ""
                   ? `$${price}`
@@ -123,21 +129,17 @@ export default function RoomCard({ room }) {
           {/* ACTIONS */}
           <div className="mt-3 flex justify-end gap-2">
             <button
-              onClick={() =>
-                navigate(`/hotel-manager/hotels/${hotel_id}/rooms/${room_id}`)
-              }
-              className="px-4 py-1.5 text-sm rounded-lg border border-gray-300 hover:bg-gray-50"
+              onClick={goView}
+              className="px-4 py-1.5 text-sm rounded-lg border border-gray-300 hover:bg-gray-50 transition
+                         active:scale-95"
             >
               View
             </button>
 
             <button
-              onClick={() =>
-                navigate(
-                  `/hotel-manager/hotels/${hotel_id}/rooms/${room_id}/edit`
-                )
-              }
-              className="px-4 py-1.5 text-sm rounded-lg bg-orange-500 text-white hover:bg-orange-600"
+              onClick={goEdit}
+              className="px-4 py-1.5 text-sm rounded-lg bg-orange-500 text-white hover:bg-orange-600 transition
+                         hover:-translate-y-[1px] active:scale-95"
             >
               Edit
             </button>
