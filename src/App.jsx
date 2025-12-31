@@ -30,6 +30,8 @@ import AdminBlogManagementPage from "./pages/Admin/BlogManagementPage";
 // ✅ HOTEL MANAGER
 import AddRoom from "./pages/HotelManager/AddRoom";
 import MyHotels from "./pages/HotelManager/MyHotels";
+import HotelRevenue from "./pages/HotelManager/HotelRevenue";
+import ReportRevenue from "./pages/HotelManager/ReportRevenue";
 
 import ScrollToTop from "./utils/ScrollToTop";
 import LoginModal from "./pages/Login";
@@ -134,6 +136,25 @@ export default function App() {
               </RequireRole>
             }
           />
+
+            <Route
+            path="/hotel-manager/revenue"
+            element={
+              <RequireRole role="HOTEL_MANAGER">
+                <HotelRevenue />
+              </RequireRole>
+            }
+          />
+
+          <Route
+            path="/hotel-manager/reports/revenue"
+            element={
+              <RequireRole role="HOTEL_MANAGER">
+                <ReportRevenue />
+              </RequireRole>
+            }
+          />
+
           {/* Route cho Admin */}
           <Route
             path="/Admin/Tours"
