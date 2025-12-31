@@ -5,6 +5,8 @@ import Logo from "@/assets/images/logo.png";
 import { getAccountDetail, logout } from "@/apis/AccountAPI";
 import { getUserFromToken } from "@/utils/auth";
 
+const S3_USER_BASE = "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/user";
+
 export default function Header({ onOpenLogin, onOpenSignup }) {
   const { lang, setLang, t } = useLang();
   const [openLang, setOpenLang] = useState(false);
@@ -14,7 +16,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // ✅ prevent redirect loop
+  //  prevent redirect loop
   const didRedirectRef = useRef(false);
 
   const userMenu = [
@@ -40,7 +42,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     { to: "/admin/blogs", key: "blog" },
   ];
 
-  // ✅ HOTEL_MANAGER menu (English)
+  // HOTEL_MANAGER menu (English)
   const hotelManagerMenu = [
     { to: "/hotel-manager/rooms/new", label: "Add Room" },
     { to: "/hotel-manager/hotels", label: "My Hotels" },
@@ -58,8 +60,8 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
       setUser({
         name: apiUser.name,
         avatar: apiUser.avatar
-          ? `/images/Users/${apiUser.avatar}`
-          : "/images/Users/default-avatar.png",
+          ? `${S3_USER_BASE}/${apiUser.avatar}`
+          : `${S3_USER_BASE}/user_default.jpg`,
         role: jwtUser?.role || null,
       });
     } catch {
@@ -81,7 +83,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     return () => window.removeEventListener("jwt-changed", handleJWT);
   }, []);
 
-  // ✅ auto redirect by role
+  //  auto redirect by role
   useEffect(() => {
     if (!user?.role) return;
 
@@ -95,7 +97,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     if (user.role === "HOTEL_MANAGER") {
       if (didRedirectRef.current) return;
 
-      // ✅ chỉ redirect khi đang ở đúng "/hotel-manager" hoặc "/hotel-manager/"
+      //  chỉ redirect khi đang ở đúng "/hotel-manager" hoặc "/hotel-manager/"
       const isHotelManagerRoot =
         location.pathname === "/hotel-manager" ||
         location.pathname === "/hotel-manager/";
@@ -152,17 +154,17 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     location.pathname.startsWith("/blog") ||
     location.pathname.startsWith("/detailblog");
 
-  // ✅ GIỮ ACTIVE "Schedule" KHI Ở DETAIL:
+  //  GIỮ ACTIVE "Schedule" KHI Ở DETAIL:
   const isGuideScheduleActive =
     location.pathname.startsWith("/guide/schedule") ||
     /^\/guide\/tour\/[^/]+\/schedule\/?$/.test(location.pathname);
 
-  // ✅ GIỮ ACTIVE "Past Tours" KHI VIEW DETAIL TOUR:
+  //  GIỮ ACTIVE "Past Tours" KHI VIEW DETAIL TOUR:
   const isGuidePastToursActive =
     location.pathname.startsWith("/guide/past-tours") ||
     location.pathname.startsWith("/detailtour");
 
-  // ✅ HOTEL_MANAGER: GIỮ ACTIVE "My Hotels" khi đang ở rooms view/edit
+  //  HOTEL_MANAGER: GIỮ ACTIVE "My Hotels" khi đang ở rooms view/edit
   const isHotelManagerHotelsActive =
     location.pathname.startsWith("/hotel-manager/hotels") ||
     location.pathname.startsWith("/hotel-manager/rooms/view") ||
@@ -197,7 +199,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
             to={it.to}
             end
             className={({ isActive }) => {
-              // ✅ giữ cam cho "My Hotels" khi view/edit room
+              //  giữ cam cho "My Hotels" khi view/edit room
               if (it.to === "/hotel-manager/hotels" && isHotelManagerHotelsActive)
                 return activeLink;
 

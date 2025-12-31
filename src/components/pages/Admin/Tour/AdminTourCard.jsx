@@ -7,6 +7,9 @@ import {
   CurrencyDollarIcon,
 } from "@heroicons/react/24/outline";
 
+const S3_TOUR_BASE =
+  "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/tour";
+
 export default function AdminTourCard({ tour, onEdit, onRemove }) {
   const {
     title,
@@ -27,26 +30,24 @@ export default function AdminTourCard({ tour, onEdit, onRemove }) {
 
   const imageUrl = mainImage?.startsWith("http")
     ? mainImage
-    : `/images/tour/${mainImage}`;
+    : `${S3_TOUR_BASE}/${mainImage}`;
 
   return (
-    <div className="flex items-center gap-6 py-6 border-b border-gray-200">
+    <div className="flex items-center gap-8 bg-white p-6 rounded-2xl shadow-md w-full">
       {/* IMAGE */}
-      <div className="w-[260px] h-[180px]">
-        <img
-          src={imageUrl}
-          alt={title}
-          className="w-full h-full object-cover rounded-xl"
-        />
-      </div>
+      <img
+        src={imageUrl}
+        alt={title}
+        className="w-60 h-36 rounded-xl object-cover flex-shrink-0 bg-gray-100"
+      />
 
       {/* MAIN CONTENT */}
       <div className="flex-1">
-        <h2 className="text-xl font-semibold mb-3">{title}</h2>
+        <h2 className="text-2xl font-semibold mb-3 line-clamp-2">{title}</h2>
 
-        <div className="flex gap-12">
+        <div className="flex gap-12 text-sm text-gray-700">
           {/* LEFT COLUMN */}
-          <div className="space-y-3 text-[15px]">
+          <div className="space-y-2">
             <div className="flex items-start gap-2">
               <CalendarDaysIcon className="w-5 h-5 text-orange-400 mt-0.5" />
               <p>
@@ -81,7 +82,7 @@ export default function AdminTourCard({ tour, onEdit, onRemove }) {
           </div>
 
           {/* RIGHT COLUMN */}
-          <div className="space-y-3 text-[15px]">
+          <div className="space-y-2">
             <div className="flex items-start gap-2">
               <ClockIcon className="w-5 h-5 text-orange-400 mt-0.5" />
               <p>
@@ -101,7 +102,7 @@ export default function AdminTourCard({ tour, onEdit, onRemove }) {
             <div className="flex items-start gap-2">
               <CurrencyDollarIcon className="w-5 h-5 text-orange-400 mt-0.5" />
               <p>
-                <span className="font-semibold">Price Adult:</span>{" "}
+                <span className="font-semibold">Adult:</span>{" "}
                 {priceAdult.toLocaleString()} đ
               </p>
             </div>
@@ -109,7 +110,7 @@ export default function AdminTourCard({ tour, onEdit, onRemove }) {
             <div className="flex items-start gap-2">
               <CurrencyDollarIcon className="w-5 h-5 text-orange-400 mt-0.5" />
               <p>
-                <span className="font-semibold">Price Child:</span>{" "}
+                <span className="font-semibold">Child:</span>{" "}
                 {priceChild?.toLocaleString()} đ
               </p>
             </div>
@@ -117,25 +118,25 @@ export default function AdminTourCard({ tour, onEdit, onRemove }) {
         </div>
       </div>
 
-      {/* ACTIONS + FINAL PRICE (ADULT) */}
-      <div className="flex flex-col items-end gap-3 min-w-[150px]">
-        <div className="text-[15px]">
+      {/* ACTIONS */}
+      <div className="flex flex-col items-end gap-4 ml-4">
+        <div className="text-sm text-gray-700">
           from{" "}
-          <span className="text-xl font-bold">
+          <span className="text-xl font-bold text-gray-900">
             {finalPriceAdult.toLocaleString()} đ
           </span>
         </div>
 
         <button
           onClick={onEdit}
-          className="px-6 py-1.5 border border-orange-400 text-orange-500 rounded-full hover:bg-orange-50 transition"
+          className="border border-orange-500 text-orange-500 px-8 py-2 rounded-full hover:bg-orange-50 transition font-medium"
         >
           Edit
         </button>
 
         <button
           onClick={onRemove}
-          className="px-6 py-1.5 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition"
+          className="bg-orange-500 text-white px-8 py-2 rounded-full hover:bg-orange-600 transition font-medium"
         >
           Remove
         </button>

@@ -48,7 +48,7 @@ export default function HotelManagement() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">Hotel management</h1>
 
-        <button className="bg-orange-500 text-white px-5 py-2 rounded-full hover:bg-orange-600 transition">
+        <button className="px-5 py-2 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition">
           + Add Hotel
         </button>
       </div>

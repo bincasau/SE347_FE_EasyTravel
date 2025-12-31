@@ -1,29 +1,28 @@
 import { FaRegIdBadge, FaUserAlt, FaRegClock, FaPlus } from "react-icons/fa";
 
+const S3_BLOG_BASE =
+  "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/blog";
+
 export default function AdminBlogCard({ blog, onView, onApprove, onRemove }) {
-  const imageSrc = `/images/blog/${blog.thumbnail}`;
+  const imageSrc = `${S3_BLOG_BASE}/${blog.thumbnail}`;
 
   return (
-    <div className="flex items-start gap-6 bg-white p-6 rounded-2xl shadow-md w-full">
+    <div className="flex items-center gap-8 bg-white p-6 rounded-2xl shadow-md w-full">
       {/* IMAGE */}
       <img
         src={imageSrc}
         alt={blog.title}
-        className="w-60 h-40 rounded-xl object-cover flex-shrink-0 bg-gray-100"
+        className="w-60 h-36 rounded-xl object-cover flex-shrink-0 bg-gray-100"
       />
 
-      {/* INFO */}
+      {/* LEFT INFO */}
       <div className="flex flex-col flex-1">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-semibold">{blog.title}</h2>
+        {/* TITLE */}
+        <h2 className="text-2xl font-semibold leading-snug break-words line-clamp-2">
+          {blog.title}
+        </h2>
 
-          {/* STATUS */}
-          <span className="px-5 py-2 bg-orange-400 text-white rounded-full text-sm font-medium">
-            Pending
-          </span>
-        </div>
-
-        <div className="mt-3 flex flex-col gap-2 text-gray-700 text-sm">
+        <div className="mt-3 space-y-1 text-sm text-gray-700">
           <p className="flex items-center gap-2">
             <FaRegIdBadge className="text-orange-500" />
             <span className="font-semibold">Blog ID:</span> {blog.blogId}
@@ -34,40 +33,49 @@ export default function AdminBlogCard({ blog, onView, onApprove, onRemove }) {
             <span className="font-semibold">Author ID:</span>{" "}
             {blog.userId ?? "..."}
           </p>
-
-          <p className="flex items-center gap-2">
-            <FaPlus className="text-orange-500" />
-            <span className="font-semibold">Created at:</span>{" "}
-            {new Date(blog.createdAt).toLocaleString()}
-          </p>
-
-          <p className="flex items-center gap-2">
-            <FaRegClock className="text-orange-500" />
-            <span className="font-semibold">Updated at:</span>{" "}
-            {blog.updatedAt ? new Date(blog.updatedAt).toLocaleString() : "—"}
-          </p>
         </div>
       </div>
 
-      {/* ACTION BUTTONS */}
-      <div className="flex flex-col items-end gap-3 min-w-[130px]">
+      {/* RIGHT INFO – CỘT CỐ ĐỊNH */}
+      <div className="flex flex-col justify-center text-sm text-gray-700 w-56">
+        <span className="mb-2 inline-block px-4 py-1 bg-orange-400 text-white rounded-full text-sm font-medium w-fit">
+          Pending
+        </span>
+
+        <p className="flex items-center gap-2">
+          <FaPlus className="text-orange-500" />
+          <span className="font-semibold">Created:</span>
+          {new Date(blog.createdAt).toLocaleDateString("en-GB")}
+        </p>
+
+        <p className="flex items-center gap-2 mt-2">
+          <FaRegClock className="text-orange-500" />
+          <span className="font-semibold">Updated:</span>
+          {blog.updatedAt
+            ? new Date(blog.updatedAt).toLocaleDateString("en-GB")
+            : "—"}
+        </p>
+      </div>
+
+      {/* ACTIONS */}
+      <div className="flex flex-col items-end gap-4 ml-4">
         <button
           onClick={onView}
-          className="px-5 py-2 border border-orange-400 text-orange-400 rounded-full text-sm hover:bg-orange-50 transition"
+          className="border border-orange-500 text-orange-500 px-8 py-2 rounded-full hover:bg-orange-50 transition font-medium"
         >
-          View Detail
+          View
         </button>
 
         <button
           onClick={onApprove}
-          className="px-5 py-2 bg-green-500 text-white rounded-full text-sm hover:bg-green-600 transition"
+          className="bg-green-500 text-white px-8 py-2 rounded-full hover:bg-green-600 transition font-medium"
         >
           Approve
         </button>
 
         <button
           onClick={onRemove}
-          className="px-5 py-2 bg-orange-500 text-white rounded-full text-sm hover:bg-orange-600 transition"
+          className="bg-orange-500 text-white px-8 py-2 rounded-full hover:bg-orange-600 transition font-medium"
         >
           Remove
         </button>

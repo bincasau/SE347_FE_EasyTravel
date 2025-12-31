@@ -8,8 +8,10 @@ import {
   FaBuilding,
 } from "react-icons/fa";
 
+const S3_HOTEL_BASE ="https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/hotel";
+
 export default function AdminHotelCard({ hotel, onEdit, onRemove }) {
-  const imageSrc = `/images/hotel/${hotel.mainImage}`;
+  const imageSrc = `${S3_HOTEL_BASE}/${hotel.mainImage}`;
 
   return (
     <div className="flex items-center gap-8 bg-white p-6 rounded-2xl shadow-md w-full">

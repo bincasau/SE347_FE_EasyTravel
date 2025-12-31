@@ -23,8 +23,8 @@ useEffect(() => {
   return (
     <div className="max-w-5xl mx-auto py-10">
       {/* PAGE HEADER */}
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold">Tour Management</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-semibold">Tour Management</h1>
         <button className="px-5 py-2 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition">
           + Add tour
         </button>
