@@ -117,5 +117,10 @@ export const en = {
     bookNow: "Book Now",
     night: "night",
     loading: "Loading...",
+    filterByProvince: "Filter by province",
+    sortBy: "Sort by",
+    defaultSort: "Default",
+    sortAsc: "Price: Low to High",
+    sortDesc: "Price: High to Low"
   },
 };

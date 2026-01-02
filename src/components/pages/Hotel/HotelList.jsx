@@ -52,7 +52,7 @@ export default function HotelList() {
   const [showFilter, setShowFilter] = useState(false);
   const [showSort, setShowSort] = useState(false);
 
-  // 🔥 ADD: refs to close dropdown when clicking outside
+  //  ADD: refs to close dropdown when clicking outside
   const filterRef = useRef(null);
   const sortRef = useRef(null);
 
@@ -183,7 +183,7 @@ export default function HotelList() {
             </button>
 
             {showFilter && (
-              <div className="absolute right-0 mt-2 w-60 bg-white border rounded-lg shadow-xl p-4 z-50 pointer-events-auto">
+              <div className="absolute right-0 mt-2 w-60 bg-white border rounded-lg shadow-xl p-4 z-50  max-h-64 overflow-y-auto pointer-events-auto">
                 <p className="font-semibold mb-2">
                   {t("hotelPage.filterByProvince")}
                 </p>

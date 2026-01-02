@@ -2,49 +2,37 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createHotelBooking } from "@/apis/Booking";
 
-const getRoomImage = (imageBed) => {
-  if (!imageBed) {
-    return "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/room/standard_bed.jpg";
-  }
+const AWS_ROOM_IMAGE_BASE =
+  "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/room";
 
-  return `https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/room/${imageBed}`;
-};
+const formatVND = (n) => `${Number(n || 0).toLocaleString("vi-VN")}₫`;
+
+const getRoomImage = (imageBed) =>
+  imageBed
+    ? `${AWS_ROOM_IMAGE_BASE}/${imageBed}`
+    : `${AWS_ROOM_IMAGE_BASE}/standard_bed.jpg`;
 
 export default function BookingStep3({ bookingData, prevStep }) {
   const navigate = useNavigate();
 
+  const { room = {}, hotel = {} } = bookingData;
+
   const [method, setMethod] = useState("");
-  const [card, setCard] = useState({ number: "", expiry: "", cvv: "" });
   const [showModal, setShowModal] = useState(false);
 
-  // ---------- Validate Card ----------
-  const validateCard = () => {
-    const cardRegex = /^[0-9]{16}$/;
-    const expRegex = /^(0[1-9]|1[0-2])\/\d{2}$/;
-    const cvvRegex = /^[0-9]{3}$/;
+  const nights = bookingData.nights || 1;
 
-    return (
-      cardRegex.test(card.number.trim()) &&
-      expRegex.test(card.expiry.trim()) &&
-      cvvRegex.test(card.cvv.trim())
-    );
-  };
-
-  // ---------- Handle Confirm ----------
   const handleConfirm = async () => {
     if (!method) {
-      return alert("❌ Vui lòng chọn phương thức thanh toán!");
+      alert("Vui lòng chọn phương thức thanh toán");
+      return;
     }
 
-    if (method === "card" && !validateCard()) {
-      return alert("❌ Vui lòng nhập thông tin thẻ hợp lệ!");
-    }
+    const token =
+      localStorage.getItem("jwt") ||
+      localStorage.getItem("token") ||
+      localStorage.getItem("accessToken");
 
-    await finishPayment();
-  };
-
-  // ---------- Finish Payment ----------
-  const finishPayment = async () => {
     try {
       const payload = {
         checkInDate: bookingData.checkInDate,
@@ -55,97 +43,97 @@ export default function BookingStep3({ bookingData, prevStep }) {
         gmail: bookingData.user.email,
       };
 
-      await createHotelBooking(payload);
-      setShowModal(true);
+      // const bookingRes = await createHotelBooking(payload);
+
+      // const bookingId =
+      //   bookingRes?.bookingId || bookingRes?.id || bookingRes?.data?.bookingId;
+
+      // if (!bookingId) {
+      //   alert("Không lấy được bookingId");
+      //   return;
+      // }
+
+      if (method === "cash") {
+        setShowModal(true);
+        return;
+      }
+
+      if (method === "vnpay") {
+        const params = new URLSearchParams();
+        params.append("amount", bookingData.total);
+        params.append("bankCode", "NCB");
+        params.append("bookingId", 15);
+        params.append("bookingType", "HOTEL");
+
+        const payRes = await fetch(
+          `http://localhost:8080/payment/vn-pay?${params.toString()}`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: token ? `Bearer ${token}` : "",
+            },
+          }
+        );
+
+        if (!payRes.ok) {
+          alert("VNPay request failed");
+          return;
+        }
+
+        const payData = await payRes.json();
+        const paymentUrl = payData?.data?.paymentUrl;
+
+        if (!paymentUrl) {
+          alert("Không lấy được link VNPay");
+          return;
+        }
+
+        window.location.href = paymentUrl;
+      }
     } catch (err) {
-      alert("❌ Lỗi khi lưu booking: " + err.message);
+      alert("Lỗi khi đặt phòng");
     }
   };
 
   return (
     <>
       <section className="grid md:grid-cols-5 gap-8">
-        {/* LEFT */}
         <div className="md:col-span-3 space-y-6">
           <h2 className="text-lg font-semibold text-gray-800">
             Chọn phương thức thanh toán
           </h2>
 
           <div className="space-y-4">
-            {/* PAYPAL */}
             <div
               className={`border rounded-lg p-4 cursor-pointer ${
-                method === "paypal" ? "border-orange-500 bg-orange-50" : ""
+                method === "cash" ? "border-orange-500 bg-orange-50" : ""
               }`}
-              onClick={() => setMethod("paypal")}
+              onClick={() => setMethod("cash")}
             >
-              <label className="flex items-center gap-3">
-                <input type="radio" checked={method === "paypal"} readOnly />
-                <span className="font-medium">PayPal</span>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input type="radio" checked={method === "cash"} readOnly />
+                <span className="font-medium">Thanh toán tiền mặt</span>
               </label>
               <p className="text-xs text-gray-500 ml-6">
-                Bạn sẽ được chuyển hướng.
+                Thanh toán khi nhận phòng
               </p>
             </div>
 
-            {/* CARD */}
             <div
               className={`border rounded-lg p-4 cursor-pointer ${
-                method === "card" ? "border-orange-500 bg-orange-50" : ""
+                method === "vnpay" ? "border-orange-500 bg-orange-50" : ""
               }`}
-              onClick={() => setMethod("card")}
+              onClick={() => setMethod("vnpay")}
             >
-              <label className="flex items-center gap-3">
-                <input type="radio" checked={method === "card"} readOnly />
-                <span className="font-semibold text-orange-600">
-                  Thanh toán bằng thẻ tín dụng
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input type="radio" checked={method === "vnpay"} readOnly />
+                <span className="font-medium text-orange-600">
+                  Thanh toán qua VNPay
                 </span>
               </label>
-
-              {method === "card" && (
-                <div className="grid grid-cols-2 gap-3 mt-3">
-                  <div className="col-span-2">
-                    <label className="text-xs text-gray-600 mb-1 block">
-                      Card Number
-                    </label>
-                    <input
-                      value={card.number}
-                      onChange={(e) =>
-                        setCard({ ...card, number: e.target.value })
-                      }
-                      maxLength={16}
-                      className="border rounded-lg px-3 py-2 text-sm w-full"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs text-gray-600 mb-1 block">
-                      Expiration MM/YY
-                    </label>
-                    <input
-                      value={card.expiry}
-                      onChange={(e) =>
-                        setCard({ ...card, expiry: e.target.value })
-                      }
-                      className="border rounded-lg px-3 py-2 text-sm w-full"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs text-gray-600 mb-1 block">
-                      CVV
-                    </label>
-                    <input
-                      value={card.cvv}
-                      onChange={(e) =>
-                        setCard({ ...card, cvv: e.target.value })
-                      }
-                      maxLength={3}
-                      className="border rounded-lg px-3 py-2 text-sm w-full"
-                    />
-                  </div>
-                </div>
-              )}
+              <p className="text-xs text-gray-500 ml-6">
+                Chuyển hướng đến cổng thanh toán
+              </p>
             </div>
           </div>
 
@@ -157,37 +145,48 @@ export default function BookingStep3({ bookingData, prevStep }) {
           </button>
         </div>
 
-        {/* RIGHT SUMMARY */}
         <aside className="md:col-span-2">
           <div className="rounded-2xl border bg-white shadow-sm p-5">
-            <h3 className="font-semibold text-gray-800 mb-4">
-              Booking Summary
+            <h3 className="text-base font-semibold text-gray-800 mb-4">
+              Tóm tắt đặt phòng
             </h3>
 
             <div className="flex gap-3 mb-4">
               <img
-                src={getRoomImage(bookingData.room.imageBed)}
-                alt={bookingData.room.type}
+                src={getRoomImage(room.image_bed)}
+                alt={room.type}
                 className="w-20 h-16 rounded-md object-cover"
               />
-              <div>
+
+              <div className="text-sm leading-snug">
                 <div className="font-medium text-gray-800">
-                  {bookingData.room.type} ({bookingData.room.guests} khách)
+                  {hotel.name} – {room.type} ({room.guests} khách)
                 </div>
-                <div className="text-xs text-gray-500">
-                  📅 {bookingData.checkInDate} → {bookingData.checkOutDate}
-                </div>
+                <div className="text-xs text-gray-500">{hotel.address}</div>
               </div>
             </div>
 
             <hr className="my-3" />
 
-            <div className="flex justify-between text-sm">
-              <span>Tiền phòng</span>
-              <span>{bookingData.total.toLocaleString("vi-VN")}₫</span>
+            <div className="text-sm space-y-2 text-gray-700">
+              <div className="flex justify-between">
+                <span>
+                  {nights} đêm · {room.type}
+                </span>
+                <span className="font-medium">
+                  {formatVND(room.price * nights)}
+                </span>
+              </div>
             </div>
 
             <hr className="my-4" />
+
+            <div className="flex justify-between text-sm font-semibold mb-4">
+              <span>Tổng tiền</span>
+              <span className="text-orange-500">
+                {formatVND(bookingData.total)}
+              </span>
+            </div>
 
             <button
               onClick={handleConfirm}
@@ -199,16 +198,12 @@ export default function BookingStep3({ bookingData, prevStep }) {
         </aside>
       </section>
 
-      {/* SUCCESS MODAL */}
       {showModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-2xl shadow-xl max-w-sm w-full text-center">
-            <div className="text-green-500 text-4xl mb-3">✔</div>
-            <h2 className="text-xl font-semibold mb-2">
-              Thanh toán thành công!
-            </h2>
+            <h2 className="text-xl font-semibold mb-2">Đặt phòng thành công</h2>
             <p className="text-gray-600 mb-4">
-              Cảm ơn bạn đã đặt phòng tại EasyTravel.
+              Cảm ơn bạn đã sử dụng EasyTravel
             </p>
 
             <button

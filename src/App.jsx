@@ -68,7 +68,7 @@ export default function App() {
           <Route path="/tours" element={<Tour />} />
           <Route path="/booking/:tourId" element={<Booking />} />
           <Route path="/hotels" element={<Hotel />} />
-          <Route path="/hotel/:id" element={<HotelDetailPage />} />
+          <Route path="/detailhotel/:id" element={<HotelDetailPage />} />
           <Route path="/booking-room" element={<RoomBooking />} />
           <Route path="/blog" element={<Blog />} />
           <Route path="/detailblog/:id" element={<BlogDetail />} />
