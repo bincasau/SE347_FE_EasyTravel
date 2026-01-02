@@ -1,14 +1,23 @@
 import React, { useEffect, useState } from "react";
 import { getAccountDetail } from "@/apis/AccountAPI";
 
+// AWS image
+const AWS_ROOM_IMAGE_BASE =
+  "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/room";
+
+// format VND
+const formatVND = (n) => `${Number(n || 0).toLocaleString("vi-VN")}₫`;
+
 export default function BookingStep2({
   bookingData,
   setBookingData,
   nextStep,
   prevStep,
 }) {
-  const { name, surname, phone, email } = bookingData.user;
-  const isRoomBooking = !!bookingData.room?.type;
+  const { room = {}, hotel = {}, user = {} } = bookingData;
+  const { name, surname, phone, email } = user;
+
+  const isRoomBooking = !!room?.type;
 
   const [isLocked, setIsLocked] = useState(false);
   const [showLoginPopup, setShowLoginPopup] = useState(false);
@@ -47,19 +56,17 @@ export default function BookingStep2({
   }
 
   /* =======================
-     CHECK LOGIN (INIT)
+     CHECK LOGIN
   ======================= */
   useEffect(() => {
     const init = async () => {
       const user = await loadLoggedInUser();
 
       if (!user) {
-        //  LƯU URL HIỆN TẠI TRƯỚC KHI LOGIN
         sessionStorage.setItem(
           "redirectAfterLogin",
           window.location.pathname + window.location.search
         );
-
         setShowLoginPopup(true);
         return;
       }
@@ -71,9 +78,6 @@ export default function BookingStep2({
     init();
   }, []);
 
-  /* =======================
-     LISTEN LOGIN SUCCESS
-  ======================= */
   useEffect(() => {
     const onJwtChanged = async () => {
       const user = await loadLoggedInUser();
@@ -83,7 +87,6 @@ export default function BookingStep2({
       setIsLocked(true);
       setShowLoginPopup(false);
 
-      // ⭐ QUAY LẠI TRANG CŨ (OVERRIDE navigate("/"))
       const redirect = sessionStorage.getItem("redirectAfterLogin");
       if (redirect) {
         sessionStorage.removeItem("redirectAfterLogin");
@@ -107,6 +110,20 @@ export default function BookingStep2({
   };
 
   /* =======================
+     SUMMARY DATA
+  ======================= */
+  const nights = bookingData.nights || 1;
+  const lineItems = [
+    {
+      label: `${room.type} Room`,
+      qty: nights,
+      price: room.price || 0,
+    },
+  ];
+
+  const total = lineItems.reduce((s, it) => s + it.qty * it.price, 0);
+
+  /* =======================
      JSX
   ======================= */
   return (
@@ -115,9 +132,7 @@ export default function BookingStep2({
         {/* LEFT */}
         <div className="md:col-span-3 space-y-6">
           <h2 className="text-lg font-semibold text-gray-800">
-            {isRoomBooking
-              ? "Thông tin người đặt phòng"
-              : "Thông tin người nhận vé"}
+            Thông tin người đặt phòng
           </h2>
 
           <div className="grid grid-cols-2 gap-5">
@@ -155,37 +170,67 @@ export default function BookingStep2({
           </button>
         </div>
 
-        {/* RIGHT */}
+        {/* RIGHT – SUMMARY */}
         <aside className="md:col-span-2">
-          <div className="rounded-2xl border bg-white p-5 shadow-sm">
-            <h3 className="font-semibold mb-4">
-              {isRoomBooking ? "Booking Summary" : "Your Tickets Overview"}
+          <div className="rounded-2xl border bg-white shadow-sm p-5">
+            <h3 className="text-base font-semibold text-gray-800 mb-4">
+              Tóm tắt đặt phòng
             </h3>
 
-            <div className="flex justify-between mb-4">
-              <span className="font-semibold">Total Price</span>
-              <span className="text-orange-500 font-bold">
-                {isRoomBooking
-                  ? bookingData.total.toLocaleString("vi-VN") + "₫"
-                  : `€${bookingData.total}.00`}
-              </span>
+            <div className="flex gap-3 mb-4">
+              <img
+                src={`${AWS_ROOM_IMAGE_BASE}/${room.image_bed}`}
+                alt={room.type}
+                className="w-20 h-16 rounded-md object-cover"
+                onError={(e) => {
+                  e.currentTarget.src = `${AWS_ROOM_IMAGE_BASE}/standard_bed.jpg`;
+                }}
+              />
+
+              <div className="text-sm leading-snug">
+                <div className="font-medium text-gray-800">
+                  {hotel.name} – {room.type} ({room.guests} khách)
+                </div>
+                <div className="text-xs text-gray-500">{hotel.address}</div>
+              </div>
+            </div>
+
+            <hr className="my-3" />
+
+            <div className="text-sm space-y-2 text-gray-700">
+              {lineItems.map((it, i) => (
+                <div key={i} className="flex justify-between">
+                  <span>
+                    {it.qty} đêm · {it.label}
+                  </span>
+                  <span className="font-medium">
+                    {formatVND(it.qty * it.price)}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <hr className="my-4" />
+
+            <div className="flex justify-between text-sm font-semibold mb-4">
+              <span>Tổng tiền</span>
+              <span className="text-orange-500">{formatVND(total)}</span>
             </div>
 
             <button
               onClick={nextStep}
-              className="w-full bg-orange-500 text-white rounded-full py-3 font-medium hover:bg-orange-600"
+              className="w-full rounded-full bg-orange-500 hover:bg-orange-600 text-white py-3 font-medium"
             >
-              Go to the Next Step
+              Tiếp tục
             </button>
           </div>
         </aside>
       </section>
 
-      {/*  LOGIN POPUP */}
+      {/* LOGIN POPUP */}
       {showLoginPopup && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-2xl shadow-xl max-w-sm w-full text-center">
-            <div className="text-4xl mb-3">⚠️</div>
             <h2 className="text-xl font-semibold mb-2">Bạn cần đăng nhập</h2>
             <p className="text-gray-600 mb-4">
               Vui lòng đăng nhập để tiếp tục đặt phòng

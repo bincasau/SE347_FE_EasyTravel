@@ -130,7 +130,7 @@ export default function BookingStep1({
         {/* HOTEL INFO */}
         <div className="border rounded-xl p-4 bg-gray-50">
           <div className="font-semibold text-gray-800">{hotel.name}</div>
-          <div className="text-sm text-gray-600">📍 {hotel.address}</div>
+          <div className="text-sm text-gray-600"> {hotel.address}</div>
         </div>
 
         {/* DATES */}

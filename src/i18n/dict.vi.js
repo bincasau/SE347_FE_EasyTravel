@@ -120,5 +120,10 @@ export const vi = {
     night: "Đêm",
     loading: "Đang tải...",
     allProvinces: "Tất cả tỉnh thành",
+    filterByProvince: "Lọc theo tỉnh thành",
+    sortBy: "Sắp xếp theo",
+    defaultSort: "Mặc định",
+    sortAsc: "Giá: Thấp đến Cao",
+    sortDesc: "Giá: Cao đến Thấp"
   },
 };

@@ -1,20 +1,24 @@
 import React, { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+
 import BookingStep1 from "@/components/pages/Booking/BookingStep1";
 import BookingStep2 from "@/components/pages/Booking/BookingStep2";
 import BookingStep3 from "@/components/pages/Booking/BookingStep3";
 
 export default function RoomBooking() {
   const [step, setStep] = useState(1);
-  const { search } = useLocation();
-  const params = new URLSearchParams(search);
+
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const params = new URLSearchParams(location.search);
   const hotelId = parseInt(params.get("hotel"), 10);
   const roomId = parseInt(params.get("room"), 10);
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Dữ liệu booking mặc định
+  // Dữ liệu booking dùng xuyên suốt các bước
   const [bookingData, setBookingData] = useState({
     date: "",
     time: "",
@@ -41,7 +45,7 @@ export default function RoomBooking() {
     },
   });
 
-  // Fetch dữ liệu phòng + khách sạn
+  // Fetch thông tin khách sạn và phòng
   useEffect(() => {
     if (!hotelId || !roomId) {
       setError("Thiếu thông tin phòng hoặc khách sạn.");
@@ -49,24 +53,21 @@ export default function RoomBooking() {
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
-
     async function loadData() {
       try {
-        // Fetch room
+        setIsLoading(true);
+        setError(null);
+
         const roomRes = await fetch(
           `http://localhost:8080/hotels/${hotelId}/rooms/${roomId}`
         );
-        if (!roomRes.ok) throw new Error("Không thể tải dữ liệu phòng");
+        if (!roomRes.ok) throw new Error("Lỗi tải phòng");
         const room = await roomRes.json();
 
-        // Fetch hotel
         const hotelRes = await fetch(`http://localhost:8080/hotels/${hotelId}`);
-        if (!hotelRes.ok) throw new Error("Không thể tải dữ liệu khách sạn");
+        if (!hotelRes.ok) throw new Error("Lỗi tải khách sạn");
         const hotel = await hotelRes.json();
 
-        // Update bookingData
         setBookingData((prev) => ({
           ...prev,
           hotel: {
@@ -96,11 +97,18 @@ export default function RoomBooking() {
     loadData();
   }, [hotelId, roomId]);
 
-  // Điều hướng giữa các bước
+  // Điều hướng bước
   const nextStep = () => setStep((s) => Math.min(3, s + 1));
   const prevStep = () => setStep((s) => Math.max(1, s - 1));
 
-  // Hiển thị Stepper
+  // Quay lại trang chi tiết khách sạn
+  const backToHotel = () => {
+    if (hotelId) {
+      navigate(`/hotel/${hotelId}`);
+    }
+  };
+
+  // Thanh step
   const Stepper = () => (
     <div className="flex items-center justify-center gap-10 mb-10 text-sm">
       {[
@@ -121,9 +129,9 @@ export default function RoomBooking() {
             {s.n}
           </div>
           <span
-            className={`${
+            className={
               step === s.n ? "text-orange-500 font-medium" : "text-gray-500"
-            }`}
+            }
           >
             {s.label}
           </span>
@@ -133,17 +141,19 @@ export default function RoomBooking() {
     </div>
   );
 
-  // Render từng bước
+  // Render nội dung từng bước
   const renderStep = () => {
-    if (isLoading)
+    if (isLoading) {
       return (
         <p className="text-center text-gray-400 animate-pulse">
           Đang tải dữ liệu phòng...
         </p>
       );
+    }
 
-    if (error)
-      return <p className="text-center text-red-500 font-medium">{error}</p>;
+    if (error) {
+      return <p className="text-center text-red-500">{error}</p>;
+    }
 
     switch (step) {
       case 1:
@@ -178,7 +188,17 @@ export default function RoomBooking() {
 
   return (
     <div className="bg-gray-50 min-h-screen py-12">
+      <div className="max-w-6xl mx-auto px-6 mb-6">
+        <button
+          onClick={backToHotel}
+          className="mb-6 border border-orange-500 text-orange-500 px-4 py-1.5 rounded-md hover:bg-orange-500 hover:text-white transition"
+        >
+          Quay lại khách sạn
+        </button>
+      </div>
+
       <Stepper />
+
       <div className="max-w-6xl mx-auto px-6">{renderStep()}</div>
     </div>
   );
