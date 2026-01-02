@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   startOfMonth,
@@ -20,12 +20,16 @@ import travel4 from "../../../assets/images/Tour/travel4.jpg";
 export default function TourDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+
   const [tour, setTour] = useState(null);
-  const [images, setImages] = useState([]); // ✅ sẽ là 5 ảnh S3
+  const [images, setImages] = useState([]);
+  const [selectedImg, setSelectedImg] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const S3_TOUR_IMG_BASE =
     "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/image";
+
+  const fallbackImages = useMemo(() => [travel1, travel2, travel3, travel4], []);
 
   useEffect(() => {
     const fetchTour = async () => {
@@ -35,12 +39,13 @@ export default function TourDetail() {
         const data = await res.json();
         setTour(data);
 
-        // ✅ Build 5 ảnh theo format: tour_<id>_img_<n>.jpg
         const s3Images = Array.from({ length: 5 }, (_, idx) => {
           const n = idx + 1;
           return `${S3_TOUR_IMG_BASE}/tour_${id}_img_${n}.jpg`;
         });
+
         setImages(s3Images);
+        setSelectedImg(s3Images[0]);
       } catch (err) {
         console.error("❌ Lỗi khi fetch tour:", err);
       } finally {
@@ -48,8 +53,13 @@ export default function TourDetail() {
       }
     };
 
+    setLoading(true);
     fetchTour();
   }, [id]);
+
+  useEffect(() => {
+    if (images?.length) setSelectedImg(images[0]);
+  }, [images]);
 
   if (loading)
     return (
@@ -137,7 +147,7 @@ export default function TourDetail() {
         else cellClass += "text-gray-400";
 
         days.push(
-          <div key={day} className="relative">
+          <div key={format(day, "yyyy-MM-dd")} className="relative">
             {isInRange && (
               <div className="absolute inset-0 bg-orange-200 z-0"></div>
             )}
@@ -149,7 +159,10 @@ export default function TourDetail() {
       }
 
       rows.push(
-        <div className="grid grid-cols-7 gap-[0px] mb-[1px]" key={day}>
+        <div
+          className="grid grid-cols-7 gap-[0px] mb-[1px]"
+          key={format(day, "yyyy-MM-dd")}
+        >
           {days}
         </div>
       );
@@ -159,27 +172,26 @@ export default function TourDetail() {
     return <div>{rows}</div>;
   };
 
-  // ✅ Ảnh chính: img_1
-  const mainImg = images[0] || travel1;
-
-  // ✅ preview: img_2, img_3, img_4 (nếu thiếu thì fallback)
-  const previewImages = images.length >= 4 ? images.slice(1, 4) : [travel2, travel3, travel4];
+  const mainImg = selectedImg || images[0] || fallbackImages[0];
+  const previewImages =
+    images.length >= 4 ? images.slice(1, 4) : fallbackImages.slice(1, 4);
 
   const handleBuyNow = () => {
     navigate(`/booking/${id}`, {
-      state: { tour, images }, // ✅ images là 5 ảnh S3
+      state: { tour, images },
     });
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-8 grid md:grid-cols-2 gap-10 items-end">
+    // ✅ CHỈNH Ở ĐÂY: giảm gap để sát ảnh hơn
+    <div className="max-w-6xl mx-auto px-6 py-8 grid md:grid-cols-2 gap-6 md:gap-8 items-start">
       {/* Left images */}
       <div className="flex flex-col relative">
         <button
           onClick={() =>
             window.history.length > 1 ? navigate(-1) : navigate("/tours")
           }
-          className="absolute -top-10 mb-10 left-0 flex items-center gap-2 
+          className="absolute -top-10 left-0 flex items-center gap-2 
             border border-orange-500 text-orange-500 
             bg-white text-[15px] font-medium 
             px-4 py-1.5 rounded-md
@@ -189,36 +201,54 @@ export default function TourDetail() {
           ← Back
         </button>
 
-        <img
-          src={mainImg}
-          alt={title}
-          className="rounded-2xl w-full h-[540px] object-cover shadow-md hover:scale-[1.01] transition"
-          onError={(e) => (e.currentTarget.src = travel1)}
-        />
+        <div className="w-full h-[620px] rounded-2xl overflow-hidden shadow-md bg-gray-100">
+          <img
+            src={mainImg}
+            alt={title}
+            className="w-full h-full object-cover transition-transform duration-200 hover:scale-[1.01]"
+            onError={(e) => (e.currentTarget.src = fallbackImages[0])}
+          />
+        </div>
 
-        <div className="flex gap-4 mt-4">
-          {previewImages.map((img, i) => (
-            <img
-              key={i}
-              src={img}
-              alt={`preview-${i}`}
-              className="w-1/3 h-32 rounded-xl object-cover hover:scale-105 transition"
-              onError={(e) => (e.currentTarget.src = travel2)}
-            />
-          ))}
+        <div className="grid grid-cols-3 gap-4 mt-4">
+          {previewImages.map((img, i) => {
+            const isActive = img === mainImg;
+
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setSelectedImg(img)}
+                className={[
+                  "rounded-xl overflow-hidden bg-gray-100 shadow-sm",
+                  "h-[140px] w-full",
+                  "ring-2 ring-offset-2 transition",
+                  isActive
+                    ? "ring-orange-500"
+                    : "ring-transparent hover:ring-orange-300",
+                ].join(" ")}
+              >
+                <img
+                  src={img}
+                  alt={`preview-${i}`}
+                  className="w-full h-full object-cover hover:scale-[1.03] transition-transform duration-200"
+                  onError={(e) => (e.currentTarget.src = fallbackImages[1])}
+                />
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {/* Right info */}
-      <div className="flex flex-col justify-between h-full pb-4">
-        <div className="mt-[60px]">
+      <div className="flex flex-col pb-4">
+        <div className="mt-2 md:mt-0">
           <h1 className="text-4xl font-podcast font-light mb-1 text-gray-800 leading-snug">
             {title}
           </h1>
 
           <p className="text-sm text-gray-500 mb-1">{destination}</p>
 
-          {/* PRICE + DISCOUNT */}
           <div className="mb-4">
             {percentDiscount > 0 ? (
               <div className="flex flex-col gap-1">
@@ -247,19 +277,25 @@ export default function TourDetail() {
 
           <p className="font-medium mb-2 text-gray-700">Trip Duration</p>
 
-          <div className="border rounded-2xl p-3 inline-block shadow-md w-[280px] sm:w-[300px] bg-white">
-            {renderHeader()}
-            {renderDays()}
-            {renderCells()}
+          {/* Calendar + Book Now stack dọc */}
+          <div className="flex flex-col r mt-2">
+            <div className="border rounded-2xl p-3 shadow-md w-[280px] sm:w-[300px] bg-white">
+              {renderHeader()}
+              {renderDays()}
+              {renderCells()}
+            </div>
+
+            <button
+              onClick={handleBuyNow}
+              className="bg-orange-500 hover:bg-orange-600 text-white
+                         w-[280px] sm:w-[300px]
+                         rounded-full px-6 py-3 shadow-md
+                         transition-all mt-4"
+            >
+              Book Now
+            </button>
           </div>
         </div>
-
-        <button
-          onClick={handleBuyNow}
-          className="bg-orange-500 hover:bg-orange-600 text-white w-44 self-center md:self-start rounded-full px-6 py-3 shadow-md transition-all mt-6"
-        >
-          Book Now
-        </button>
       </div>
     </div>
   );
