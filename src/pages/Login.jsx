@@ -30,17 +30,20 @@ export default function LoginModal({ onClose, onOpenSignup }) {
       onClose?.();
 
       // ⭐ Điều hướng theo role
-      if (user?.role === "TOUR_GUIDE") {
-        navigate("/guide/schedule"); // ✔ Dẫn vào trang lịch trình
+      if (user?.role === "HOTEL_MANAGER") {
+        navigate("/hotel-manager/hotels/addroom"); // ✅ dẫn vào Add Room
+      } else if (user?.role === "TOUR_GUIDE") {
+        navigate("/guide/schedule"); // ✅ dẫn vào trang lịch trình
+      } else if (user?.role === "ADMIN") {
+        navigate("/admin/dashboard"); // ✅ (optional) admin
       } else {
-        navigate("/"); // ✔ User bình thường về Home
+        navigate("/"); // ✅ user thường
       }
 
       // ⭐ Báo cho app biết JWT đã thay đổi
       window.dispatchEvent(new Event("jwt-changed"));
-
     } catch (error) {
-      setErr(error.message || "Đăng nhập thất bại!");
+      setErr(error?.message || "Đăng nhập thất bại!");
     } finally {
       setLoading(false);
     }
@@ -53,7 +56,6 @@ export default function LoginModal({ onClose, onOpenSignup }) {
 
   return (
     <div className="w-[92%] max-w-md rounded-2xl bg-white p-6 shadow-2xl relative animate-fadeIn">
-
       <button
         onClick={onClose}
         className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
@@ -70,7 +72,6 @@ export default function LoginModal({ onClose, onOpenSignup }) {
       {err && <p className="text-sm text-red-600 mb-3">{err}</p>}
 
       <form className="space-y-5" onSubmit={handleSubmit}>
-
         <div className="space-y-1">
           <label className="text-sm font-medium text-gray-800">Username</label>
           <input

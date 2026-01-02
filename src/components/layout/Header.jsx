@@ -5,7 +5,8 @@ import Logo from "@/assets/images/logo.png";
 import { getAccountDetail, logout } from "@/apis/AccountAPI";
 import { getUserFromToken } from "@/utils/auth";
 
-const S3_USER_BASE = "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/user";
+const S3_USER_BASE =
+  "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/user";
 
 export default function Header({ onOpenLogin, onOpenSignup }) {
   const { lang, setLang, t } = useLang();
@@ -16,7 +17,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
   const location = useLocation();
   const navigate = useNavigate();
 
-  //  prevent redirect loop
+  // prevent redirect loop
   const didRedirectRef = useRef(false);
 
   const userMenu = [
@@ -44,10 +45,10 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
 
   // HOTEL_MANAGER menu (English)
   const hotelManagerMenu = [
-    { to: "/hotel-manager/rooms/new", label: "Add Room" },
-    { to: "/hotel-manager/hotels", label: "My Hotels" },
+    { to: "/hotel-manager/hotels/addroom", label: "Add Rooms" },
     { to: "/hotel-manager/revenue", label: "Hotel Revenue" },
     { to: "/hotel-manager/reports/revenue", label: "Revenue Reports" },
+    { to: "/hotel-manager/myhotel", label: "My Hotel" },
   ];
 
   const fetchUser = async () => {
@@ -83,7 +84,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     return () => window.removeEventListener("jwt-changed", handleJWT);
   }, []);
 
-  //  auto redirect by role
+  // auto redirect by role
   useEffect(() => {
     if (!user?.role) return;
 
@@ -94,17 +95,18 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
       return;
     }
 
-    if (user.role === "HOTEL_MANAGER") {
+    // ✅ HOTEL_MANAGER và TOUR_GUIDE đều coi như vào nhánh hotel-manager
+    if (user.role === "HOTEL_MANAGER" || user.role === "TOUR_GUIDE") {
       if (didRedirectRef.current) return;
 
-      //  chỉ redirect khi đang ở đúng "/hotel-manager" hoặc "/hotel-manager/"
+      // chỉ redirect khi đang ở đúng "/hotel-manager" hoặc "/hotel-manager/"
       const isHotelManagerRoot =
         location.pathname === "/hotel-manager" ||
         location.pathname === "/hotel-manager/";
 
       if (isHotelManagerRoot) {
         didRedirectRef.current = true;
-        navigate("/hotel-manager/rooms/new", { replace: true });
+        navigate("/hotel-manager/hotels/addroom", { replace: true });
         return;
       }
 
@@ -154,17 +156,25 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     location.pathname.startsWith("/blog") ||
     location.pathname.startsWith("/detailblog");
 
-  //  GIỮ ACTIVE "Schedule" KHI Ở DETAIL:
+  // GIỮ ACTIVE "Schedule" KHI Ở DETAIL:
   const isGuideScheduleActive =
     location.pathname.startsWith("/guide/schedule") ||
     /^\/guide\/tour\/[^/]+\/schedule\/?$/.test(location.pathname);
 
-  //  GIỮ ACTIVE "Past Tours" KHI VIEW DETAIL TOUR:
+  // GIỮ ACTIVE "Past Tours" KHI VIEW DETAIL TOUR:
   const isGuidePastToursActive =
     location.pathname.startsWith("/guide/past-tours") ||
     location.pathname.startsWith("/detailtour");
 
-  //  HOTEL_MANAGER: GIỮ ACTIVE "My Hotels" khi đang ở rooms view/edit
+  // ✅ HOTEL_MANAGER: GIỮ ACTIVE "Add Rooms" khi đang ở form add room (kể cả sub-route)
+  const isHotelManagerAddRoomActive =
+    location.pathname.startsWith("/hotel-manager/hotels/addroom");
+
+  // ✅ HOTEL_MANAGER: GIỮ ACTIVE "Hotel Revenue" khi vào list booking/detail
+  const isHotelManagerRevenueActive =
+    location.pathname.startsWith("/hotel-manager/revenue");
+
+  // HOTEL_MANAGER: GIỮ ACTIVE "My Hotels" khi đang ở rooms view/edit (giữ lại nếu bạn cần)
   const isHotelManagerHotelsActive =
     location.pathname.startsWith("/hotel-manager/hotels") ||
     location.pathname.startsWith("/hotel-manager/rooms/view") ||
@@ -199,8 +209,27 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
             to={it.to}
             end
             className={({ isActive }) => {
-              //  giữ cam cho "My Hotels" khi view/edit room
-              if (it.to === "/hotel-manager/hotels" && isHotelManagerHotelsActive)
+              // ✅ GIỮ SÁNG "Add Rooms" KHI ĐANG Ở FORM
+              if (
+                it.to === "/hotel-manager/hotels/addroom" &&
+                isHotelManagerAddRoomActive
+              ) {
+                return activeLink;
+              }
+
+              // ✅ GIỮ SÁNG "Hotel Revenue" KHI Ở /hotel-manager/revenue/* (vd: /revenue/bookings)
+              if (
+                it.to === "/hotel-manager/revenue" &&
+                isHotelManagerRevenueActive
+              ) {
+                return activeLink;
+              }
+
+              // (optional) giữ cam cho "My Hotels" khi view/edit room (nếu menu có link /hotel-manager/hotels)
+              if (
+                it.to === "/hotel-manager/hotels" &&
+                isHotelManagerHotelsActive
+              )
                 return activeLink;
 
               return isActive ? activeLink : baseLink;
@@ -252,18 +281,35 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
       user.role === "ADMIN"
         ? "/admin/dashboard"
         : user.role === "HOTEL_MANAGER"
-        ? "/hotel-manager/rooms/new"
+        ? "/hotel-manager/hotels/addroom"
         : user.role === "TOUR_GUIDE"
-        ? "/guide/profile"
+        ? "/hotel-manager/hotels/addroom"
         : "/profile"
     );
+  };
+
+  // ✅ LOGO: đi theo role (HOTEL_MANAGER/TOUR_GUIDE -> addroom)
+  const getHomeByRole = () => {
+    if (!user?.role) return "/";
+
+    switch (user.role) {
+      case "ADMIN":
+        return "/admin/dashboard";
+      case "HOTEL_MANAGER":
+        return "/hotel-manager/hotels/addroom";
+      case "TOUR_GUIDE":
+        return "/hotel-manager/hotels/addroom";
+      default:
+        return "/";
+    }
   };
 
   return (
     <header className="sticky top-0 bg-white/90 backdrop-blur border-b border-gray-100 z-50">
       <div className="max-w-7xl mx-auto px-6">
         <div className="h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 shrink-0">
+          {/* ✅ Logo click theo role */}
+          <Link to={getHomeByRole()} className="flex items-center gap-2 shrink-0">
             <img src={Logo} className="h-9" alt="logo" />
             <span className="text-2xl font-semibold text-orange-500">Easy</span>
             <span className="text-2xl font-semibold text-gray-900 -ml-2">

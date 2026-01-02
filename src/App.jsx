@@ -29,11 +29,13 @@ import AdminBlogManagementPage from "./pages/Admin/BlogManagementPage";
 
 // ✅ HOTEL MANAGER
 import AddRoom from "./pages/HotelManager/AddRoom";
-import MyHotels from "./pages/HotelManager/MyHotels";
+import Rooms from "./pages/HotelManager/Rooms";
 import HotelRevenue from "./pages/HotelManager/HotelRevenue";
 import ReportRevenue from "./pages/HotelManager/ReportRevenue";
 import RoomEdit from "@/pages/HotelManager/RoomEdit";
 import RoomView from "@/pages/HotelManager/RoomView";
+import ListBooking from "@/pages/HotelManager/ListBooking";
+import MyHotel from "@/pages/HotelManager/MyHotel";
 
 import ScrollToTop from "./utils/ScrollToTop";
 import LoginModal from "./pages/Login";
@@ -123,7 +125,7 @@ export default function App() {
           />
 
           <Route
-            path="/hotel-manager/rooms/new"
+            path="/hotel-manager/hotels/addroom/new"
             element={
               <RequireRole role="HOTEL_MANAGER">
                 <AddRoom />
@@ -132,10 +134,10 @@ export default function App() {
           />
 
           <Route
-            path="/hotel-manager/hotels"
+            path="/hotel-manager/hotels/addroom"
             element={
               <RequireRole role="HOTEL_MANAGER">
-                <MyHotels />
+                <Rooms />
               </RequireRole>
             }
           />
@@ -148,6 +150,12 @@ export default function App() {
               </RequireRole>
             }
           />
+
+          <Route
+            path="/hotel-manager/revenue/bookings"
+            element={<ListBooking />}
+          />
+
 
           <Route
             path="/hotel-manager/reports/revenue"
@@ -172,6 +180,15 @@ export default function App() {
             element={
               <RequireRole role="HOTEL_MANAGER">
                 <RoomView />
+              </RequireRole>
+            }
+          />
+
+          <Route
+            path="/hotel-manager/myhotel"
+            element={
+              <RequireRole role="HOTEL_MANAGER">
+                <MyHotel />
               </RequireRole>
             }
           />

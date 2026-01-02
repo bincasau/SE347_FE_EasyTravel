@@ -1,10 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import TourCard from "../Tour/TourCard";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faChevronLeft,
-  faChevronRight,
-} from "@fortawesome/free-solid-svg-icons";
+import { faChevronLeft, faChevronRight } from "@fortawesome/free-solid-svg-icons";
 import { getPopularTours } from "@/apis/Home";
 import { useLang } from "@/contexts/LangContext";
 
@@ -18,27 +15,54 @@ const PopularTours = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const itemsPerPage = 4;
 
-  //  Fetch Tours
+  // Fetch Tours
   useEffect(() => {
+    let isMounted = true;
+
     const fetchTours = async () => {
       try {
-        const data = await getPopularTours();
-        setTours(data);
+        setLoading(true);
+        setError(null);
+
+        const res = await getPopularTours();
+        console.log("getPopularTours() response:", res);
+
+        // Chuẩn hoá dữ liệu: ưu tiên mảng, nếu API bọc trong {data: []} thì lấy data
+        const list = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+
+        if (!isMounted) return;
+
+        setTours(list);
+
+        // reset index nếu data ít
+        setCurrentIndex(0);
       } catch (err) {
+        console.error("getPopularTours error:", err);
+        if (!isMounted) return;
         setError("Không thể tải danh sách tour.");
+        setTours([]);
       } finally {
+        if (!isMounted) return;
         setLoading(false);
       }
     };
 
     fetchTours();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
+  const canNavigate = tours.length > 0;
+
   const handleNext = () => {
+    if (!canNavigate) return;
     setCurrentIndex((prev) => (prev + itemsPerPage) % tours.length);
   };
 
   const handlePrev = () => {
+    if (!canNavigate) return;
     setCurrentIndex((prev) => {
       const newIndex = prev - itemsPerPage;
       return newIndex < 0
@@ -47,14 +71,22 @@ const PopularTours = () => {
     });
   };
 
-  const visibleTours = Array.from({ length: itemsPerPage }, (_, i) => {
-    const index = (currentIndex + i) % tours.length;
-    return tours[index];
-  });
+  // visibleTours: không ép đủ 4 nếu thiếu, và loại undefined
+  const visibleTours = useMemo(() => {
+    if (!Array.isArray(tours) || tours.length === 0) return [];
+
+    return Array.from({ length: Math.min(itemsPerPage, tours.length) }, (_, i) => {
+      const index = (currentIndex + i) % tours.length;
+      return tours[index];
+    }).filter(Boolean);
+  }, [tours, currentIndex]);
 
   if (loading) return <div className="text-center py-10">Đang tải tour...</div>;
-  if (error)
-    return <div className="text-center text-red-500 py-10">{error}</div>;
+
+  if (error) return <div className="text-center text-red-500 py-10">{error}</div>;
+
+  if (!Array.isArray(tours) || tours.length === 0)
+    return <div className="text-center py-10">Chưa có tour phổ biến.</div>;
 
   return (
     <section className="py-20 px-6 md:px-12 lg:px-20 bg-white font-poppins">
@@ -68,7 +100,12 @@ const PopularTours = () => {
         <div className="flex items-center gap-3">
           <button
             onClick={handlePrev}
-            className="p-2 rounded-full border bg-orange-100 text-orange-500 hover:bg-orange-200 transition"
+            disabled={!canNavigate}
+            className={`p-2 rounded-full border transition ${
+              canNavigate
+                ? "bg-orange-100 text-orange-500 hover:bg-orange-200"
+                : "bg-gray-100 text-gray-400 cursor-not-allowed"
+            }`}
             aria-label="Previous tours"
           >
             <FontAwesomeIcon icon={faChevronLeft} />
@@ -76,7 +113,12 @@ const PopularTours = () => {
 
           <button
             onClick={handleNext}
-            className="p-2 rounded-full border bg-orange-500 text-white hover:bg-orange-600 transition"
+            disabled={!canNavigate}
+            className={`p-2 rounded-full border transition ${
+              canNavigate
+                ? "bg-orange-500 text-white hover:bg-orange-600"
+                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+            }`}
             aria-label="Next tours"
           >
             <FontAwesomeIcon icon={faChevronRight} />
@@ -86,8 +128,11 @@ const PopularTours = () => {
 
       {/* Tour list */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 justify-items-center">
-        {visibleTours.map((tour) => (
-          <TourCard key={tour.id} tour={tour} />
+        {visibleTours.map((tour, idx) => (
+          <TourCard
+            key={tour?.id ?? tour?.tour_id ?? `${currentIndex}-${idx}`}
+            tour={tour}
+          />
         ))}
       </div>
     </section>

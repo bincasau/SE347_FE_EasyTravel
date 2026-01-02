@@ -7,7 +7,9 @@ export default function MyRooms() {
 
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
+
   const [sortBy, setSortBy] = useState("price_asc");
+  const [q, setQ] = useState(""); // ✅ search query
 
   useEffect(() => {
     const mock = [
@@ -25,6 +27,20 @@ export default function MyRooms() {
         image_wc:
           "https://images.unsplash.com/photo-1600566753051-f0fbc6c0c0c5?w=1200&q=80&auto=format&fit=crop",
       },
+      {
+        room_id: 2,
+        hotel_id: 2,
+        room_number: "B202",
+        room_type: "Standard",
+        number_of_guests: 3,
+        price: 45,
+        description: "Cozy standard room.",
+        created_at: "2024-08-21",
+        image_bed:
+          "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=1200&q=80&auto=format&fit=crop",
+        image_wc:
+          "https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?w=1200&q=80&auto=format&fit=crop",
+      },
     ];
 
     setTimeout(() => {
@@ -38,15 +54,33 @@ export default function MyRooms() {
     navigate("/hotel-manager/rooms/edit", { state: { room } });
   };
 
-  // 🔽 Sort logic
+  // ✅ Filter by search
+  const filteredRooms = useMemo(() => {
+    const keyword = q.trim().toLowerCase();
+    if (!keyword) return rooms;
+
+    return rooms.filter((r) => {
+      const roomNumber = String(r.room_number ?? "").toLowerCase();
+      const roomType = String(r.room_type ?? "").toLowerCase();
+      const desc = String(r.description ?? "").toLowerCase();
+
+      return (
+        roomNumber.includes(keyword) ||
+        roomType.includes(keyword) ||
+        desc.includes(keyword)
+      );
+    });
+  }, [rooms, q]);
+
+  // 🔽 Sort logic (sort after filter)
   const sortedRooms = useMemo(() => {
-    const data = [...rooms];
+    const data = [...filteredRooms];
 
     switch (sortBy) {
       case "price_asc":
-        return data.sort((a, b) => a.price - b.price);
+        return data.sort((a, b) => (a.price ?? 0) - (b.price ?? 0));
       case "price_desc":
-        return data.sort((a, b) => b.price - a.price);
+        return data.sort((a, b) => (b.price ?? 0) - (a.price ?? 0));
       case "date_desc":
         return data.sort(
           (a, b) => new Date(b.created_at) - new Date(a.created_at)
@@ -58,7 +92,7 @@ export default function MyRooms() {
       default:
         return data;
     }
-  }, [rooms, sortBy]);
+  }, [filteredRooms, sortBy]);
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-gray-50">
@@ -68,7 +102,7 @@ export default function MyRooms() {
           {/* ✅ Left: Add Room button */}
           <div className="absolute left-6 top-1/2 -translate-y-1/2">
             <button
-              onClick={() => navigate("/hotel-manager/rooms/new")}
+              onClick={() => navigate("/hotel-manager/hotels/addroom/new")}
               className="px-4 py-2 rounded-lg bg-orange-500 text-white text-sm font-semibold
                          hover:bg-orange-600 transition hover:-translate-y-[1px] active:scale-95"
             >
@@ -97,6 +131,34 @@ export default function MyRooms() {
             </select>
           </div>
         </div>
+
+        {/* ✅ SEARCH BAR */}
+        <div className="max-w-6xl mx-auto px-6 pb-5">
+          <div className="flex items-center gap-3">
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search by room number, type, description..."
+              className="w-full border rounded-xl px-4 py-2.5 bg-white
+                         focus:outline-none focus:ring-2 focus:ring-orange-200"
+            />
+
+            {q.trim() && (
+              <button
+                onClick={() => setQ("")}
+                className="px-4 py-2.5 rounded-xl border border-gray-300 hover:bg-gray-50 text-sm"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          {/* ✅ small helper text */}
+          <div className="mt-2 text-xs text-gray-500">
+            Showing <span className="font-semibold">{sortedRooms.length}</span> /{" "}
+            <span className="font-semibold">{rooms.length}</span> rooms
+          </div>
+        </div>
       </div>
 
       {/* ===== CONTENT ===== */}
@@ -104,7 +166,9 @@ export default function MyRooms() {
         {loading ? (
           <p className="text-gray-400 text-center">Loading...</p>
         ) : sortedRooms.length === 0 ? (
-          <p className="text-gray-400 text-center">No rooms found.</p>
+          <p className="text-gray-400 text-center">
+            No rooms found{q.trim() ? ` for "${q.trim()}"` : ""}.
+          </p>
         ) : (
           <div className="flex flex-col gap-4">
             {sortedRooms.map((room) => (

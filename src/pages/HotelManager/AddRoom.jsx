@@ -1,10 +1,10 @@
 import { useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
-
+import { useParams, useNavigate } from "react-router-dom";
 
 export default function AddRoom() {
   // ✅ get hotelId from route
   const { hotelId } = useParams(); // string
+  const navigate = useNavigate(); // ✅ back
 
   const [form, setForm] = useState({
     room_number: "",
@@ -185,7 +185,16 @@ export default function AddRoom() {
       {/* Header bar */}
       <div className="bg-white border-b">
         <div className="max-w-5xl mx-auto px-6 h-16 flex items-center">
-          <div className="flex-1" />
+          {/* ✅ Back button */}
+          <div className="flex-1">
+            <button
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-2 text-gray-600 hover:text-orange-500 font-medium"
+            >
+              ← Back
+            </button>
+          </div>
+
           <h1 className="flex-1 text-center text-xl font-semibold text-gray-900">
             Add Room
           </h1>
