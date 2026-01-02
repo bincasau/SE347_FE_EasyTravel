@@ -21,13 +21,13 @@ export default function SchedulePage() {
 
   /* FAKE DATA */
   const exampleSchedule = {
-    "2025-12-03": [
+    "2026-01-01": [
       {
         id: 1,
         title: "Lucca Bike Tour",
         img: "/images/tours/tour1.jpg",
-        from: "2025-12-03",
-        to: "2025-01-05",
+        from: "2026-1-01",
+        to: "2026-01-05",
         time: "08:00",
         task: "Tour guiding with group A",
       },

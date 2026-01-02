@@ -30,7 +30,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
   ];
 
   const guideMenu = [
-    { to: "/guide/schedule", label: "Schedule" },
+    { to: "/guide/schedule", label: "Tour Schedule" },
     { to: "/guide/available-days", label: "Days Available" },
     { to: "/guide/past-tours", label: "Past Tours" },
   ];
@@ -43,7 +43,6 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     { to: "/admin/blogs", key: "blog" },
   ];
 
-  // HOTEL_MANAGER menu (English)
   const hotelManagerMenu = [
     { to: "/hotel-manager/hotels/addroom", label: "Add Rooms" },
     { to: "/hotel-manager/revenue", label: "Hotel Revenue" },
@@ -88,6 +87,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
   useEffect(() => {
     if (!user?.role) return;
 
+    // ✅ Admin redirect
     if (user.role === "ADMIN") {
       if (!location.pathname.startsWith("/admin")) {
         navigate("/admin/dashboard", { replace: true });
@@ -95,11 +95,10 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
       return;
     }
 
-    // ✅ HOTEL_MANAGER và TOUR_GUIDE đều coi như vào nhánh hotel-manager
-    if (user.role === "HOTEL_MANAGER" || user.role === "TOUR_GUIDE") {
+    // ✅ Hotel manager redirect khi đứng ở root /hotel-manager
+    if (user.role === "HOTEL_MANAGER") {
       if (didRedirectRef.current) return;
 
-      // chỉ redirect khi đang ở đúng "/hotel-manager" hoặc "/hotel-manager/"
       const isHotelManagerRoot =
         location.pathname === "/hotel-manager" ||
         location.pathname === "/hotel-manager/";
@@ -107,6 +106,22 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
       if (isHotelManagerRoot) {
         didRedirectRef.current = true;
         navigate("/hotel-manager/hotels/addroom", { replace: true });
+        return;
+      }
+
+      didRedirectRef.current = true;
+    }
+
+    // ✅ Tour guide redirect khi đứng ở root /guide
+    if (user.role === "TOUR_GUIDE") {
+      if (didRedirectRef.current) return;
+
+      const isGuideRoot =
+        location.pathname === "/guide" || location.pathname === "/guide/";
+
+      if (isGuideRoot) {
+        didRedirectRef.current = true;
+        navigate("/guide/schedule", { replace: true });
         return;
       }
 
@@ -156,29 +171,19 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     location.pathname.startsWith("/blog") ||
     location.pathname.startsWith("/detailblog");
 
-  // GIỮ ACTIVE "Schedule" KHI Ở DETAIL:
   const isGuideScheduleActive =
     location.pathname.startsWith("/guide/schedule") ||
     /^\/guide\/tour\/[^/]+\/schedule\/?$/.test(location.pathname);
 
-  // GIỮ ACTIVE "Past Tours" KHI VIEW DETAIL TOUR:
   const isGuidePastToursActive =
     location.pathname.startsWith("/guide/past-tours") ||
     location.pathname.startsWith("/detailtour");
 
-  // ✅ HOTEL_MANAGER: GIỮ ACTIVE "Add Rooms" khi đang ở form add room (kể cả sub-route)
   const isHotelManagerAddRoomActive =
     location.pathname.startsWith("/hotel-manager/hotels/addroom");
 
-  // ✅ HOTEL_MANAGER: GIỮ ACTIVE "Hotel Revenue" khi vào list booking/detail
   const isHotelManagerRevenueActive =
     location.pathname.startsWith("/hotel-manager/revenue");
-
-  // HOTEL_MANAGER: GIỮ ACTIVE "My Hotels" khi đang ở rooms view/edit (giữ lại nếu bạn cần)
-  const isHotelManagerHotelsActive =
-    location.pathname.startsWith("/hotel-manager/hotels") ||
-    location.pathname.startsWith("/hotel-manager/rooms/view") ||
-    location.pathname.startsWith("/hotel-manager/rooms/edit");
 
   const renderNavClass = (it, isActive) => {
     if (it.to === "/tours" && isToursActive) return activeLink;
@@ -209,26 +214,15 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
             to={it.to}
             end
             className={({ isActive }) => {
-              // ✅ GIỮ SÁNG "Add Rooms" KHI ĐANG Ở FORM
               if (
                 it.to === "/hotel-manager/hotels/addroom" &&
                 isHotelManagerAddRoomActive
-              ) {
+              )
                 return activeLink;
-              }
 
-              // ✅ GIỮ SÁNG "Hotel Revenue" KHI Ở /hotel-manager/revenue/* (vd: /revenue/bookings)
               if (
                 it.to === "/hotel-manager/revenue" &&
                 isHotelManagerRevenueActive
-              ) {
-                return activeLink;
-              }
-
-              // (optional) giữ cam cho "My Hotels" khi view/edit room (nếu menu có link /hotel-manager/hotels)
-              if (
-                it.to === "/hotel-manager/hotels" &&
-                isHotelManagerHotelsActive
               )
                 return activeLink;
 
@@ -283,12 +277,12 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
         : user.role === "HOTEL_MANAGER"
         ? "/hotel-manager/hotels/addroom"
         : user.role === "TOUR_GUIDE"
-        ? "/hotel-manager/hotels/addroom"
+        ? "/guide/schedule"
         : "/profile"
     );
   };
 
-  // ✅ LOGO: đi theo role (HOTEL_MANAGER/TOUR_GUIDE -> addroom)
+  // ✅ LOGO: đi theo role
   const getHomeByRole = () => {
     if (!user?.role) return "/";
 
@@ -298,7 +292,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
       case "HOTEL_MANAGER":
         return "/hotel-manager/hotels/addroom";
       case "TOUR_GUIDE":
-        return "/hotel-manager/hotels/addroom";
+        return "/guide/schedule"; // ✅ FIX: tour guide về schedule
       default:
         return "/";
     }
@@ -308,7 +302,6 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     <header className="sticky top-0 bg-white/90 backdrop-blur border-b border-gray-100 z-50">
       <div className="max-w-7xl mx-auto px-6">
         <div className="h-16 flex items-center justify-between">
-          {/* ✅ Logo click theo role */}
           <Link to={getHomeByRole()} className="flex items-center gap-2 shrink-0">
             <img src={Logo} className="h-9" alt="logo" />
             <span className="text-2xl font-semibold text-orange-500">Easy</span>
