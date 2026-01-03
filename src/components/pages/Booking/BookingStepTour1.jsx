@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { FaCalendarAlt, FaClock } from "react-icons/fa";
+import { FaCalendarAlt } from "react-icons/fa";
 import DatePicker from "react-datepicker";
 import Select from "react-select";
 import "react-datepicker/dist/react-datepicker.css";
@@ -63,7 +63,7 @@ export default function BookingStepTour1({ bookingData, setBookingData, nextStep
   const priceAdult = basePriceAdult * discountFactor;
   const priceChild = basePriceChild * discountFactor;
 
-  const { time, tickets = {} } = bookingData;
+  const { tickets = {} } = bookingData;
   const { adult = 0, child = 0 } = tickets;
 
   // 3️⃣ Tính tổng + giới hạn ghế
@@ -77,8 +77,6 @@ export default function BookingStepTour1({ bookingData, setBookingData, nextStep
       date: d ? d.toISOString().split("T")[0] : "",
     });
   };
-
-  const setTime = (v) => setBookingData({ ...bookingData, time: v?.value || "" });
 
   const setQty = (key, qty) => {
     // tính thử số lượng mới
@@ -108,12 +106,6 @@ export default function BookingStepTour1({ bookingData, setBookingData, nextStep
     }
   }, [total]);
 
-  // 5️⃣ Danh sách giờ
-  const timeOptions = ["09:00", "11:00", "13:00", "15:00", "17:00"].map((t) => ({
-    value: t,
-    label: t,
-  }));
-
   const disableAdultPlus =
     availableSeats > 0 && adult + child >= availableSeats;
   const disableChildPlus =
@@ -134,27 +126,6 @@ export default function BookingStepTour1({ bookingData, setBookingData, nextStep
             placeholderText="Choose a travel date"
             showPopperArrow={false}
             className="w-full text-sm text-gray-800 focus:outline-none"
-          />
-        </div>
-      </div>
-
-      {/* 🕒 TIME */}
-      <div>
-        <label className="block text-sm text-gray-600 mb-2">Select a Time</label>
-        <div className="relative flex items-center border rounded-lg px-3 py-2 bg-white shadow-sm">
-          <FaClock className="text-gray-500 mr-2" />
-          <Select
-            options={timeOptions}
-            value={timeOptions.find((t) => t.value === time) || null}
-            onChange={setTime}
-            className="flex-1 text-sm"
-            styles={{
-              control: (base) => ({
-                ...base,
-                border: "none",
-                boxShadow: "none",
-              }),
-            }}
           />
         </div>
       </div>

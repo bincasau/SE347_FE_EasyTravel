@@ -1,20 +1,27 @@
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { getUserFromToken } from "@/utils/auth";
 
 export default function RequireRole({ role, children }) {
   const user = getUserFromToken();
+  const location = useLocation();
 
   console.log("Decoded user =", user);
 
-  // 1. Chưa login → trả về trang chủ
-  if (!user) return <Navigate to="/" replace />;
+  // 1️⃣ Chưa login → về trang chủ
+  if (!user) {
+    return <Navigate to="/" replace state={{ from: location }} />;
+  }
 
-  // 2. Token không có role
-  if (!user.role) return <Navigate to="/" replace />;
+  // 2️⃣ Có token nhưng không có role → 403
+  if (!user.role) {
+    return <Navigate to="/403" replace />;
+  }
 
-  // 3. Role không khớp
-  if (user.role !== role) return <Navigate to="/" replace />;
+  // 3️⃣ Role không khớp → 403
+  if (user.role !== role) {
+    return <Navigate to="/403" replace />;
+  }
 
-  // 4. Đúng role → cho vào
+  // 4️⃣ Đúng role → cho vào
   return children;
 }

@@ -8,34 +8,79 @@ const formatVND = (n) =>
     currency: "VND",
   });
 
+// ✅ AWS S3 giống TourCard
+const S3_BASE = "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/tour";
+const buildS3TourImage = (id) => (id != null ? `${S3_BASE}/tour_${id}.jpg` : "");
+
 export default function BookingSummary({ bookingData }) {
-  const { tourId, tickets = {}, total, date, time } = bookingData || {};
+  const {
+    tourId,
+    tourInfo: tourInfoFromBooking,
+    tickets = {},
+    total,
+    date,
+  } = bookingData || {};
+
   const { adult = 0, child = 0 } = tickets;
 
-  const [tourInfo, setTourInfo] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [mainImageUrl, setMainImageUrl] = useState(imgFallback);
+  const [tourInfo, setTourInfo] = useState(tourInfoFromBooking || null);
+  const [loading, setLoading] = useState(!tourInfoFromBooking && !!tourId);
 
-  // ✅ Fetch tour info (title, image, prices)
+  // ✅ ưu tiên id từ tourInfo (nếu có), fallback tourId
+  const resolvedTourId = tourInfoFromBooking?.id ?? tourInfoFromBooking?.tourId ?? tourId;
+
+  // ✅ main image dùng S3 theo id giống TourCard
+  const [mainImageUrl, setMainImageUrl] = useState(() => {
+    const s3Url = buildS3TourImage(resolvedTourId);
+    return s3Url || imgFallback;
+  });
+
+  // ✅ nếu bookingData có tourInfo thì dùng luôn, khỏi fetch
   useEffect(() => {
+    if (tourInfoFromBooking) {
+      setTourInfo(tourInfoFromBooking);
+
+      const id =
+        tourInfoFromBooking?.id ?? tourInfoFromBooking?.tourId ?? tourId;
+
+      const s3Url = buildS3TourImage(id);
+      setMainImageUrl(s3Url || imgFallback);
+
+      setLoading(false);
+      return;
+    }
+
+    // fallback: fetch nếu chỉ có tourId
     if (!tourId) return;
+
     const fetchTour = async () => {
       try {
+        setLoading(true);
         const res = await fetch(`http://localhost:8080/tours/${tourId}`);
         if (!res.ok) throw new Error("Failed to load tour data");
         const data = await res.json();
+
         setTourInfo(data);
-        if (data.mainImage) {
-          setMainImageUrl(`http://localhost:8080/images/${data.mainImage}`);
-        }
+
+        const id = data?.id ?? data?.tourId ?? tourId;
+        const s3Url = buildS3TourImage(id);
+        setMainImageUrl(s3Url || imgFallback);
       } catch (err) {
         console.error("❌ Error fetching tour:", err);
+        setMainImageUrl(imgFallback);
       } finally {
         setLoading(false);
       }
     };
+
     fetchTour();
-  }, [tourId]);
+  }, [tourId, tourInfoFromBooking]);
+
+  // ✅ nếu id đổi (người dùng chọn tour khác) thì update ảnh
+  useEffect(() => {
+    const s3Url = buildS3TourImage(resolvedTourId);
+    setMainImageUrl(s3Url || imgFallback);
+  }, [resolvedTourId]);
 
   if (loading)
     return (
@@ -52,22 +97,23 @@ export default function BookingSummary({ bookingData }) {
   const discountFactor =
     percentDiscount > 0 ? 1 - percentDiscount / 100 : 1;
 
-  const effectiveAdult = priceAdult * discountFactor;
-  const effectiveChild = priceChild * discountFactor;
+  const effectiveAdult = (priceAdult ?? 0) * discountFactor;
+  const effectiveChild = (priceChild ?? 0) * discountFactor;
 
   return (
     <aside className="rounded-2xl border bg-white shadow-sm p-5 h-fit sticky top-10">
-      <h3 className="font-semibold text-gray-800 mb-4">
-        Booking Information
-      </h3>
+      <h3 className="font-semibold text-gray-800 mb-4">Booking Information</h3>
 
-      {/* 🖼️ Image + Tour details side by side */}
+      {/* 🖼️ Image + Tour details */}
       <div className="flex items-center gap-4 mb-5">
         <img
           src={mainImageUrl}
           alt={title}
           className="w-24 h-20 rounded-lg object-cover flex-shrink-0 border"
-          onError={(e) => (e.currentTarget.src = imgFallback)}
+          onError={(e) => {
+            // ✅ fallback nếu ảnh S3 không có
+            e.currentTarget.src = imgFallback;
+          }}
         />
         <div className="flex flex-col justify-center">
           <div className="font-semibold text-gray-800 text-sm leading-tight mb-1">
@@ -79,11 +125,6 @@ export default function BookingSummary({ bookingData }) {
           <div className="text-xs text-gray-500 flex items-center gap-1">
             📅 <span>{date || "--"}</span>
           </div>
-          {time && (
-            <div className="text-xs text-gray-500 flex items-center gap-1">
-              🕒 <span>{time}</span>
-            </div>
-          )}
         </div>
       </div>
 
@@ -99,15 +140,14 @@ export default function BookingSummary({ bookingData }) {
             <div className="text-right">
               {percentDiscount > 0 && (
                 <div className="text-xs text-gray-400 line-through">
-                  {formatVND(adult * priceAdult)}
+                  {formatVND(adult * (priceAdult ?? 0))}
                 </div>
               )}
-              <div className="font-medium">
-                {formatVND(adult * effectiveAdult)}
-              </div>
+              <div className="font-medium">{formatVND(adult * effectiveAdult)}</div>
             </div>
           </div>
         )}
+
         {child > 0 && (
           <div className="flex justify-between items-center text-gray-700">
             <span>
@@ -116,12 +156,10 @@ export default function BookingSummary({ bookingData }) {
             <div className="text-right">
               {percentDiscount > 0 && (
                 <div className="text-xs text-gray-400 line-through">
-                  {formatVND(child * priceChild)}
+                  {formatVND(child * (priceChild ?? 0))}
                 </div>
               )}
-              <div className="font-medium">
-                {formatVND(child * effectiveChild)}
-              </div>
+              <div className="font-medium">{formatVND(child * effectiveChild)}</div>
             </div>
           </div>
         )}

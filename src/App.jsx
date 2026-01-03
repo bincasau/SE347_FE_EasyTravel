@@ -42,6 +42,9 @@ import LoginModal from "./pages/Login";
 import { useEffect, useState } from "react";
 import SignupModal from "./pages/SignUp";
 
+import Forbidden403 from "./pages/Forbidden403";
+import NotFound404 from "./pages/NotFound404";
+
 export default function App() {
   const [openLogin, setOpenLogin] = useState(false);
   const [openSignup, setOpenSignup] = useState(false);
@@ -75,6 +78,9 @@ export default function App() {
           <Route path="/home" element={<Navigate to="/" replace />} />
           <Route path="/verify" element={<Verify />} />
           <Route path="/profile" element={<Profile />} />
+
+          <Route path="/403" element={<Forbidden403 />} />
+
 
           {/* TourGuide */}
           <Route
@@ -218,7 +224,10 @@ export default function App() {
               </RequireRole>
             }
           />
+
+           <Route path="*" element={<NotFound404 />} />
         </Routes>
+
 
         <Footer />
 
