@@ -18,11 +18,17 @@ export default function BlogDetailContent() {
   const [allBlogs, setAllBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const S3_BLOG_BASE =
+  // ✅ S3 paths đúng theo link bạn đưa
+  const S3_BLOG_MAIN =
     "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/blog";
-  const blogImg = (blogId) => `${S3_BLOG_BASE}/blog_${blogId}.jpg`;
+  const S3_BLOG_IMAGE =
+    "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/image";
 
-  // ✅ Fetch blog detail + tất cả blog (để xác định prev/next)
+  const blogMainImg = (blogId) => `${S3_BLOG_MAIN}/blog_${blogId}.jpg`;
+  const blogExtraImg = (blogId, idx) =>
+    `${S3_BLOG_IMAGE}/blog_${blogId}_img_${idx}.jpg`;
+
+  // ✅ Fetch blog detail + all blogs
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -43,8 +49,10 @@ export default function BlogDetailContent() {
           id: detailData.blogId,
           title: detailData.title,
           details: detailData.details || "",
-          thumbnail: blogImg(detailData.blogId),
-          createdAt: new Date(detailData.createdAt).toLocaleDateString("vi-VN"),
+          thumbnail: blogMainImg(detailData.blogId),
+          createdAt: detailData.createdAt
+            ? new Date(detailData.createdAt).toLocaleDateString("vi-VN")
+            : "",
         };
 
         setBlog(current);
@@ -104,6 +112,7 @@ export default function BlogDetailContent() {
         src={blog.thumbnail}
         alt={blog.title}
         className="w-full h-[420px] object-cover rounded-2xl"
+        loading="lazy"
         onError={(e) => {
           e.currentTarget.src =
             "https://via.placeholder.com/1200x600?text=No+Image";
@@ -120,12 +129,37 @@ export default function BlogDetailContent() {
       </h1>
 
       {/* ---------- CONTENT ---------- */}
-      <div
-        className="prose prose-lg max-w-none mt-6 text-gray-700 leading-relaxed"
-        dangerouslySetInnerHTML={{
-          __html: (blog.details || "").replace(/\n/g, "<br/>"),
-        }}
-      ></div>
+      <div className="mt-6 rounded-2xl border bg-white p-6 md:p-8 shadow-sm">
+        <div
+          className="prose prose-lg max-w-none text-gray-700 leading-relaxed prose-p:my-4"
+          dangerouslySetInnerHTML={{
+            __html: (blog.details || "").replace(/\n/g, "<br/>"),
+          }}
+        />
+      </div>
+
+      {/* ---------- EXTRA IMAGES (FULL Ô, KHÔNG TÊN) ---------- */}
+      <div className="mt-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {[1, 2].map((idx) => (
+            <div
+              key={idx}
+              className="rounded-2xl overflow-hidden bg-white shadow-sm hover:shadow-md transition"
+            >
+              <img
+                src={blogExtraImg(blog.id, idx)}
+                alt={`blog-${blog.id}-img-${idx}`}
+                className="w-full h-72 object-cover hover:scale-[1.03] transition-transform duration-300"
+                loading="lazy"
+                onError={(e) => {
+                  e.currentTarget.src =
+                    "https://via.placeholder.com/900x600?text=No+Image";
+                }}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* ---------- TAGS + SHARE ---------- */}
       <div className="flex flex-wrap items-center justify-between mt-10 border-b border-gray-100 pb-6">
@@ -161,6 +195,7 @@ export default function BlogDetailContent() {
             <button
               onClick={() => navigator.clipboard.writeText(window.location.href)}
               className="hover:text-gray-800"
+              title="Copy link"
             >
               <FaLink />
             </button>
@@ -194,10 +229,6 @@ export default function BlogDetailContent() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
           {/* PREV */}
           <div className={`${!prevBlog ? "opacity-50 pointer-events-none" : ""}`}>
-            <div className="text-sm font-semibold text-orange-600 mb-2 flex items-center gap-2">
-              
-            </div>
-
             {prevBlog ? (
               <div
                 onClick={() => navigate(`/detailblog/${prevBlog.blogId}`)}
@@ -205,7 +236,7 @@ export default function BlogDetailContent() {
               >
                 <div className="w-full h-44 overflow-hidden">
                   <img
-                    src={blogImg(prevBlog.blogId)}
+                    src={blogMainImg(prevBlog.blogId)}
                     alt={prevBlog.title}
                     onError={(e) => {
                       e.currentTarget.src =
@@ -217,8 +248,10 @@ export default function BlogDetailContent() {
 
                 <div className="p-4 flex flex-col flex-1">
                   <p className="text-xs text-gray-500">
-                    {new Date(prevBlog.createdAt).toLocaleDateString("vi-VN")} •
-                    Admin
+                    {prevBlog.createdAt
+                      ? new Date(prevBlog.createdAt).toLocaleDateString("vi-VN")
+                      : "--"}{" "}
+                    • Admin
                   </p>
                   <p className="mt-2 font-medium text-gray-800 group-hover:text-orange-500 line-clamp-2">
                     {prevBlog.title}
@@ -238,10 +271,6 @@ export default function BlogDetailContent() {
 
           {/* NEXT */}
           <div className={`${!nextBlog ? "opacity-50 pointer-events-none" : ""}`}>
-            <div className="text-sm font-semibold text-orange-600 mb-2 flex items-center justify-end gap-2">
-              
-            </div>
-
             {nextBlog ? (
               <div
                 onClick={() => navigate(`/detailblog/${nextBlog.blogId}`)}
@@ -249,7 +278,7 @@ export default function BlogDetailContent() {
               >
                 <div className="w-full h-44 overflow-hidden">
                   <img
-                    src={blogImg(nextBlog.blogId)}
+                    src={blogMainImg(nextBlog.blogId)}
                     alt={nextBlog.title}
                     onError={(e) => {
                       e.currentTarget.src =
@@ -261,8 +290,10 @@ export default function BlogDetailContent() {
 
                 <div className="p-4 flex flex-col flex-1">
                   <p className="text-xs text-gray-500">
-                    {new Date(nextBlog.createdAt).toLocaleDateString("vi-VN")} •
-                    Admin
+                    {nextBlog.createdAt
+                      ? new Date(nextBlog.createdAt).toLocaleDateString("vi-VN")
+                      : "--"}{" "}
+                    • Admin
                   </p>
                   <p className="mt-2 font-medium text-gray-800 group-hover:text-orange-500 line-clamp-2">
                     {nextBlog.title}
@@ -280,39 +311,40 @@ export default function BlogDetailContent() {
             )}
           </div>
         </div>
-      </div>
 
-      {/* ---------- PREV / NEXT BUTTONS (GIỮ NGUYÊN NẾU BẠN MUỐN) ---------- */}
-      <div className="mt-12 border-t border-gray-100 pt-8">
-        <div className="flex justify-between text-sm font-medium text-orange-600 mb-5">
-          <button
-            disabled={!prevBlog}
-            onClick={() => prevBlog && navigate(`/detailblog/${prevBlog.blogId}`)}
-            className={`flex items-center gap-1 transition ${
-              !prevBlog
-                ? "opacity-50 cursor-not-allowed"
-                : "hover:text-orange-500"
-            }`}
-          >
-            <span className="text-lg">←</span> Prev
-          </button>
+        {/* ✅ PREV / NEXT BUTTONS (thêm lại) */}
+        <div className="mt-10 border-t border-gray-100 pt-6">
+          <div className="flex justify-between text-sm font-medium text-orange-600">
+            <button
+              disabled={!prevBlog}
+              onClick={() => prevBlog && navigate(`/detailblog/${prevBlog.blogId}`)}
+              className={`flex items-center gap-2 transition ${
+                !prevBlog
+                  ? "opacity-50 cursor-not-allowed"
+                  : "hover:text-orange-500"
+              }`}
+            >
+              <span className="text-lg">←</span> Prev
+            </button>
 
-          <button
-            disabled={!nextBlog}
-            onClick={() => nextBlog && navigate(`/detailblog/${nextBlog.blogId}`)}
-            className={`flex items-center gap-1 transition ${
-              !nextBlog
-                ? "opacity-50 cursor-not-allowed"
-                : "hover:text-orange-500"
-            }`}
-          >
-            Next <span className="text-lg">→</span>
-          </button>
+            <button
+              disabled={!nextBlog}
+              onClick={() => nextBlog && navigate(`/detailblog/${nextBlog.blogId}`)}
+              className={`flex items-center gap-2 transition ${
+                !nextBlog
+                  ? "opacity-50 cursor-not-allowed"
+                  : "hover:text-orange-500"
+              }`}
+            >
+              Next <span className="text-lg">→</span>
+            </button>
+          </div>
         </div>
       </div>
 
       {/* ---------- COMMENTS ---------- */}
-      {/* <BlogComments /> */}
+      {/* Nếu muốn bật comment, dùng dòng dưới */}
+      {/* <div className="mt-12"><BlogComments blogId={blog.id} /></div> */}
     </div>
   );
 }
