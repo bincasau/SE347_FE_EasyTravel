@@ -17,7 +17,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // prevent redirect loop
+  // prevent redirect loop (chỉ dùng cho root redirect)
   const didRedirectRef = useRef(false);
 
   const userMenu = [
@@ -83,7 +83,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     return () => window.removeEventListener("jwt-changed", handleJWT);
   }, []);
 
-  // auto redirect by role
+  // ✅ auto redirect by role (redirect ONLY on root pages)
   useEffect(() => {
     if (!user?.role) return;
 
@@ -95,37 +95,29 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
       return;
     }
 
-    // ✅ Hotel manager redirect khi đứng ở root /hotel-manager
+    // ✅ Hotel manager: chỉ redirect khi đứng đúng ROOT /hotel-manager
     if (user.role === "HOTEL_MANAGER") {
-      if (didRedirectRef.current) return;
-
       const isHotelManagerRoot =
         location.pathname === "/hotel-manager" ||
         location.pathname === "/hotel-manager/";
 
-      if (isHotelManagerRoot) {
+      if (isHotelManagerRoot && !didRedirectRef.current) {
         didRedirectRef.current = true;
         navigate("/hotel-manager/hotels/addroom", { replace: true });
-        return;
       }
-
-      didRedirectRef.current = true;
+      return;
     }
 
-    // ✅ Tour guide redirect khi đứng ở root /guide
+    // ✅ Tour guide: chỉ redirect khi đứng đúng ROOT /guide
     if (user.role === "TOUR_GUIDE") {
-      if (didRedirectRef.current) return;
-
       const isGuideRoot =
         location.pathname === "/guide" || location.pathname === "/guide/";
 
-      if (isGuideRoot) {
+      if (isGuideRoot && !didRedirectRef.current) {
         didRedirectRef.current = true;
         navigate("/guide/schedule", { replace: true });
-        return;
       }
-
-      didRedirectRef.current = true;
+      return;
     }
   }, [user, location.pathname, navigate]);
 
@@ -179,8 +171,11 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     location.pathname.startsWith("/guide/past-tours") ||
     location.pathname.startsWith("/detailtour");
 
+  // ✅ FIX: đang ở rooms/edit hoặc rooms/view thì vẫn active "Add Rooms"
   const isHotelManagerAddRoomActive =
-    location.pathname.startsWith("/hotel-manager/hotels/addroom");
+    location.pathname.startsWith("/hotel-manager/hotels/addroom") ||
+    location.pathname.startsWith("/hotel-manager/rooms/edit") ||
+    location.pathname.startsWith("/hotel-manager/rooms/view");
 
   const isHotelManagerRevenueActive =
     location.pathname.startsWith("/hotel-manager/revenue");
@@ -292,7 +287,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
       case "HOTEL_MANAGER":
         return "/hotel-manager/hotels/addroom";
       case "TOUR_GUIDE":
-        return "/guide/schedule"; // ✅ FIX: tour guide về schedule
+        return "/guide/schedule";
       default:
         return "/";
     }
@@ -369,7 +364,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
                   onClick={handleLogout}
                   className="min-w-[110px] border border-red-400 text-red-500 px-3 py-1.5 rounded-full hover:bg-red-50"
                 >
-                  {t("header.logout")}
+                  {t("Log Out")}
                 </button>
               </div>
             ) : (
@@ -378,13 +373,13 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
                   onClick={() => onOpenLogin()}
                   className="border border-orange-500 text-orange-600 px-4 py-2 rounded-full hover:bg-orange-50"
                 >
-                  {t("header.login")}
+                  {t("Login")}
                 </button>
                 <button
                   onClick={() => onOpenSignup()}
                   className="bg-orange-500 text-white px-5 py-2 rounded-full hover:bg-orange-400 shadow"
                 >
-                  {t("header.signup")}
+                  {t("Sign Up")}
                 </button>
               </>
             )}

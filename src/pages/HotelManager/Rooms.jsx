@@ -9,44 +9,94 @@ export default function MyRooms() {
   const [loading, setLoading] = useState(true);
 
   const [sortBy, setSortBy] = useState("price_asc");
-  const [q, setQ] = useState(""); // ✅ search query
+  const [q, setQ] = useState("");
+
+  // ✅ lấy token (tự thử nhiều key phổ biến)
+  const getToken = () =>
+    localStorage.getItem("jwt") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("accessToken") ||
+    "";
+
+  // ✅ fetch auto gửi JWT
+  const fetchWithAuth = async (url, options = {}) => {
+    const token = getToken();
+
+    const headers = {
+      ...(options.headers || {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+
+    const res = await fetch(url, { ...options, headers });
+
+    // debug khi lỗi
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      console.error("[FETCH ERROR]", url, res.status, text);
+      throw new Error(`HTTP ${res.status}: ${text || res.statusText}`);
+    }
+
+    return res;
+  };
+
+  // ✅ map camelCase API -> snake_case UI
+  const normalizeRoom = (r) => ({
+    room_id: r.roomId,
+    room_number: r.roomNumber,
+    room_type: r.roomType,
+    number_of_guests: r.numberOfGuest,
+    price: r.price,
+    description: r.desc,
+    image_bed: r.imageBed,
+    image_wc: r.imageWC,
+    created_at: r.createdAt || "", // nếu backend không có thì để ""
+  });
 
   useEffect(() => {
-    const mock = [
-      {
-        room_id: 1,
-        hotel_id: 2,
-        room_number: "A101",
-        room_type: "Deluxe",
-        number_of_guests: 2,
-        price: 59,
-        description: "Nice room with balcony.",
-        created_at: "2024-09-10",
-        image_bed:
-          "https://images.unsplash.com/photo-1540518614846-7eded433c457?w=1200&q=80&auto=format&fit=crop",
-        image_wc:
-          "https://images.unsplash.com/photo-1600566753051-f0fbc6c0c0c5?w=1200&q=80&auto=format&fit=crop",
-      },
-      {
-        room_id: 2,
-        hotel_id: 2,
-        room_number: "B202",
-        room_type: "Standard",
-        number_of_guests: 3,
-        price: 45,
-        description: "Cozy standard room.",
-        created_at: "2024-08-21",
-        image_bed:
-          "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=1200&q=80&auto=format&fit=crop",
-        image_wc:
-          "https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?w=1200&q=80&auto=format&fit=crop",
-      },
-    ];
+    let mounted = true;
 
-    setTimeout(() => {
-      setRooms(mock);
-      setLoading(false);
-    }, 300);
+    (async () => {
+      try {
+        setLoading(true);
+
+        // 1) lấy my hotel -> lấy hotelId
+        const myHotelRes = await fetchWithAuth(
+          "http://localhost:8080/hotel_manager/my-hotel"
+        );
+        const hotel = await myHotelRes.json();
+
+        const hotelId = hotel?.hotelId;
+        console.log("[MY HOTEL]", hotel);
+        console.log("[HOTEL ID]", hotelId);
+
+        if (!hotelId) throw new Error("Không tìm thấy hotelId từ API my-hotel");
+
+        // 2) lấy rooms theo hotelId (HATEOAS: data._embedded.rooms)
+        const roomsRes = await fetchWithAuth(
+          `http://localhost:8080/hotels/${hotelId}/rooms`
+        );
+        const data = await roomsRes.json();
+
+        console.log("[ROOMS RAW]", data);
+
+        // ✅ rooms nằm ở _embedded.rooms
+        const list = data?._embedded?.rooms ?? [];
+        console.log("[ROOMS LIST LENGTH]", list.length);
+
+        const normalized = list.map(normalizeRoom);
+
+        if (mounted) setRooms(normalized);
+      } catch (err) {
+        console.error("Lỗi load rooms:", err);
+        if (mounted) setRooms([]);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // ✅ Edit route (no id) => pass room via state

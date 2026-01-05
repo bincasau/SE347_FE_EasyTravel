@@ -1,6 +1,11 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
+const S3_ROOM_BASE =
+  "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/room";
+
+const FALLBACK_IMAGE = `${S3_ROOM_BASE}/standard_bed.jpg`;
+
 export default function RoomCard({ room }) {
   const navigate = useNavigate();
 
@@ -17,9 +22,19 @@ export default function RoomCard({ room }) {
   } = room;
 
   const imageUrl = useMemo(() => {
+    // lấy 1 ảnh bed/wc (string hoặc array)
     const bed = Array.isArray(image_bed) ? image_bed[0] : image_bed;
     const wc = Array.isArray(image_wc) ? image_wc[0] : image_wc;
-    return bed || wc || "/images/placeholder-room.jpg";
+
+    // ✅ Nếu backend trả URL full thì dùng luôn, còn không thì ghép S3
+    const toUrl = (v) => {
+      if (!v) return "";
+      const s = String(v);
+      if (s.startsWith("http://") || s.startsWith("https://")) return s;
+      return `${S3_ROOM_BASE}/${s}`;
+    };
+
+    return toUrl(bed) || toUrl(wc) || FALLBACK_IMAGE;
   }, [image_bed, image_wc]);
 
   const statusMeta = useMemo(() => {
@@ -53,12 +68,10 @@ export default function RoomCard({ room }) {
   }, [status]);
 
   const goView = () => {
-    // ✅ route basic + pass data
     navigate("/hotel-manager/rooms/view", { state: { room } });
   };
 
   const goEdit = () => {
-    // ✅ route basic + pass data
     navigate("/hotel-manager/rooms/edit", { state: { room } });
   };
 
@@ -71,6 +84,9 @@ export default function RoomCard({ room }) {
             src={imageUrl}
             alt={room_number || "room"}
             className="w-full h-full object-cover"
+            onError={(e) => {
+              e.currentTarget.src = FALLBACK_IMAGE;
+            }}
           />
         </div>
 
@@ -88,7 +104,6 @@ export default function RoomCard({ room }) {
                     </span>
                   </h3>
 
-                  {/* Status badge */}
                   <span
                     className={[
                       "text-xs px-2 py-1 rounded-full border font-semibold",
@@ -107,7 +122,6 @@ export default function RoomCard({ room }) {
                 </div>
               </div>
 
-              {/* price */}
               <span className="text-orange-600 font-bold text-xl whitespace-nowrap">
                 {price !== null && price !== undefined && price !== ""
                   ? `$${price}`
@@ -115,7 +129,6 @@ export default function RoomCard({ room }) {
               </span>
             </div>
 
-            {/* Grid info */}
             <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
               <Info label="Guests" value={number_of_guests} />
               <Info label="Floor" value={floor} />

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useEffect, useState } from "react";
 
 const HOTEL_IMAGE_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/hotel";
@@ -7,20 +7,72 @@ const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=1200&q=80&auto=format&fit=crop";
 
 export default function MyHotel() {
-  // ✅ MOCK DATA để xem UI/UX
-  const [hotel] = useState({
-    hotel_id: 2,
-    name: "EasyTravel Hotel Da Nang",
-    address: "123 Võ Nguyên Giáp, Sơn Trà, Đà Nẵng",
-    description:
-      "Khách sạn nằm gần biển, phòng rộng rãi, dịch vụ tốt.\n\n- Check-in: 14:00\n- Check-out: 12:00\n- Có hồ bơi & buffet sáng",
-    email: "easytravel.danang@example.com",
-    phone_number: "0901 234 567",
-    main_image: "", // để trống -> dùng fallback (hoặc thay bằng filename thật trên S3)
-    min_price: 450000,
-    created_at: "2024-09-01T10:30:00",
-    updated_at: "2024-09-15T16:20:00",
-  });
+  const [hotel, setHotel] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  // ✅ format backend -> UI keys (camelCase -> snake_case)
+  const normalizeHotel = (raw) => {
+    if (!raw) return null;
+    return {
+      hotel_id: raw.hotel_id ?? raw.hotelId ?? raw.id,
+      name: raw.name ?? "",
+      address: raw.address ?? "",
+      phone_number: raw.phone_number ?? raw.phoneNumber ?? "",
+      email: raw.email ?? "",
+      description: raw.description ?? "",
+      main_image: raw.main_image ?? raw.mainImage ?? "",
+      min_price: raw.min_price ?? raw.minPrice ?? null,
+      created_at: raw.created_at ?? raw.createdAt ?? null,
+      updated_at: raw.updated_at ?? raw.updatedAt ?? null,
+      images: Array.isArray(raw.images) ? raw.images : [],
+    };
+  };
+
+  /** ===============================
+   *  LOAD HOTEL FROM JWT
+   * =============================== */
+  useEffect(() => {
+    const token =
+      localStorage.getItem("jwt") ||
+      localStorage.getItem("token") ||
+      localStorage.getItem("accessToken");
+
+    const loadHotel = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const res = await fetch("http://localhost:8080/hotel_manager/my-hotel", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          // nếu backend dùng cookie session thì bật cái này:
+          // credentials: "include",
+        });
+
+        if (!res.ok) {
+          let msg = `Request failed: ${res.status}`;
+          try {
+            const e = await res.json();
+            msg = e?.message || e?.error || msg;
+          } catch {}
+          throw new Error(msg);
+        }
+
+        const data = await res.json();
+        setHotel(normalizeHotel(data));
+      } catch (err) {
+        setError(err?.message || "Fetch failed");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadHotel();
+  }, []);
 
   const formatDate = (d) => {
     if (!d) return "--";
@@ -42,15 +94,47 @@ export default function MyHotel() {
     ? `${HOTEL_IMAGE_BASE}/${mainImage}`
     : FALLBACK_IMAGE;
 
+  if (loading) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] bg-gray-50 flex items-center justify-center">
+        <div className="text-gray-600">Đang tải thông tin khách sạn...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] bg-gray-50 flex items-center justify-center px-6">
+        <div className="max-w-xl w-full bg-white border rounded-2xl p-6">
+          <div className="text-lg font-semibold text-gray-900">Lỗi</div>
+          <div className="text-sm text-gray-600 mt-2 break-words">{error}</div>
+
+          <button
+            className="mt-4 px-4 py-2 rounded-xl bg-gray-900 text-white text-sm"
+            onClick={() => window.location.reload()}
+          >
+            Thử lại
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!hotel) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] bg-gray-50 flex items-center justify-center">
+        <div className="text-gray-600">Không có dữ liệu khách sạn.</div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-[calc(100vh-64px)] bg-gray-50">
       {/* ===== HEADER ===== */}
       <div className="bg-white border-b">
         <div className="max-w-6xl mx-auto px-6 py-6 text-center">
           <h1 className="text-2xl font-semibold text-gray-900">My Hotel</h1>
-          <p className="text-sm text-gray-500 mt-1">
-           Hotel Information
-          </p>
+          <p className="text-sm text-gray-500 mt-1">Hotel Information</p>
         </div>
       </div>
 
@@ -82,15 +166,14 @@ export default function MyHotel() {
             </div>
           </div>
 
+          {/* ✅ Quick Info: đã bỏ Hotel ID + Main image */}
           <div className="bg-white border rounded-2xl p-5 shadow-sm">
             <div className="text-sm font-semibold text-gray-900 mb-3">
               Quick Info
             </div>
 
-            <Row label="Hotel ID" value={hotel?.hotel_id} />
             <Row label="Email" value={hotel?.email} />
             <Row label="Phone" value={hotel?.phone_number} />
-            <Row label="Main image" value={mainImage || "(using fallback image)"} />
           </div>
         </div>
 
@@ -119,7 +202,6 @@ export default function MyHotel() {
             </div>
           </div>
 
-          {/* OPTIONAL: thêm section contact cho đẹp */}
           <div className="bg-white border rounded-2xl p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Contact</h2>
 

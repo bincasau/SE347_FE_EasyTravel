@@ -1,5 +1,9 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+
+const S3_ROOM_BASE =
+  "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/room";
+const FALLBACK_IMAGE = `${S3_ROOM_BASE}/standard_bed.jpg`;
 
 export default function RoomView() {
   const navigate = useNavigate();
@@ -28,12 +32,52 @@ export default function RoomView() {
     floor,
   } = room;
 
+  // ✅ convert filename -> full S3 URL (or keep if already http)
+  const toAwsUrl = (v) => {
+    if (!v) return "";
+    const s = String(v);
+    if (s.startsWith("http://") || s.startsWith("https://")) return s;
+    return `${S3_ROOM_BASE}/${s}`;
+  };
+
+  // ✅ build images list: bed + wc (đủ 2 ảnh), có thể nhiều hơn nếu array
   const images = useMemo(() => {
-    const bed = Array.isArray(image_bed) ? image_bed : image_bed ? [image_bed] : [];
-    const wc = Array.isArray(image_wc) ? image_wc : image_wc ? [image_wc] : [];
-    const all = [...bed, ...wc];
-    return all.length ? all : ["/images/placeholder-room.jpg"];
+    const bedArr = Array.isArray(image_bed)
+      ? image_bed
+      : image_bed
+      ? [image_bed]
+      : [];
+    const wcArr = Array.isArray(image_wc)
+      ? image_wc
+      : image_wc
+      ? [image_wc]
+      : [];
+
+    const all = [...bedArr, ...wcArr]
+      .map(toAwsUrl)
+      .filter(Boolean);
+
+    return all.length ? all : [FALLBACK_IMAGE];
   }, [image_bed, image_wc]);
+
+  const [index, setIndex] = useState(0);
+
+  // nếu images đổi (đổi room), reset index
+  useEffect(() => {
+    setIndex(0);
+  }, [images.length]);
+
+  const total = images.length;
+
+  const next = () => {
+    if (total <= 1) return;
+    setIndex((prev) => (prev + 1) % total);
+  };
+
+  const prev = () => {
+    if (total <= 1) return;
+    setIndex((prev) => (prev - 1 + total) % total);
+  };
 
   const statusColor = {
     AVAILABLE: "bg-green-100 text-green-700",
@@ -65,13 +109,55 @@ export default function RoomView() {
 
       {/* ===== CONTENT ===== */}
       <div className="max-w-4xl mx-auto px-6 py-8 space-y-8">
-        {/* IMAGE */}
-        <div className="rounded-2xl overflow-hidden border bg-gray-100">
+        {/* IMAGE SLIDER */}
+        <div className="rounded-2xl overflow-hidden border bg-gray-100 relative">
           <img
-            src={images[0]}
-            alt="Room"
+            src={images[index]}
+            alt={`Room-${index}`}
             className="w-full h-[320px] object-cover"
+            onError={(e) => {
+              e.currentTarget.src = FALLBACK_IMAGE;
+            }}
           />
+
+          {/* Prev/Next buttons */}
+          {total > 1 && (
+            <>
+              <button
+                onClick={prev}
+                className="absolute left-3 top-1/2 -translate-y-1/2
+                           bg-black/40 hover:bg-black/70 text-white w-10 h-10 rounded-full
+                           flex items-center justify-center transition"
+                aria-label="Previous image"
+              >
+                ‹
+              </button>
+
+              <button
+                onClick={next}
+                className="absolute right-3 top-1/2 -translate-y-1/2
+                           bg-black/40 hover:bg-black/70 text-white w-10 h-10 rounded-full
+                           flex items-center justify-center transition"
+                aria-label="Next image"
+              >
+                ›
+              </button>
+
+              {/* Dots */}
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2">
+                {images.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setIndex(i)}
+                    className={`w-2.5 h-2.5 rounded-full transition ${
+                      i === index ? "bg-white" : "bg-white/50"
+                    }`}
+                    aria-label={`Go to image ${i + 1}`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         {/* BASIC INFO */}
@@ -96,11 +182,7 @@ export default function RoomView() {
             <Info label="Room Type" value={room_type} />
             <Info label="Guests" value={number_of_guests} />
             <Info label="Floor" value={floor} />
-            <Info
-              label="Price"
-              value={price ? `$${price}` : "--"}
-              highlight
-            />
+            <Info label="Price" value={price ? `$${price}` : "--"} highlight />
           </div>
 
           {/* DESCRIPTION */}

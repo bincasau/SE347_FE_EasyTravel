@@ -1,29 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
-// NOTE: Demo only - bạn thay bằng API thật
-async function fakeFetchRoomDetail(hotelId, roomId) {
-  // giả lập data (nên replace bằng API get room detail)
-  return {
-    room_id: Number(roomId),
-    hotel_id: Number(hotelId),
-    room_number: "A101",
-    room_type: "Deluxe",
-    number_of_guests: 2,
-    price: 59.99,
-    description: "Nice room with city view.",
-    floor: 10,
-    status: "AVAILABLE",
-    image_bed: [],
-    image_wc: [],
-  };
-}
+const S3_ROOM_BASE =
+  "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/room";
+const FALLBACK_IMAGE = `${S3_ROOM_BASE}/standard_bed.jpg`;
 
 export default function RoomEdit() {
   const navigate = useNavigate();
-  const { hotelId, roomId } = useParams();
+  const location = useLocation();
 
-  const [loading, setLoading] = useState(true);
+  // ✅ lấy room từ state (MyRooms/Card -> navigate("/hotel-manager/rooms/edit", { state:{ room } }))
+  const room = location.state?.room;
+
+  // nếu refresh trang → mất state → quay về danh sách
+  useEffect(() => {
+    if (!room) navigate(-1, { replace: true });
+  }, [room, navigate]);
 
   // ✅ Read-only by default
   const [isEditing, setIsEditing] = useState(false);
@@ -42,7 +34,7 @@ export default function RoomEdit() {
   });
 
   // ✅ images: existing + new upload
-  const [bedPreviews, setBedPreviews] = useState([]); // string[] (existing or new blob urls)
+  const [bedPreviews, setBedPreviews] = useState([]); // string[] (aws urls or blob)
   const [wcPreviews, setWcPreviews] = useState([]);
   const [bedFiles, setBedFiles] = useState([]); // File[]
   const [wcFiles, setWcFiles] = useState([]);
@@ -50,61 +42,57 @@ export default function RoomEdit() {
   const bedInputRef = useRef(null);
   const wcInputRef = useRef(null);
 
+  const toAwsUrl = (v) => {
+    if (!v) return "";
+    const s = String(v);
+    if (s.startsWith("http://") || s.startsWith("https://")) return s;
+    return `${S3_ROOM_BASE}/${s}`;
+  };
+
+  const normalizeToAwsUrls = (images) => {
+    if (!images) return [];
+    const arr = Array.isArray(images) ? images : [images];
+    return arr.map(toAwsUrl).filter(Boolean);
+  };
+
   // ----------------------------
-  // Load room detail
+  // Load from room state ONLY
   // ----------------------------
   useEffect(() => {
-    const run = async () => {
-      try {
-        setLoading(true);
-        const data = await fakeFetchRoomDetail(hotelId, roomId);
+    if (!room) return;
 
-        const nextForm = {
-          room_number: data.room_number ?? "",
-          room_type: data.room_type ?? "",
-          number_of_guests:
-            data.number_of_guests === null || data.number_of_guests === undefined
-              ? ""
-              : String(data.number_of_guests),
-          price:
-            data.price === null || data.price === undefined
-              ? ""
-              : String(data.price),
-          description: data.description ?? "",
-          floor:
-            data.floor === null || data.floor === undefined
-              ? ""
-              : String(data.floor),
-          status: data.status ?? "AVAILABLE",
-        };
-
-        setForm(nextForm);
-        setOriginal({
-          form: nextForm,
-          bedPreviews: normalizeToUrls(data.image_bed),
-          wcPreviews: normalizeToUrls(data.image_wc),
-        });
-
-        setBedPreviews(normalizeToUrls(data.image_bed));
-        setWcPreviews(normalizeToUrls(data.image_wc));
-      } catch (e) {
-        alert("Failed to load room detail.");
-      } finally {
-        setLoading(false);
-      }
+    // room có thể là snake_case (room_number...) hoặc camelCase (roomNumber...)
+    const nextForm = {
+      room_number: room.room_number ?? room.roomNumber ?? "",
+      room_type: room.room_type ?? room.roomType ?? "",
+      number_of_guests:
+        room.number_of_guests ?? room.numberOfGuest ?? room.numberOfGuest === 0
+          ? String(room.number_of_guests ?? room.numberOfGuest)
+          : "",
+      price:
+        room.price === null || room.price === undefined ? "" : String(room.price),
+      description: room.description ?? room.desc ?? "",
+      floor:
+        room.floor === null || room.floor === undefined ? "" : String(room.floor),
+      status: room.status ?? "AVAILABLE",
     };
 
-    run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hotelId, roomId]);
+    const bedUrls = normalizeToAwsUrls(room.image_bed ?? room.imageBed);
+    const wcUrls = normalizeToAwsUrls(room.image_wc ?? room.imageWC);
 
-  function normalizeToUrls(images) {
-    // backend có thể trả string hoặc array string
-    // ở demo: nếu empty => []
-    if (!images) return [];
-    if (Array.isArray(images)) return images;
-    return [images];
-  }
+    setForm(nextForm);
+
+    setOriginal({
+      form: nextForm,
+      bedPreviews: bedUrls,
+      wcPreviews: wcUrls,
+    });
+
+    setBedPreviews(bedUrls);
+    setWcPreviews(wcUrls);
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room]);
 
   // ----------------------------
   // Form handlers
@@ -119,11 +107,8 @@ export default function RoomEdit() {
   };
 
   // ----------------------------
-  // Image helpers (bed/wc)
+  // Image helpers
   // ----------------------------
-  const pickBedImages = () => isEditing && bedInputRef.current?.click();
-  const pickWcImages = () => isEditing && wcInputRef.current?.click();
-
   const addImages = (files, setFiles, setUrls) => {
     const arr = Array.from(files || []);
     if (arr.length === 0) return;
@@ -134,59 +119,38 @@ export default function RoomEdit() {
   };
 
   const removeAt = (idx, setFiles, previews, setPreviews) => {
-    // allow remove only in edit mode
     if (!isEditing) return;
 
-    // If this preview is a blob url created from File => revoke
     setPreviews((prev) => {
       const url = prev[idx];
       if (url && url.startsWith("blob:")) URL.revokeObjectURL(url);
       return prev.filter((_, i) => i !== idx);
     });
 
-    // remove corresponding file if it was newly added
-    // (naive approach: remove by index in new files list if possible)
     setFiles((prev) => prev.filter((_, i) => i !== idx));
   };
 
   const clearAll = (filesSetter, previews, previewsSetter) => {
     if (!isEditing) return;
-    previews.forEach((u) => {
-      if (u && u.startsWith("blob:")) URL.revokeObjectURL(u);
-    });
+    previews.forEach((u) => u?.startsWith("blob:") && URL.revokeObjectURL(u));
     filesSetter([]);
     previewsSetter([]);
   };
 
   // ----------------------------
-  // Validate & actions
+  // Actions (demo only)
   // ----------------------------
-  const validate = () => {
-    if (!hotelId || !roomId) return "Missing hotelId/roomId in URL.";
-    if (!String(form.room_number).trim()) return "Room number is required.";
-    if (!String(form.room_type).trim()) return "Room type is required.";
-    if (!String(form.number_of_guests).trim())
-      return "Number of guests is required.";
-    if (!String(form.price).trim()) return "Price is required.";
-    return null;
-  };
-
-  const onClickChange = () => setIsEditing(true);
-
   const onCancel = () => {
     if (!original) return setIsEditing(false);
 
-    // reset form
     setForm(original.form);
 
-    // reset previews (revoke blob urls currently in use)
     bedPreviews.forEach((u) => u.startsWith("blob:") && URL.revokeObjectURL(u));
     wcPreviews.forEach((u) => u.startsWith("blob:") && URL.revokeObjectURL(u));
 
     setBedPreviews(original.bedPreviews);
     setWcPreviews(original.wcPreviews);
 
-    // reset files
     setBedFiles([]);
     setWcFiles([]);
 
@@ -194,61 +158,30 @@ export default function RoomEdit() {
   };
 
   const onSave = async () => {
-    const err = validate();
-    if (err) return alert(err);
-
-    // payload
+    // demo: chỉ log
     const payload = {
-      hotel_id: Number(hotelId),
-      room_id: Number(roomId),
       ...form,
-      number_of_guests: Number(form.number_of_guests),
-      price: Number(form.price),
+      number_of_guests:
+        form.number_of_guests === "" ? null : Number(form.number_of_guests),
+      price: form.price === "" ? null : Number(form.price),
       floor: form.floor === "" ? null : Number(form.floor),
     };
 
-    const fd = new FormData();
-    Object.entries(payload).forEach(([k, v]) => {
-      if (v === null || v === undefined) return;
-      fd.append(k, String(v));
-    });
+    console.log("[SAVE DEMO payload]", payload);
+    console.log("[NEW bed files]", bedFiles);
+    console.log("[NEW wc files]", wcFiles);
 
-    // new images
-    bedFiles.forEach((f) => fd.append("image_bed", f));
-    wcFiles.forEach((f) => fd.append("image_wc", f));
+    alert("Saved (demo only - chưa call API).");
 
-    // TODO: call API update
-    // await axios.put(`/api/hotels/${hotelId}/rooms/${roomId}`, fd, { headers: { "Content-Type": "multipart/form-data" } });
-
-    console.log("SAVE room:", payload);
-    console.log("New bed files:", bedFiles);
-    console.log("New wc files:", wcFiles);
-
-    alert("Saved (demo).");
-
-    // after save: lock again + update original snapshot
-    const newOriginal = {
+    setOriginal({
       form: { ...form },
       bedPreviews: [...bedPreviews],
       wcPreviews: [...wcPreviews],
-    };
-    setOriginal(newOriginal);
+    });
+
     setIsEditing(false);
   };
 
-  const onDelete = async () => {
-    if (!confirm("Delete this room? This action cannot be undone.")) return;
-
-    // TODO: call API delete
-    // await axios.delete(`/api/hotels/${hotelId}/rooms/${roomId}`);
-
-    alert("Deleted (demo).");
-    navigate(`/hotel-manager/hotels/${hotelId}`);
-  };
-
-  // ----------------------------
-  // UI helpers
-  // ----------------------------
   const readonlyCls = isEditing
     ? ""
     : "pointer-events-none select-none opacity-95";
@@ -259,13 +192,7 @@ export default function RoomEdit() {
     ? ""
     : "bg-gray-50 text-gray-700 border-gray-200";
 
-  if (loading) {
-    return (
-      <div className="min-h-[calc(100vh-64px)] bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-500">Loading room...</div>
-      </div>
-    );
-  }
+  if (!room) return null;
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-gray-50">
@@ -289,7 +216,6 @@ export default function RoomEdit() {
         </div>
       </div>
 
-      {/* Form */}
       <div className="max-w-5xl mx-auto px-6 py-8">
         <div className="bg-white rounded-2xl shadow-sm border p-6">
           {/* lock badge */}
@@ -308,6 +234,7 @@ export default function RoomEdit() {
             </div>
           </div>
 
+          {/* form */}
           <div className={`grid grid-cols-1 md:grid-cols-2 gap-5 ${readonlyCls}`}>
             <Field label="Room Number" required>
               <input
@@ -315,7 +242,6 @@ export default function RoomEdit() {
                 value={form.room_number}
                 onChange={handleChange}
                 className={`${inputBase} ${inputReadonly}`}
-                placeholder="e.g. A101"
                 disabled={!isEditing}
               />
             </Field>
@@ -326,7 +252,6 @@ export default function RoomEdit() {
                 value={form.room_type}
                 onChange={handleChange}
                 className={`${inputBase} ${inputReadonly}`}
-                placeholder="e.g. Deluxe, Standard..."
                 disabled={!isEditing}
               />
             </Field>
@@ -337,7 +262,6 @@ export default function RoomEdit() {
                 value={form.number_of_guests}
                 onChange={handleChange}
                 className={`${inputBase} ${inputReadonly}`}
-                placeholder="e.g. 2"
                 inputMode="numeric"
                 disabled={!isEditing}
               />
@@ -349,7 +273,6 @@ export default function RoomEdit() {
                 value={form.price}
                 onChange={handleChange}
                 className={`${inputBase} ${inputReadonly}`}
-                placeholder="e.g. 59.99"
                 inputMode="decimal"
                 disabled={!isEditing}
               />
@@ -361,7 +284,6 @@ export default function RoomEdit() {
                 value={form.floor}
                 onChange={handleChange}
                 className={`${inputBase} ${inputReadonly}`}
-                placeholder="e.g. 10"
                 inputMode="numeric"
                 disabled={!isEditing}
               />
@@ -388,21 +310,20 @@ export default function RoomEdit() {
                 value={form.description}
                 onChange={handleChange}
                 className={`${inputBase} ${inputReadonly} min-h-[120px]`}
-                placeholder="Room description..."
                 disabled={!isEditing}
               />
             </Field>
           </div>
 
-          {/* Upload images at bottom */}
+          {/* images */}
           <div className="mt-8 border-t pt-6 space-y-6">
             <ImageSection
               title="Bed Images"
-              subtitle='Upload will be sent as "image_bed[]"'
+              subtitle='(demo) existing = AWS URL, new upload = blob URL'
               pickLabel="Choose Bed Images"
-              onPick={pickBedImages}
+              onPick={() => isEditing && bedInputRef.current?.click()}
               onClear={() => clearAll(setBedFiles, bedPreviews, setBedPreviews)}
-              previews={bedPreviews}
+              previews={bedPreviews.length ? bedPreviews : [FALLBACK_IMAGE]}
               onRemove={(idx) =>
                 removeAt(idx, setBedFiles, bedPreviews, setBedPreviews)
               }
@@ -417,11 +338,11 @@ export default function RoomEdit() {
 
             <ImageSection
               title="WC Images"
-              subtitle='Upload will be sent as "image_wc[]"'
+              subtitle='(demo) existing = AWS URL, new upload = blob URL'
               pickLabel="Choose WC Images"
-              onPick={pickWcImages}
+              onPick={() => isEditing && wcInputRef.current?.click()}
               onClear={() => clearAll(setWcFiles, wcPreviews, setWcPreviews)}
-              previews={wcPreviews}
+              previews={wcPreviews.length ? wcPreviews : [FALLBACK_IMAGE]}
               onRemove={(idx) =>
                 removeAt(idx, setWcFiles, wcPreviews, setWcPreviews)
               }
@@ -435,11 +356,11 @@ export default function RoomEdit() {
             />
           </div>
 
-          {/* Bottom actions */}
+          {/* actions */}
           <div className="mt-8 flex justify-end gap-2">
             {!isEditing ? (
               <button
-                onClick={onClickChange}
+                onClick={() => setIsEditing(true)}
                 className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow"
               >
                 Change
@@ -454,13 +375,6 @@ export default function RoomEdit() {
                 </button>
 
                 <button
-                  onClick={onDelete}
-                  className="px-5 py-2.5 rounded-xl border border-red-300 text-red-600 hover:bg-red-50"
-                >
-                  Delete
-                </button>
-
-                <button
                   onClick={onSave}
                   className="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded-xl font-semibold shadow"
                 >
@@ -472,8 +386,8 @@ export default function RoomEdit() {
         </div>
 
         <div className="mt-4 text-sm text-gray-600">
-          Tip: Click <span className="font-semibold">Change</span> to unlock
-          editing.
+          *Hiện tại chỉ hiển thị dữ liệu từ <span className="font-semibold">room state</span>{" "}
+          (không fetch, không push).
         </div>
       </div>
     </div>
@@ -571,7 +485,14 @@ function ImageSection({
                 key={src + idx}
                 className="relative rounded-xl overflow-hidden border bg-gray-50"
               >
-                <img src={src} alt={`preview-${idx}`} className="w-full h-28 object-cover" />
+                <img
+                  src={src}
+                  alt={`preview-${idx}`}
+                  className="w-full h-28 object-cover"
+                  onError={(e) => {
+                    e.currentTarget.src = FALLBACK_IMAGE;
+                  }}
+                />
                 <button
                   type="button"
                   onClick={() => onRemove(idx)}
