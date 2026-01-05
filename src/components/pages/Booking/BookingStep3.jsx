@@ -43,15 +43,18 @@ export default function BookingStep3({ bookingData, prevStep }) {
         gmail: bookingData.user.email,
       };
 
-      // const bookingRes = await createHotelBooking(payload);
+      const bookingRes = await createHotelBooking(payload);
+      console.log("bookingRes =", bookingRes);
+      console.log("bookingRes.data =", typeof bookingRes);
 
-      // const bookingId =
-      //   bookingRes?.bookingId || bookingRes?.id || bookingRes?.data?.bookingId;
 
-      // if (!bookingId) {
-      //   alert("Không lấy được bookingId");
-      //   return;
-      // }
+      const bookingId =
+        bookingRes?.bookingId || bookingRes?.id || bookingRes?.data?.bookingId;
+
+      if (!bookingId) {
+        alert("Không lấy được bookingId");
+        return;
+      }
 
       if (method === "cash") {
         setShowModal(true);
@@ -62,7 +65,7 @@ export default function BookingStep3({ bookingData, prevStep }) {
         const params = new URLSearchParams();
         params.append("amount", bookingData.total);
         params.append("bankCode", "NCB");
-        params.append("bookingId", 15);
+        params.append("bookingId", bookingId);
         params.append("bookingType", "HOTEL");
 
         const payRes = await fetch(

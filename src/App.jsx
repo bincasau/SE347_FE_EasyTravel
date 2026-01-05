@@ -23,6 +23,8 @@ import DaysAvailable from "./pages/TourGuide/DaysAvailable";
 import GuideProfile from "./pages/TourGuide/GuideProfile";
 import TourScheduleDetail from "./pages/TourGuide/TourScheduleDetail";
 
+//  ADMIN
+import AdminUserManagementPage from "./pages/Admin/UserManagementPage";
 import AdminTourManagementPage from "./pages/Admin/TourManagementPage";
 import AdminHotelManagementPage from "./pages/Admin/HotelManagementPage";
 import AdminBlogManagementPage from "./pages/Admin/BlogManagementPage";
@@ -81,7 +83,6 @@ export default function App() {
 
           <Route path="/403" element={<Forbidden403 />} />
 
-
           {/* TourGuide */}
           <Route
             path="/guide/past-tours"
@@ -124,7 +125,7 @@ export default function App() {
             }
           />
 
-          {/* ✅ Hotel Manager (FIXED) */}
+          {/*  Hotel Manager  */}
           <Route
             path="/hotel-manager"
             element={<Navigate to="/hotel-manager/hotels" replace />}
@@ -161,7 +162,6 @@ export default function App() {
             path="/hotel-manager/revenue/bookings"
             element={<ListBooking />}
           />
-
 
           <Route
             path="/hotel-manager/reports/revenue"
@@ -217,6 +217,14 @@ export default function App() {
             }
           />
           <Route
+            path="/Admin/users"
+            element={
+              <RequireRole role="ADMIN">
+                <AdminUserManagementPage />
+              </RequireRole>
+            }
+          />
+          <Route
             path="/Admin/blogs"
             element={
               <RequireRole role="ADMIN">
@@ -225,9 +233,8 @@ export default function App() {
             }
           />
 
-           <Route path="*" element={<NotFound404 />} />
+          <Route path="*" element={<NotFound404 />} />
         </Routes>
-
 
         <Footer />
 

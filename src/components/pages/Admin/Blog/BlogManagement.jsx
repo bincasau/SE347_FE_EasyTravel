@@ -47,10 +47,6 @@ export default function BlogManagement() {
         <h1 className="text-2xl font-semibold">Blog management</h1>
 
         <div className="flex items-center gap-3">
-          <button className="px-5 py-2 rounded-full border border-gray-300 text-sm">
-            All ▼
-          </button>
-
           <button className="px-5 py-2 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition">
             + Add Blog
           </button>

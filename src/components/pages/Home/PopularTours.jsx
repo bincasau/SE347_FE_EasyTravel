@@ -25,7 +25,6 @@ const PopularTours = () => {
         setError(null);
 
         const res = await getPopularTours();
-        console.log("getPopularTours() response:", res);
 
         // Chuẩn hoá dữ liệu: ưu tiên mảng, nếu API bọc trong {data: []} thì lấy data
         const list = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];

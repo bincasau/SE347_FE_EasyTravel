@@ -51,5 +51,5 @@ export async function createHotelBooking(payload) {
     throw new Error(msg || "Failed to create booking");
   }
 
-  return res.text();
+  return res.json();
 }

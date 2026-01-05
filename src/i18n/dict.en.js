@@ -1,3 +1,5 @@
+import { use } from "react";
+
 export const en = {
   // ===== HEADER =====
   header: {
@@ -10,7 +12,7 @@ export const en = {
     login: "Login",
     signup: "Sign Up",
     logout: "Log out",
-    tourguide: "Tour Guide",
+    users: "Users",
     dashboard: "Dashboard",
   },
 

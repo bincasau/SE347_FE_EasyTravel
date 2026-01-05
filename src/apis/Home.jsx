@@ -1,5 +1,6 @@
 export const API_BASE = "http://localhost:8080";
-
+const S3_BLOG_BASE =
+  "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/blog";
 export const getPopularHotels = async () => {
   try {
     const res = await fetch(`${API_BASE}/hotels`);
@@ -21,7 +22,7 @@ export const getPopularBlogs = async () => {
 
     return limited.map((b) => ({
       id: b.blogId,
-      image: `/images/blog/${b.mainImage}`,
+      image: `${S3_BLOG_BASE}/${b.thumbnail}`,
       date: b.createdAt?.split("T")[0],
       title: b.title,
       description: b.shortDescription || "",

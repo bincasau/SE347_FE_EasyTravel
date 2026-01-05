@@ -38,7 +38,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
   const adminMenu = [
     { to: "/admin/dashboard", key: "dashboard" },
     { to: "/admin/tours", key: "tours" },
-    { to: "/admin/guides", key: "tourguide" },
+    { to: "/admin/users", key: "users" },
     { to: "/admin/hotels", key: "hotel" },
     { to: "/admin/blogs", key: "blog" },
   ];

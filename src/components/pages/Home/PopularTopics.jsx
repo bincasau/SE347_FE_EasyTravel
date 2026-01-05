@@ -47,16 +47,19 @@ const PopularTopics = () => {
     });
   };
 
-  const visibleBlogs = Array.from({ length: itemsPerPage }, (_, i) => {
-    const index = (currentIndex + i) % blogs.length;
-    return blogs[index];
-  });
+  const visibleBlogs = Array.from(
+    { length: Math.min(itemsPerPage, blogs.length) },
+    (_, i) => {
+      const index = (currentIndex + i) % blogs.length;
+      return blogs[index];
+    }
+  );
+
 
   if (loading)
     return <div className="text-center py-10">Đang tải bài viết...</div>;
   if (error)
     return <div className="text-center text-red-500 py-10">{error}</div>;
-
   return (
     <section className="py-20 px-6 md:px-12 lg:px-20 bg-white font-poppins">
       {/* Header */}

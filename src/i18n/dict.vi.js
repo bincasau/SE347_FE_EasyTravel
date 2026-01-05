@@ -12,7 +12,7 @@ export const vi = {
     login: "Đăng nhập",
     signup: "Đăng ký",
     logout: "Đăng xuất",
-    tourguide: "Hướng dẫn viên",
+    users: "Người dùng",
     dashboard: "Bảng điều khiển",
   },
 
