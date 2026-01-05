@@ -12,10 +12,14 @@ import {
   isWithinInterval,
   parseISO,
 } from "date-fns";
+
 import travel1 from "../../../assets/images/Tour/travel1.jpg";
 import travel2 from "../../../assets/images/Tour/travel2.jpg";
 import travel3 from "../../../assets/images/Tour/travel3.jpg";
 import travel4 from "../../../assets/images/Tour/travel4.jpg";
+
+// ✅ dùng chung với Header (project bạn đã có)
+import { getUserFromToken } from "@/utils/auth";
 
 export default function TourDetail() {
   const { id } = useParams();
@@ -176,14 +180,38 @@ export default function TourDetail() {
   const previewImages =
     images.length >= 4 ? images.slice(1, 4) : fallbackImages.slice(1, 4);
 
+  // ✅ helper: check login + role
+  const getToken = () =>
+    localStorage.getItem("jwt") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("accessToken") ||
+    "";
+
   const handleBuyNow = () => {
+    const token = getToken();
+    if (!token) {
+      // chưa đăng nhập
+      alert("Please log in to book this tour.");
+      // optional: mở popup login nếu bạn đang dùng event
+      window.dispatchEvent(new Event("open-login"));
+      return;
+    }
+
+    const jwtUser = getUserFromToken(); // { role, ... } hoặc null
+    const role = String(jwtUser?.role || "").toUpperCase();
+
+    if (role === "TOUR_GUIDE") {
+      alert("Please log in with a USER account to book this tour.");
+      return;
+    }
+
+    // ✅ USER (hoặc role khác bạn muốn cho booking)
     navigate(`/booking/${id}`, {
       state: { tour, images },
     });
   };
 
   return (
-    // ✅ CHỈNH Ở ĐÂY: giảm gap để sát ảnh hơn
     <div className="max-w-6xl mx-auto px-6 py-8 grid md:grid-cols-2 gap-6 md:gap-8 items-start">
       {/* Left images */}
       <div className="flex flex-col relative">
@@ -278,7 +306,7 @@ export default function TourDetail() {
           <p className="font-medium mb-2 text-gray-700">Trip Duration</p>
 
           {/* Calendar + Book Now stack dọc */}
-          <div className="flex flex-col r mt-2">
+          <div className="flex flex-col mt-2">
             <div className="border rounded-2xl p-3 shadow-md w-[280px] sm:w-[300px] bg-white">
               {renderHeader()}
               {renderDays()}
