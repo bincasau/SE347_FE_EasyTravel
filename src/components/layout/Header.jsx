@@ -151,9 +151,11 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
   const activeLink =
     "text-orange-500 font-semibold relative after:absolute after:left-0 after:-bottom-2 after:h-[2px] after:w-full after:bg-orange-500";
 
+  // ✅ FIX: booking vẫn active Tours
   const isToursActive =
     location.pathname.startsWith("/tours") ||
-    location.pathname.startsWith("/detailtour");
+    location.pathname.startsWith("/detailtour") ||
+    /^\/booking(\/|$)/.test(location.pathname);
 
   const isHotelActive =
     location.pathname.startsWith("/hotels") ||

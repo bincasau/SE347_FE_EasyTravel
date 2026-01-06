@@ -40,7 +40,11 @@ function QtyControl({ value, onChange, disablePlus }) {
   );
 }
 
-export default function BookingStepTour1({ bookingData, setBookingData, nextStep }) {
+export default function BookingStepTour1({
+  bookingData,
+  setBookingData,
+  nextStep,
+}) {
   const [localDate, setLocalDate] = useState(
     bookingData.date ? new Date(bookingData.date) : null
   );
@@ -57,18 +61,13 @@ export default function BookingStepTour1({ bookingData, setBookingData, nextStep
   const basePriceAdult = tour.priceAdult ?? 0;
   const basePriceChild = tour.priceChild ?? 0;
   const discountPercent = tour.percentDiscount ?? 0;
-  const discountFactor =
-    discountPercent > 0 ? 1 - discountPercent / 100 : 1;
+  const discountFactor = discountPercent > 0 ? 1 - discountPercent / 100 : 1;
 
   const priceAdult = basePriceAdult * discountFactor;
   const priceChild = basePriceChild * discountFactor;
 
   const { tickets = {} } = bookingData;
   const { adult = 0, child = 0 } = tickets;
-
-  // 3️⃣ Tính tổng + giới hạn ghế
-  const totalSelected = adult + child;
-  const maxReached = availableSeats > 0 && totalSelected >= availableSeats;
 
   const handleDateChange = (d) => {
     setLocalDate(d);
@@ -79,12 +78,10 @@ export default function BookingStepTour1({ bookingData, setBookingData, nextStep
   };
 
   const setQty = (key, qty) => {
-    // tính thử số lượng mới
     const newAdult = key === "adult" ? qty : adult;
     const newChild = key === "child" ? qty : child;
 
     if (availableSeats > 0 && newAdult + newChild > availableSeats) {
-      // không alert, chỉ không update để UX mượt hơn
       return;
     }
 
@@ -104,12 +101,18 @@ export default function BookingStepTour1({ bookingData, setBookingData, nextStep
     if (bookingData.total !== total) {
       setBookingData((prev) => ({ ...prev, total }));
     }
-  }, [total]);
+  }, [total, bookingData.total, setBookingData]);
 
-  const disableAdultPlus =
-    availableSeats > 0 && adult + child >= availableSeats;
-  const disableChildPlus =
-    availableSeats > 0 && adult + child >= availableSeats;
+  const disableAdultPlus = availableSeats > 0 && adult + child >= availableSeats;
+  const disableChildPlus = availableSeats > 0 && adult + child >= availableSeats;
+
+  const handleContinue = () => {
+    if (adult + child === 0) {
+      alert("Bạn phải chọn ít nhất 1 vé.");
+      return;
+    }
+    nextStep();
+  };
 
   return (
     <div className="space-y-6">
@@ -185,19 +188,22 @@ export default function BookingStepTour1({ bookingData, setBookingData, nextStep
         </p>
       </div>
 
-      {/* ➡️ CONTINUE */}
-      <button
-        onClick={() => {
-          if (adult + child === 0) {
-            alert("Bạn phải chọn ít nhất 1 vé.");
-            return;
-          }
-          nextStep();
-        }}
-        className="w-full rounded-full bg-orange-500 hover:bg-orange-600 text-white py-3 font-medium mt-4"
-      >
-        Continue
-      </button>
+      {/* ✅ BUTTONS (y chang Step 2/3) */}
+      <div className="flex justify-between pt-4">
+        <button
+          onClick={() => window.history.back()}
+          className="px-4 py-2 border rounded-lg text-gray-600 hover:bg-gray-100"
+        >
+          Back
+        </button>
+
+        <button
+          onClick={handleContinue}
+          className="px-5 py-2 rounded-lg bg-orange-500 text-white hover:bg-orange-600"
+        >
+          Continue
+        </button>
+      </div>
     </div>
   );
 }

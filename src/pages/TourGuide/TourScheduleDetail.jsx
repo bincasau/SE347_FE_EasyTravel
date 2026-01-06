@@ -3,7 +3,6 @@ import { useParams } from "react-router-dom";
 
 const API_BASE = "http://localhost:8080";
 
-// (optional) nếu tour có mainImage và bạn muốn show đâu đó sau này
 const S3_TOUR_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/tour";
 const FALLBACK_IMAGE = `${S3_TOUR_BASE}/tour_default.jpg`;
@@ -11,8 +10,8 @@ const FALLBACK_IMAGE = `${S3_TOUR_BASE}/tour_default.jpg`;
 export default function TourScheduleDetail() {
   const { tourId } = useParams();
 
-  const [tour, setTour] = useState(null); // { tourId, title, ... }
-  const [days, setDays] = useState([]); // [{ day, location, steps: [{title,time,duration}] }]
+  const [tour, setTour] = useState(null);
+  const [days, setDays] = useState([]);
   const [openDay, setOpenDay] = useState(null);
 
   // checkbox state: key = `${dayIdx}-${stepIdx}`
@@ -21,14 +20,21 @@ export default function TourScheduleDetail() {
   const [loading, setLoading] = useState(true);
   const [errMsg, setErrMsg] = useState("");
 
-  // ✅ lấy token
+  // ✅ NEW: chặn save trước khi load xong
+  const [hydrated, setHydrated] = useState(false);
+
+  // ✅ key localStorage theo tourId
+  const storageKey = useMemo(() => {
+    const id = String(tourId ?? "");
+    return `tourScheduleDoneMap:${id}`;
+  }, [tourId]);
+
   const getToken = () =>
     localStorage.getItem("jwt") ||
     localStorage.getItem("token") ||
     localStorage.getItem("accessToken") ||
     "";
 
-  // ✅ fetch auto gửi JWT
   const fetchWithAuth = async (url, options = {}) => {
     const token = getToken();
     const headers = {
@@ -43,22 +49,18 @@ export default function TourScheduleDetail() {
       console.error("[FETCH ERROR]", url, res.status, text);
       throw new Error(`HTTP ${res.status}: ${text || res.statusText}`);
     }
-
     return res;
   };
 
-  // ✅ helper: tách activities -> list task
   const splitActivitiesToSteps = (activities) => {
     const raw = (activities ?? "").toString().trim();
     if (!raw) return [];
 
-    // tách theo dấu chấm, bỏ rỗng
     const lines = raw
       .split(".")
       .map((s) => s.trim())
       .filter(Boolean);
 
-    // convert sang format step
     return lines.map((line) => ({
       time: "—",
       title: line,
@@ -66,7 +68,6 @@ export default function TourScheduleDetail() {
     }));
   };
 
-  // ✅ normalize itineraries response
   const extractItineraries = (data) => {
     const items =
       data?._embedded?.itineraries ||
@@ -76,8 +77,40 @@ export default function TourScheduleDetail() {
     return Array.isArray(items) ? items : [];
   };
 
-  // ✅ sort itineraries theo day_number
   const sortByDay = (a, b) => (a.day_number ?? 0) - (b.day_number ?? 0);
+
+  // ✅ 1) LOAD doneMap từ localStorage (và đánh dấu hydrated)
+  useEffect(() => {
+    setHydrated(false); // tourId đổi => hydrate lại
+
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) {
+        setDoneMap({});
+        setHydrated(true);
+        return;
+      }
+
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") setDoneMap(parsed);
+      else setDoneMap({});
+    } catch (e) {
+      console.warn("Failed to load doneMap:", e);
+      setDoneMap({});
+    } finally {
+      setHydrated(true);
+    }
+  }, [storageKey]);
+
+  // ✅ 2) SAVE doneMap (chỉ sau khi hydrated)
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(doneMap));
+    } catch (e) {
+      console.warn("Failed to save doneMap:", e);
+    }
+  }, [doneMap, storageKey, hydrated]);
 
   useEffect(() => {
     let mounted = true;
@@ -90,7 +123,7 @@ export default function TourScheduleDetail() {
         const idNum = Number(tourId);
         if (!idNum) throw new Error("tourId không hợp lệ");
 
-        // 1) ✅ fetch upcoming -> find tour theo tourId
+        // 1) fetch upcoming -> find tour theo tourId
         const upRes = await fetchWithAuth(`${API_BASE}/tour_guide/upcoming`);
         const upData = await upRes.json();
         const upcomingList = Array.isArray(upData?.content) ? upData.content : [];
@@ -102,7 +135,6 @@ export default function TourScheduleDetail() {
           );
         }
 
-        // set tour basic
         const normalizedTour = {
           tourId: foundTour.tourId,
           title: foundTour.title,
@@ -115,18 +147,14 @@ export default function TourScheduleDetail() {
 
         if (mounted) setTour(normalizedTour);
 
-        // 2) ✅ fetch itineraries của tour đó
-        const itRes = await fetchWithAuth(
-          `${API_BASE}/tours/${idNum}/itineraries`
-        );
+        // 2) fetch itineraries
+        const itRes = await fetchWithAuth(`${API_BASE}/tours/${idNum}/itineraries`);
         const itData = await itRes.json();
         const itineraries = extractItineraries(itData).sort(sortByDay);
 
-        // build days array
         const builtDays = itineraries.map((it, idx) => {
           const dayNumber = it.day_number ?? idx + 1;
           const location = it.title?.trim() || `Day ${dayNumber}`;
-
           return {
             day: dayNumber,
             location,
@@ -225,9 +253,7 @@ export default function TourScheduleDetail() {
 
       {/* DAYS */}
       {days.length === 0 ? (
-        <div className="text-center text-gray-500">
-          Tour này chưa có lịch trình.
-        </div>
+        <div className="text-center text-gray-500">Tour này chưa có lịch trình.</div>
       ) : (
         <div className="space-y-4">
           {days.map((day, dayIdx) => {
@@ -263,7 +289,6 @@ export default function TourScheduleDetail() {
                         </div>
                       </div>
 
-                      {/* progress bar */}
                       <div className="mt-3 h-2 w-full bg-gray-100 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-orange-500 rounded-full transition-all"
@@ -272,7 +297,6 @@ export default function TourScheduleDetail() {
                       </div>
                     </div>
 
-                    {/* chevron */}
                     <div
                       className={`shrink-0 w-10 h-10 rounded-xl border flex items-center justify-center text-orange-600 transition ${
                         isOpen ? "bg-orange-100 rotate-180" : "bg-white"
@@ -288,9 +312,7 @@ export default function TourScheduleDetail() {
                 {isOpen && (
                   <div className="px-5 pb-5">
                     {day.steps.length === 0 ? (
-                      <div className="text-gray-500 text-sm">
-                        No activities.
-                      </div>
+                      <div className="text-gray-500 text-sm">No activities.</div>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {day.steps.map((step, stepIdx) => {
@@ -350,16 +372,13 @@ export default function TourScheduleDetail() {
                       </div>
                     )}
 
-                    {/* footer actions */}
                     <div className="mt-4 flex flex-wrap gap-2">
                       <button
                         onClick={() => {
                           const steps = day.steps.length;
                           setDoneMap((prev) => {
                             const next = { ...prev };
-                            for (let i = 0; i < steps; i++) {
-                              next[`${dayIdx}-${i}`] = true;
-                            }
+                            for (let i = 0; i < steps; i++) next[`${dayIdx}-${i}`] = true;
                             return next;
                           });
                         }}
@@ -374,9 +393,7 @@ export default function TourScheduleDetail() {
                           const steps = day.steps.length;
                           setDoneMap((prev) => {
                             const next = { ...prev };
-                            for (let i = 0; i < steps; i++) {
-                              delete next[`${dayIdx}-${i}`];
-                            }
+                            for (let i = 0; i < steps; i++) delete next[`${dayIdx}-${i}`];
                             return next;
                           });
                         }}

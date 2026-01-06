@@ -10,14 +10,17 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
   const { user, tickets, total, tourInfo, date } = bookingData;
 
   const [payment, setPayment] = useState("cash");
+  const [bankCode, setBankCode] = useState(""); // ✅ cho chọn ngân hàng
+  const [loading, setLoading] = useState(false); // ✅ tránh bấm spam
 
   const handleConfirm = async () => {
+    if (loading) return;
+
     const token =
       localStorage.getItem("jwt") ||
       localStorage.getItem("token") ||
       localStorage.getItem("accessToken");
 
-    // ✅ Payload đúng DTO BookingTourRequest
     const payload = {
       tourId: tourInfo.tourId,
       adults: tickets.adult,
@@ -27,7 +30,9 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
     };
 
     try {
-      // 1️⃣ Gửi booking tour
+      setLoading(true);
+
+      // 1️⃣ Booking
       const bookingRes = await fetch("http://localhost:8080/booking/tour", {
         method: "POST",
         headers: {
@@ -40,8 +45,6 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
       if (!bookingRes.ok) throw new Error(await bookingRes.text());
 
       const bookingData = await bookingRes.json();
-      console.log("📌 Booking response:", bookingData);
-
       const bookingId =
         bookingData.bookingId || bookingData.id || bookingData?.data?.bookingId;
 
@@ -50,53 +53,54 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
         return;
       }
 
-      // 2️⃣ Nếu chọn thanh toán CASH → xong luôn
+      // 2️⃣ CASH
       if (payment === "cash") {
         alert("🎉 Booking successfully! Please pay at departure.");
         return;
       }
 
-      // 3️⃣ Nếu chọn VNPay → gọi /payment/vn-pay
+      // 3️⃣ VNPAY
       if (payment === "vnpay") {
         const params = new URLSearchParams();
-        params.append("amount", total);          // số tiền
-        params.append("bankCode", "NCB");        // bankCode demo
-        params.append("bookingId", bookingId);   // id booking mới tạo
-        params.append("bookingType", "TOUR");    // nếu BE yêu cầu HOTEL thì đổi lại
+        params.append("amount", total);
+        params.append("bookingId", bookingId);
+        params.append("bookingType", "TOUR");
+
+        // ✅ chỉ gửi bankCode nếu user chọn (để BE tự default hoặc hiển thị chọn bank trên VNPay)
+        if (bankCode) params.append("bankCode", bankCode);
 
         const vnpApi = `http://localhost:8080/payment/vn-pay?${params.toString()}`;
-        console.log("📌 VNPay request URL:", vnpApi);
 
         const payRes = await fetch(vnpApi, {
           method: "GET",
           headers: {
-            // 💥 QUAN TRỌNG: gửi kèm JWT, nếu không Spring Security sẽ 403
             Authorization: token ? `Bearer ${token}` : "",
           },
         });
 
         if (!payRes.ok) {
-          console.error("❌ VNPay API Error:", payRes.status);
-          alert("VNPay request failed: " + payRes.status);
+          const msg = await payRes.text().catch(() => "");
+          alert(`VNPay request failed: ${payRes.status} ${msg}`);
           return;
         }
 
         const payData = await payRes.json();
-        console.log("📌 VNPay response:", payData);
-
         const paymentUrl = payData?.data?.paymentUrl;
+
         if (!paymentUrl) {
           alert("❌ Cannot get VNPay payment URL!");
           return;
         }
 
-        alert("Redirecting to VNPay...");
-        window.location.href = paymentUrl;
+        // ✅ Redirect thẳng — không popup
+        window.location.assign(paymentUrl);
         return;
       }
     } catch (err) {
       console.error("❌ Booking error:", err);
       alert("Booking failed!");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -118,7 +122,7 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
       </div>
 
       {/* PAYMENT */}
-      <div className="border rounded-lg p-4 space-y-2">
+      <div className="border rounded-lg p-4 space-y-3">
         <h3 className="font-semibold text-gray-800 mb-2">Payment Method</h3>
 
         <label className="flex items-center gap-2 cursor-pointer">
@@ -140,21 +144,53 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
           />
           VNPay
         </label>
+
+        {/* ✅ Chọn ngân hàng chỉ khi VNPay */}
+        {payment === "vnpay" && (
+          <div className="pt-2">
+            <label className="block text-sm text-gray-700 mb-1">
+              Choose bank (optional)
+            </label>
+            <select
+              className="w-full border rounded-lg px-3 py-2"
+              value={bankCode}
+              onChange={(e) => setBankCode(e.target.value)}
+            >
+              <option value="">Auto / Let VNPay choose</option>
+              <option value="NCB">NCB</option>
+              <option value="VNPAYQR">VNPAYQR</option>
+              <option value="VIETCOMBANK">Vietcombank</option>
+              <option value="VIETINBANK">Vietinbank</option>
+              <option value="BIDV">BIDV</option>
+              <option value="AGRIBANK">Agribank</option>
+              <option value="SACOMBANK">Sacombank</option>
+              <option value="ACB">ACB</option>
+              <option value="TECHCOMBANK">Techcombank</option>
+              <option value="MB">MB</option>
+              <option value="VPBANK">VPBank</option>
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              If you don't choose a bank, VNPay will display options during
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="flex justify-between pt-4">
         <button
           onClick={prevStep}
           className="px-4 py-2 border rounded-lg text-gray-600 hover:bg-gray-100"
+          disabled={loading}
         >
           Back
         </button>
 
         <button
           onClick={handleConfirm}
-          className="px-5 py-2 rounded-lg bg-orange-500 text-white hover:bg-orange-600"
+          className="px-5 py-2 rounded-lg bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-60"
+          disabled={loading}
         >
-          Complete Booking
+          {loading ? "Processing..." : "Complete Booking"}
         </button>
       </div>
     </div>
