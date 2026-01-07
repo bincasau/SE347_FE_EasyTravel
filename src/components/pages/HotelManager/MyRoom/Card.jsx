@@ -8,36 +8,64 @@ const S3_ROOM_BASE =
 
 const FALLBACK_IMAGE = `${S3_ROOM_BASE}/standard_bed.jpg`;
 
+/** -------- helpers -------- */
+function getToken() {
+  return (
+    localStorage.getItem("jwt") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("accessToken") ||
+    ""
+  );
+}
+
+async function readResponseSmart(res) {
+  const ct = res.headers.get("content-type") || "";
+  if (ct.includes("application/json")) {
+    return res.json().catch(() => res.text());
+  }
+  return res.text();
+}
+
 export default function RoomCard({ room, onDeleted }) {
   const navigate = useNavigate();
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
 
-  const token =
-    localStorage.getItem("jwt") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken") ||
-    "";
-
+  // ✅ support both snake_case & camelCase
   const {
     room_id,
     roomId,
     room_number,
+    roomNumber,
     room_type,
+    roomType,
     number_of_guests,
+    numberOfGuest,
     price,
     description,
+    desc,
     image_bed,
+    imageBed,
     image_wc,
+    imageWC,
     floor,
-    status, // AVAILABLE / BOOKED / MAINTENANCE / INACTIVE
-  } = room;
+    status,
+  } = room || {};
 
-  const id = room_id ?? roomId; // ✅ support both
+  const id = room_id ?? roomId;
+  const showRoomNumber = room_number ?? roomNumber;
+  const showRoomType = room_type ?? roomType;
+  const showGuests = number_of_guests ?? numberOfGuest;
+  const showDesc = description ?? desc;
 
   const imageUrl = useMemo(() => {
-    const bed = Array.isArray(image_bed) ? image_bed[0] : image_bed;
-    const wc = Array.isArray(image_wc) ? image_wc[0] : image_wc;
+    const bed = Array.isArray(image_bed ?? imageBed)
+      ? (image_bed ?? imageBed)[0]
+      : (image_bed ?? imageBed);
+
+    const wc = Array.isArray(image_wc ?? imageWC)
+      ? (image_wc ?? imageWC)[0]
+      : (image_wc ?? imageWC);
 
     const toUrl = (v) => {
       if (!v) return "";
@@ -47,7 +75,7 @@ export default function RoomCard({ room, onDeleted }) {
     };
 
     return toUrl(bed) || toUrl(wc) || FALLBACK_IMAGE;
-  }, [image_bed, image_wc]);
+  }, [image_bed, imageBed, image_wc, imageWC]);
 
   const statusMeta = useMemo(() => {
     const s = String(status || "").toUpperCase();
@@ -79,13 +107,8 @@ export default function RoomCard({ room, onDeleted }) {
     };
   }, [status]);
 
-  const goView = () => {
-    navigate("/hotel-manager/rooms/view", { state: { room } });
-  };
-
-  const goEdit = () => {
-    navigate("/hotel-manager/rooms/edit", { state: { room } });
-  };
+  const goView = () => navigate("/hotel-manager/rooms/view", { state: { room } });
+  const goEdit = () => navigate("/hotel-manager/rooms/edit", { state: { room } });
 
   const doDelete = async () => {
     setDeleteError("");
@@ -94,13 +117,15 @@ export default function RoomCard({ room, onDeleted }) {
       setDeleteError("Missing room id (room_id/roomId)");
       return;
     }
+
+    const token = getToken();
     if (!token) {
       setDeleteError("NO_TOKEN (Bạn chưa đăng nhập)");
       return;
     }
 
     const ok = window.confirm(
-      `Delete room ${room_number || ""}? This action cannot be undone.`
+      `Delete room ${showRoomNumber || id}? This action cannot be undone.`
     );
     if (!ok) return;
 
@@ -108,19 +133,27 @@ export default function RoomCard({ room, onDeleted }) {
       setDeleting(true);
 
       const url = `${API_BASE}/hotel_manager/rooms/${id}`;
+
       const res = await fetch(url, {
         method: "DELETE",
+        mode: "cors",
+        credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`,
+          // ❌ không set Content-Type ở DELETE (không có body)
         },
       });
 
-      const ct = res.headers.get("content-type") || "";
-      const raw = ct.includes("application/json")
-        ? await res.json().catch(async () => await res.text())
-        : await res.text();
+      const raw = await readResponseSmart(res);
+
+      console.log("[RoomCard] DELETE", { url, status: res.status, ok: res.ok, raw });
 
       if (!res.ok) {
+        if (res.status === 403) {
+          throw new Error(
+            "403 Forbidden. JWT/role HOTEL_MANAGER chưa được BE accept, hoặc OPTIONS(/error) bị chặn."
+          );
+        }
         throw new Error(typeof raw === "string" ? raw : JSON.stringify(raw));
       }
 
@@ -140,7 +173,7 @@ export default function RoomCard({ room, onDeleted }) {
         <div className="w-[220px] bg-gray-100 shrink-0 self-stretch">
           <img
             src={imageUrl}
-            alt={room_number || "room"}
+            alt={showRoomNumber || "room"}
             className="w-full h-full object-cover"
             onError={(e) => {
               e.currentTarget.src = FALLBACK_IMAGE;
@@ -158,7 +191,7 @@ export default function RoomCard({ room, onDeleted }) {
                   <h3 className="text-lg font-semibold text-gray-900 leading-tight">
                     Room{" "}
                     <span className="text-orange-600 font-semibold">
-                      {room_number || "--"}
+                      {showRoomNumber || "--"}
                     </span>
                   </h3>
 
@@ -175,7 +208,7 @@ export default function RoomCard({ room, onDeleted }) {
                 <div className="text-sm text-gray-600 mt-0.5">
                   Type:{" "}
                   <span className="text-orange-600 font-medium">
-                    {room_type || "--"}
+                    {showRoomType || "--"}
                   </span>
                 </div>
               </div>
@@ -188,12 +221,12 @@ export default function RoomCard({ room, onDeleted }) {
             </div>
 
             <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
-              <Info label="Guests" value={number_of_guests} />
+              <Info label="Guests" value={showGuests} />
               <Info label="Floor" value={floor} />
             </div>
 
             <p className="text-sm text-gray-600 mt-2 line-clamp-2">
-              {description || "--"}
+              {showDesc || "--"}
             </p>
 
             {!!deleteError && (

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import RoomCard from "@/components/pages/HotelManager/MyRoom/Card.jsx";
 
@@ -27,7 +27,12 @@ export default function MyRooms() {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
 
-    const res = await fetch(url, { ...options, headers });
+    const res = await fetch(url, {
+      ...options,
+      headers,
+      mode: "cors",
+      credentials: "include",
+    });
 
     // debug khi lỗi
     if (!res.ok) {
@@ -41,67 +46,75 @@ export default function MyRooms() {
 
   // ✅ map camelCase API -> snake_case UI
   const normalizeRoom = (r) => ({
-    room_id: r.roomId,
-    room_number: r.roomNumber,
-    room_type: r.roomType,
-    number_of_guests: r.numberOfGuest,
+    room_id: r.roomId ?? r.room_id,
+    room_number: r.roomNumber ?? r.room_number,
+    room_type: r.roomType ?? r.room_type,
+    number_of_guests: r.numberOfGuest ?? r.number_of_guests,
     price: r.price,
-    description: r.desc,
-    image_bed: r.imageBed,
-    image_wc: r.imageWC,
-    created_at: r.createdAt || "", // nếu backend không có thì để ""
+    description: r.desc ?? r.description,
+    image_bed: r.imageBed ?? r.image_bed,
+    image_wc: r.imageWC ?? r.image_wc,
+    created_at: r.createdAt || r.created_at || "",
+    status: r.status,
+    floor: r.floor,
   });
+
+  const loadRooms = useCallback(async () => {
+    setLoading(true);
+    try {
+      // 1) lấy my hotel -> lấy hotelId
+      const myHotelRes = await fetchWithAuth(
+        "http://localhost:8080/hotel_manager/my-hotel"
+      );
+      const hotel = await myHotelRes.json();
+
+      const hotelId = hotel?.hotelId ?? hotel?.hotel_id ?? hotel?.id;
+      console.log("[MY HOTEL]", hotel);
+      console.log("[HOTEL ID]", hotelId);
+
+      if (!hotelId) throw new Error("Không tìm thấy hotelId từ API my-hotel");
+
+      // 2) lấy rooms theo hotelId (HATEOAS: data._embedded.rooms)
+      const roomsRes = await fetchWithAuth(
+        `http://localhost:8080/hotels/${hotelId}/rooms`
+      );
+      const data = await roomsRes.json();
+
+      console.log("[ROOMS RAW]", data);
+
+      const list = data?._embedded?.rooms ?? [];
+      console.log("[ROOMS LIST LENGTH]", list.length);
+
+      setRooms(list.map(normalizeRoom));
+    } catch (err) {
+      console.error("Lỗi load rooms:", err);
+      setRooms([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []); // fetchWithAuth dùng localStorage nên không cần dep
 
   useEffect(() => {
     let mounted = true;
-
     (async () => {
-      try {
-        setLoading(true);
-
-        // 1) lấy my hotel -> lấy hotelId
-        const myHotelRes = await fetchWithAuth(
-          "http://localhost:8080/hotel_manager/my-hotel"
-        );
-        const hotel = await myHotelRes.json();
-
-        const hotelId = hotel?.hotelId;
-        console.log("[MY HOTEL]", hotel);
-        console.log("[HOTEL ID]", hotelId);
-
-        if (!hotelId) throw new Error("Không tìm thấy hotelId từ API my-hotel");
-
-        // 2) lấy rooms theo hotelId (HATEOAS: data._embedded.rooms)
-        const roomsRes = await fetchWithAuth(
-          `http://localhost:8080/hotels/${hotelId}/rooms`
-        );
-        const data = await roomsRes.json();
-
-        console.log("[ROOMS RAW]", data);
-
-        // ✅ rooms nằm ở _embedded.rooms
-        const list = data?._embedded?.rooms ?? [];
-        console.log("[ROOMS LIST LENGTH]", list.length);
-
-        const normalized = list.map(normalizeRoom);
-
-        if (mounted) setRooms(normalized);
-      } catch (err) {
-        console.error("Lỗi load rooms:", err);
-        if (mounted) setRooms([]);
-      } finally {
-        if (mounted) setLoading(false);
-      }
+      if (!mounted) return;
+      await loadRooms();
     })();
-
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [loadRooms]);
 
   // ✅ Edit route (no id) => pass room via state
   const goEditRoom = (room) => {
     navigate("/hotel-manager/rooms/edit", { state: { room } });
+  };
+
+  // ✅ callback: xóa xong update UI ngay (khỏi reload)
+  const handleDeleted = (deletedId) => {
+    setRooms((prev) =>
+      prev.filter((r) => (r.room_id ?? r.roomId) !== deletedId)
+    );
   };
 
   // ✅ Filter by search
@@ -167,7 +180,7 @@ export default function MyRooms() {
           </div>
 
           {/* Sort (right) */}
-          <div className="absolute right-6 top-1/2 -translate-y-1/2">
+          <div className="absolute right-6 top-1/2 -translate-y-1/2 flex gap-2">
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
@@ -179,6 +192,15 @@ export default function MyRooms() {
               <option value="date_desc">Newest</option>
               <option value="date_asc">Oldest</option>
             </select>
+
+            {/* ✅ optional: manual refresh */}
+            <button
+              onClick={loadRooms}
+              className="px-3 py-2 text-sm rounded-md border hover:bg-gray-50"
+              title="Reload"
+            >
+              ⟳
+            </button>
           </div>
         </div>
 
@@ -203,7 +225,6 @@ export default function MyRooms() {
             )}
           </div>
 
-          {/* ✅ small helper text */}
           <div className="mt-2 text-xs text-gray-500">
             Showing <span className="font-semibold">{sortedRooms.length}</span> /{" "}
             <span className="font-semibold">{rooms.length}</span> rooms
@@ -223,9 +244,10 @@ export default function MyRooms() {
           <div className="flex flex-col gap-4">
             {sortedRooms.map((room) => (
               <RoomCard
-                key={room.room_id}
+                key={room.room_id ?? room.roomId}
                 room={room}
                 onEdit={() => goEditRoom(room)}
+                onDeleted={handleDeleted}   // ✅ đây là cái thiếu
               />
             ))}
           </div>

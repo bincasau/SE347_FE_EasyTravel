@@ -1,202 +1,282 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
+const API_BASE = "http://localhost:8080";
+const UPDATE_ROOM_URL = `${API_BASE}/hotel_manager/rooms`; // ✅ BE saveOrUpdateRoom mapping "/rooms"
 const S3_ROOM_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/room";
 const FALLBACK_IMAGE = `${S3_ROOM_BASE}/standard_bed.jpg`;
+
+/** ---------- helpers ---------- */
+function toAwsUrl(v) {
+  if (!v) return "";
+  const s = String(v);
+  if (s.startsWith("http://") || s.startsWith("https://")) return s;
+  return `${S3_ROOM_BASE}/${s}`;
+}
+
+function safeNumber(v, fallback = 0) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+async function readResponseSmart(res) {
+  const ct = res.headers.get("content-type") || "";
+  if (ct.includes("application/json")) {
+    return res.json().catch(() => res.text());
+  }
+  return res.text();
+}
+
+async function apiFetch(url, { token, method = "GET", body } = {}) {
+  const res = await fetch(url, {
+    method,
+    mode: "cors",
+    credentials: "include",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      // ❌ không set Content-Type khi FormData
+    },
+    cache: "no-store",
+    body,
+  });
+
+  const raw = await readResponseSmart(res);
+  console.log("[apiFetch]", { method, url, status: res.status, ok: res.ok, raw });
+
+  if (!res.ok) {
+    const msg =
+      typeof raw === "string" && raw.trim()
+        ? raw
+        : typeof raw === "object"
+        ? JSON.stringify(raw)
+        : "";
+    const err = new Error(`${method} ${url} failed (${res.status})${msg ? ` - ${msg}` : ""}`);
+    err.status = res.status;
+    err.raw = raw;
+    throw err;
+  }
+
+  return raw;
+}
 
 export default function RoomEdit() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // ✅ lấy room từ state (MyRooms/Card -> navigate("/hotel-manager/rooms/edit", { state:{ room } }))
+  const token =
+    localStorage.getItem("jwt") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("accessToken") ||
+    "";
+
+  // room từ state
   const room = location.state?.room;
 
-  // nếu refresh trang → mất state → quay về danh sách
   useEffect(() => {
     if (!room) navigate(-1, { replace: true });
   }, [room, navigate]);
 
-  // ✅ Read-only by default
   const [isEditing, setIsEditing] = useState(false);
-
-  // ✅ store original to revert on Cancel
   const [original, setOriginal] = useState(null);
 
+  // ✅ form theo UI snake_case, nhưng lúc gửi BE -> camelCase
   const [form, setForm] = useState({
+    room_id: "",
     room_number: "",
     room_type: "",
     number_of_guests: "",
     price: "",
     description: "",
-    floor: "",
-    status: "AVAILABLE",
+    status: "AVAILABLE", // UI có thì giữ, BE có thể ignore
   });
 
-  // ✅ images: existing + new upload
-  const [bedPreviews, setBedPreviews] = useState([]); // string[] (aws urls or blob)
-  const [wcPreviews, setWcPreviews] = useState([]);
-  const [bedFiles, setBedFiles] = useState([]); // File[]
-  const [wcFiles, setWcFiles] = useState([]);
+  // ✅ single image (bedFile/wcFile)
+  const [bedFile, setBedFile] = useState(null);
+  const [wcFile, setWcFile] = useState(null);
+
+  // preview: ưu tiên ảnh mới (blob), không có thì ảnh cũ (aws)
+  const [bedPreview, setBedPreview] = useState("");
+  const [wcPreview, setWcPreview] = useState("");
 
   const bedInputRef = useRef(null);
   const wcInputRef = useRef(null);
 
-  const toAwsUrl = (v) => {
-    if (!v) return "";
-    const s = String(v);
-    if (s.startsWith("http://") || s.startsWith("https://")) return s;
-    return `${S3_ROOM_BASE}/${s}`;
-  };
+  const [submitting, setSubmitting] = useState(false);
 
-  const normalizeToAwsUrls = (images) => {
-    if (!images) return [];
-    const arr = Array.isArray(images) ? images : [images];
-    return arr.map(toAwsUrl).filter(Boolean);
-  };
-
-  // ----------------------------
-  // Load from room state ONLY
-  // ----------------------------
+  /** ---------- init from state ---------- */
   useEffect(() => {
     if (!room) return;
 
-    // room có thể là snake_case (room_number...) hoặc camelCase (roomNumber...)
+    const roomId = room.room_id ?? room.roomId ?? room.roomID ?? room.id ?? "";
+
     const nextForm = {
-      room_number: room.room_number ?? room.roomNumber ?? "",
-      room_type: room.room_type ?? room.roomType ?? "",
-      number_of_guests:
-        room.number_of_guests ?? room.numberOfGuest ?? room.numberOfGuest === 0
-          ? String(room.number_of_guests ?? room.numberOfGuest)
-          : "",
-      price:
-        room.price === null || room.price === undefined ? "" : String(room.price),
-      description: room.description ?? room.desc ?? "",
-      floor:
-        room.floor === null || room.floor === undefined ? "" : String(room.floor),
-      status: room.status ?? "AVAILABLE",
+      room_id: String(roomId ?? ""),
+      room_number: String(room.room_number ?? room.roomNumber ?? ""),
+      room_type: String(room.room_type ?? room.roomType ?? ""),
+      number_of_guests: String(room.number_of_guests ?? room.numberOfGuest ?? ""),
+      price: room.price === null || room.price === undefined ? "" : String(room.price),
+      description: String(room.description ?? room.desc ?? ""),
+      status: String(room.status ?? "AVAILABLE"),
     };
 
-    const bedUrls = normalizeToAwsUrls(room.image_bed ?? room.imageBed);
-    const wcUrls = normalizeToAwsUrls(room.image_wc ?? room.imageWC);
+    // ảnh cũ
+    const bedOld = toAwsUrl(room.image_bed ?? room.imageBed);
+    const wcOld = toAwsUrl(room.image_wc ?? room.imageWC);
 
     setForm(nextForm);
 
     setOriginal({
       form: nextForm,
-      bedPreviews: bedUrls,
-      wcPreviews: wcUrls,
+      bedOld,
+      wcOld,
     });
 
-    setBedPreviews(bedUrls);
-    setWcPreviews(wcUrls);
+    setBedPreview(bedOld || FALLBACK_IMAGE);
+    setWcPreview(wcOld || FALLBACK_IMAGE);
+
+    // reset file mới
+    setBedFile(null);
+    setWcFile(null);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room]);
 
-  // ----------------------------
-  // Form handlers
-  // ----------------------------
-  const setField = (key, value) => {
-    setForm((prev) => ({ ...prev, [key]: value ?? "" }));
+  /** ---------- handlers ---------- */
+  const setField = (key, value) => setForm((p) => ({ ...p, [key]: value ?? "" }));
+  const handleChange = (e) => setField(e.target.name, e.target.value);
+
+  const pickBed = () => isEditing && bedInputRef.current?.click();
+  const pickWc = () => isEditing && wcInputRef.current?.click();
+
+  const setSingleImage = (file, setFile, previewSetter) => {
+    if (!file) {
+      setFile(null);
+      // preview giữ ảnh cũ, không reset ở đây
+      return;
+    }
+    setFile(file);
+    previewSetter(URL.createObjectURL(file));
   };
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setField(name, value);
-  };
-
-  // ----------------------------
-  // Image helpers
-  // ----------------------------
-  const addImages = (files, setFiles, setUrls) => {
-    const arr = Array.from(files || []);
-    if (arr.length === 0) return;
-
-    setFiles((prev) => [...prev, ...arr]);
-    const urls = arr.map((f) => URL.createObjectURL(f));
-    setUrls((prev) => [...prev, ...urls]);
-  };
-
-  const removeAt = (idx, setFiles, previews, setPreviews) => {
+  const clearBed = () => {
     if (!isEditing) return;
-
-    setPreviews((prev) => {
-      const url = prev[idx];
-      if (url && url.startsWith("blob:")) URL.revokeObjectURL(url);
-      return prev.filter((_, i) => i !== idx);
-    });
-
-    setFiles((prev) => prev.filter((_, i) => i !== idx));
+    if (bedPreview?.startsWith("blob:")) URL.revokeObjectURL(bedPreview);
+    setBedFile(null);
+    setBedPreview(original?.bedOld || FALLBACK_IMAGE);
   };
 
-  const clearAll = (filesSetter, previews, previewsSetter) => {
+  const clearWc = () => {
     if (!isEditing) return;
-    previews.forEach((u) => u?.startsWith("blob:") && URL.revokeObjectURL(u));
-    filesSetter([]);
-    previewsSetter([]);
+    if (wcPreview?.startsWith("blob:")) URL.revokeObjectURL(wcPreview);
+    setWcFile(null);
+    setWcPreview(original?.wcOld || FALLBACK_IMAGE);
   };
 
-  // ----------------------------
-  // Actions (demo only)
-  // ----------------------------
   const onCancel = () => {
     if (!original) return setIsEditing(false);
 
+    // revoke blob previews
+    if (bedPreview?.startsWith("blob:")) URL.revokeObjectURL(bedPreview);
+    if (wcPreview?.startsWith("blob:")) URL.revokeObjectURL(wcPreview);
+
     setForm(original.form);
-
-    bedPreviews.forEach((u) => u.startsWith("blob:") && URL.revokeObjectURL(u));
-    wcPreviews.forEach((u) => u.startsWith("blob:") && URL.revokeObjectURL(u));
-
-    setBedPreviews(original.bedPreviews);
-    setWcPreviews(original.wcPreviews);
-
-    setBedFiles([]);
-    setWcFiles([]);
-
+    setBedFile(null);
+    setWcFile(null);
+    setBedPreview(original.bedOld || FALLBACK_IMAGE);
+    setWcPreview(original.wcOld || FALLBACK_IMAGE);
     setIsEditing(false);
   };
 
+  /** ---------- VALIDATE ---------- */
+  const validate = () => {
+    if (!token) return "NO_TOKEN (Bạn chưa đăng nhập)";
+    if (!form.room_id) return "Missing roomId (state room bị thiếu id)";
+    if (!String(form.room_number).trim()) return "Room number is required.";
+    if (!String(form.room_type).trim()) return "Room type is required.";
+    if (!String(form.number_of_guests).trim()) return "Number of guests is required.";
+    if (!String(form.price).trim()) return "Price is required.";
+    return null;
+  };
+
+  /** ---------- SAVE (UPDATE) ---------- */
   const onSave = async () => {
-    // demo: chỉ log
-    const payload = {
-      ...form,
-      number_of_guests:
-        form.number_of_guests === "" ? null : Number(form.number_of_guests),
-      price: form.price === "" ? null : Number(form.price),
-      floor: form.floor === "" ? null : Number(form.floor),
+    const err = validate();
+    if (err) return alert(err);
+
+    // ✅ JSON gửi vào @RequestPart("room") phải match entity Room
+    const roomPayload = {
+      roomId: safeNumber(form.room_id, 0),
+      roomNumber: safeNumber(form.room_number, 0),
+      roomType: String(form.room_type).trim(),
+      numberOfGuest: safeNumber(form.number_of_guests, 0),
+      price: safeNumber(form.price, 0),
+      desc: String(form.description || "").trim(),
+      // ✅ hotel bắt buộc trong entity, nên gửi lại nếu có
+      // nếu room state có hotelId thì dùng, không thì bỏ (BE có thể tự map theo roomId)
+      ...(room?.hotel?.hotelId
+        ? { hotel: { hotelId: Number(room.hotel.hotelId) } }
+        : room?.hotelId
+        ? { hotel: { hotelId: Number(room.hotelId) } }
+        : {}),
     };
 
-    console.log("[SAVE DEMO payload]", payload);
-    console.log("[NEW bed files]", bedFiles);
-    console.log("[NEW wc files]", wcFiles);
+    const fd = new FormData();
+    fd.append("room", new Blob([JSON.stringify(roomPayload)], { type: "application/json" }));
 
-    alert("Saved (demo only - chưa call API).");
+    // ✅ đúng tên backend
+    if (bedFile) fd.append("bedFile", bedFile);
+    if (wcFile) fd.append("wcFile", wcFile);
 
-    setOriginal({
-      form: { ...form },
-      bedPreviews: [...bedPreviews],
-      wcPreviews: [...wcPreviews],
-    });
+    try {
+      setSubmitting(true);
 
-    setIsEditing(false);
+      // ✅ đa số BE dùng POST để saveOrUpdate (như bạn gửi screenshot: @PostMapping("/rooms"))
+      // Nếu BE bạn là PUT mapping thì đổi method: "PUT"
+      await apiFetch(UPDATE_ROOM_URL, {
+        token,
+        method: "POST",
+        body: fd,
+      });
+
+      alert("Updated room success!");
+
+      // cập nhật original
+      const bedOld = bedPreview?.startsWith("blob:") ? bedPreview : (original?.bedOld || "");
+      const wcOld = wcPreview?.startsWith("blob:") ? wcPreview : (original?.wcOld || "");
+
+      setOriginal({
+        form: { ...form },
+        bedOld: bedOld || original?.bedOld || "",
+        wcOld: wcOld || original?.wcOld || "",
+      });
+
+      setIsEditing(false);
+    } catch (e) {
+      console.error(e);
+      if (e?.status === 403) {
+        alert(
+          "403 Forbidden khi update /hotel_manager/rooms.\n" +
+            "=> BE chưa nhận JWT / role HOTEL_MANAGER chưa đúng / OPTIONS bị chặn."
+        );
+      } else {
+        alert(e?.message || "Update failed");
+      }
+    } finally {
+      setSubmitting(false);
+    }
   };
-
-  const readonlyCls = isEditing
-    ? ""
-    : "pointer-events-none select-none opacity-95";
-
-  const inputBase =
-    "w-full border rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-200";
-  const inputReadonly = isEditing
-    ? ""
-    : "bg-gray-50 text-gray-700 border-gray-200";
 
   if (!room) return null;
 
+  const readonlyCls = isEditing ? "" : "pointer-events-none select-none opacity-95";
+  const inputBase =
+    "w-full border rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-200";
+  const inputReadonly = isEditing ? "" : "bg-gray-50 text-gray-700 border-gray-200";
+
   return (
     <div className="min-h-[calc(100vh-64px)] bg-gray-50">
-      {/* Header bar */}
+      {/* Header */}
       <div className="bg-white border-b">
         <div className="max-w-5xl mx-auto px-6 h-16 flex items-center">
           <div className="flex-1">
@@ -218,7 +298,7 @@ export default function RoomEdit() {
 
       <div className="max-w-5xl mx-auto px-6 py-8">
         <div className="bg-white rounded-2xl shadow-sm border p-6">
-          {/* lock badge */}
+          {/* Mode */}
           <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
             <div className="text-sm text-gray-600">
               Mode:{" "}
@@ -234,7 +314,7 @@ export default function RoomEdit() {
             </div>
           </div>
 
-          {/* form */}
+          {/* Form */}
           <div className={`grid grid-cols-1 md:grid-cols-2 gap-5 ${readonlyCls}`}>
             <Field label="Room Number" required>
               <input
@@ -243,6 +323,7 @@ export default function RoomEdit() {
                 onChange={handleChange}
                 className={`${inputBase} ${inputReadonly}`}
                 disabled={!isEditing}
+                inputMode="numeric"
               />
             </Field>
 
@@ -262,8 +343,8 @@ export default function RoomEdit() {
                 value={form.number_of_guests}
                 onChange={handleChange}
                 className={`${inputBase} ${inputReadonly}`}
-                inputMode="numeric"
                 disabled={!isEditing}
+                inputMode="numeric"
               />
             </Field>
 
@@ -273,19 +354,8 @@ export default function RoomEdit() {
                 value={form.price}
                 onChange={handleChange}
                 className={`${inputBase} ${inputReadonly}`}
+                disabled={!isEditing}
                 inputMode="decimal"
-                disabled={!isEditing}
-              />
-            </Field>
-
-            <Field label="Floor">
-              <input
-                name="floor"
-                value={form.floor}
-                onChange={handleChange}
-                className={`${inputBase} ${inputReadonly}`}
-                inputMode="numeric"
-                disabled={!isEditing}
               />
             </Field>
 
@@ -315,48 +385,40 @@ export default function RoomEdit() {
             </Field>
           </div>
 
-          {/* images */}
-          <div className="mt-8 border-t pt-6 space-y-6">
-            <ImageSection
-              title="Bed Images"
-              subtitle='(demo) existing = AWS URL, new upload = blob URL'
-              pickLabel="Choose Bed Images"
-              onPick={() => isEditing && bedInputRef.current?.click()}
-              onClear={() => clearAll(setBedFiles, bedPreviews, setBedPreviews)}
-              previews={bedPreviews.length ? bedPreviews : [FALLBACK_IMAGE]}
-              onRemove={(idx) =>
-                removeAt(idx, setBedFiles, bedPreviews, setBedPreviews)
-              }
+          {/* Images */}
+          <div className="mt-8 border-t pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <SingleImage
+              title="Bed Image (bedFile)"
+              preview={bedPreview || FALLBACK_IMAGE}
+              onPick={pickBed}
+              onClear={clearBed}
               inputRef={bedInputRef}
               onChange={(e) => {
                 if (!isEditing) return;
-                addImages(e.target.files, setBedFiles, setBedPreviews);
+                const f = e.target.files?.[0] || null;
+                if (f) setSingleImage(f, setBedFile, setBedPreview);
                 e.target.value = "";
               }}
               disabled={!isEditing}
             />
 
-            <ImageSection
-              title="WC Images"
-              subtitle='(demo) existing = AWS URL, new upload = blob URL'
-              pickLabel="Choose WC Images"
-              onPick={() => isEditing && wcInputRef.current?.click()}
-              onClear={() => clearAll(setWcFiles, wcPreviews, setWcPreviews)}
-              previews={wcPreviews.length ? wcPreviews : [FALLBACK_IMAGE]}
-              onRemove={(idx) =>
-                removeAt(idx, setWcFiles, wcPreviews, setWcPreviews)
-              }
+            <SingleImage
+              title="WC Image (wcFile)"
+              preview={wcPreview || FALLBACK_IMAGE}
+              onPick={pickWc}
+              onClear={clearWc}
               inputRef={wcInputRef}
               onChange={(e) => {
                 if (!isEditing) return;
-                addImages(e.target.files, setWcFiles, setWcPreviews);
+                const f = e.target.files?.[0] || null;
+                if (f) setSingleImage(f, setWcFile, setWcPreview);
                 e.target.value = "";
               }}
               disabled={!isEditing}
             />
           </div>
 
-          {/* actions */}
+          {/* Actions */}
           <div className="mt-8 flex justify-end gap-2">
             {!isEditing ? (
               <button
@@ -369,31 +431,29 @@ export default function RoomEdit() {
               <>
                 <button
                   onClick={onCancel}
-                  className="px-5 py-2.5 rounded-xl border hover:bg-gray-50"
+                  disabled={submitting}
+                  className="px-5 py-2.5 rounded-xl border hover:bg-gray-50 disabled:opacity-60"
                 >
                   Cancel
                 </button>
 
                 <button
                   onClick={onSave}
-                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded-xl font-semibold shadow"
+                  disabled={submitting}
+                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded-xl font-semibold shadow disabled:opacity-60"
                 >
-                  Save
+                  {submitting ? "Saving..." : "Save"}
                 </button>
               </>
             )}
           </div>
-        </div>
-
-        <div className="mt-4 text-sm text-gray-600">
-          *Hiện tại chỉ hiển thị dữ liệu từ <span className="font-semibold">room state</span>{" "}
-          (không fetch, không push).
         </div>
       </div>
     </div>
   );
 }
 
+/** ---------- components ---------- */
 function Field({ label, required, children, className = "" }) {
   return (
     <div className={className}>
@@ -410,107 +470,54 @@ function Field({ label, required, children, className = "" }) {
   );
 }
 
-function ImageSection({
-  title,
-  subtitle,
-  pickLabel,
-  onPick,
-  onClear,
-  previews,
-  onRemove,
-  inputRef,
-  onChange,
-  disabled,
-}) {
+function SingleImage({ title, preview, onPick, onClear, inputRef, onChange, disabled }) {
   return (
-    <div>
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <div className="font-semibold text-gray-900">{title}</div>
-          <p className="text-xs text-gray-500">{subtitle}</p>
-        </div>
+    <div className="bg-gray-50 border rounded-xl p-4">
+      <div className="flex items-center justify-between gap-2">
+        <div className="font-semibold text-gray-900">{title}</div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex gap-2">
           <button
             type="button"
             onClick={onPick}
             disabled={disabled}
             className={[
-              "border px-4 py-2 rounded-xl font-medium",
+              "border px-3 py-1.5 rounded-lg font-medium",
               disabled
                 ? "border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed"
                 : "border-orange-500 text-orange-600 hover:bg-orange-50",
             ].join(" ")}
           >
-            {pickLabel}
+            Choose
           </button>
 
-          {previews.length > 0 && (
-            <button
-              type="button"
-              onClick={onClear}
-              disabled={disabled}
-              className={[
-                "border px-4 py-2 rounded-xl",
-                disabled
-                  ? "border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed"
-                  : "border-gray-300 text-gray-700 hover:bg-gray-50",
-              ].join(" ")}
-            >
-              Clear
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={onClear}
+            disabled={disabled}
+            className={[
+              "border px-3 py-1.5 rounded-lg",
+              disabled
+                ? "border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed"
+                : "border-gray-300 text-gray-700 hover:bg-gray-100",
+            ].join(" ")}
+          >
+            Clear
+          </button>
         </div>
 
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="hidden"
-          onChange={onChange}
-          disabled={disabled}
-        />
+        <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={onChange} />
       </div>
 
-      <div className="w-full mt-3">
-        {previews.length === 0 ? (
-          <div className="w-full h-[120px] rounded-xl border bg-gray-50 flex items-center justify-center">
-            <span className="text-sm text-gray-400">No images</span>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {previews.map((src, idx) => (
-              <div
-                key={src + idx}
-                className="relative rounded-xl overflow-hidden border bg-gray-50"
-              >
-                <img
-                  src={src}
-                  alt={`preview-${idx}`}
-                  className="w-full h-28 object-cover"
-                  onError={(e) => {
-                    e.currentTarget.src = FALLBACK_IMAGE;
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => onRemove(idx)}
-                  disabled={disabled}
-                  className={[
-                    "absolute top-2 right-2 text-xs px-2 py-1 rounded-lg",
-                    disabled
-                      ? "bg-black/30 text-white cursor-not-allowed"
-                      : "bg-black/60 text-white hover:bg-black/75",
-                  ].join(" ")}
-                  title="Remove"
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+      <div className="mt-3">
+        <img
+          src={preview || FALLBACK_IMAGE}
+          alt="preview"
+          className="w-full h-[140px] object-cover rounded-lg border bg-white"
+          onError={(e) => {
+            e.currentTarget.src = FALLBACK_IMAGE;
+          }}
+        />
       </div>
     </div>
   );
