@@ -1,49 +1,48 @@
-import { useNavigate } from "react-router-dom";
+function fmtMoney(v) {
+  const n = Number(v ?? 0);
+  return Number.isFinite(n) ? n.toLocaleString() : "0";
+}
 
-export default function RevenueTable({ data }) {
-  const navigate = useNavigate();
-
-  const goDetail = (r) => {
-    navigate("/hotel-manager/revenue/bookings", {
-      state: { room: r }, // ✅ gửi room qua trang detail
-    });
-  };
-
+export default function RevenueTable({ data = [] }) {
   return (
     <div className="bg-white border rounded-lg overflow-hidden">
       <table className="w-full text-sm">
         <thead className="bg-gray-50 border-b">
           <tr>
-            <th className="px-4 py-3 text-left">Room</th>
-            <th className="px-4 py-3 text-left">Type</th>
-            <th className="px-4 py-3 text-right">Bookings</th>
-            <th className="px-4 py-3 text-right">Nights</th>
+            <th className="px-4 py-3 text-left">Check-in</th>
+            <th className="px-4 py-3 text-left">Check-out</th>
+            <th className="px-4 py-3 text-left">Status</th>
             <th className="px-4 py-3 text-right">Revenue</th>
-            <th className="px-4 py-3 text-right">Action</th> {/* ✅ NEW */}
           </tr>
         </thead>
 
         <tbody>
-          {data.map((r) => (
-            <tr key={r.room_id} className="border-b last:border-none">
-              <td className="px-4 py-3 font-medium">{r.room_number}</td>
-              <td className="px-4 py-3">{r.room_type}</td>
-              <td className="px-4 py-3 text-right">{r.bookings}</td>
-              <td className="px-4 py-3 text-right">{r.nights}</td>
-              <td className="px-4 py-3 text-right font-semibold">
-                ${Number(r.revenue ?? 0).toLocaleString()}
-              </td>
+          {data.map((b) => {
+            const revenue = b?.payment?.totalPrice ?? b?.totalPrice ?? 0;
 
-              <td className="px-4 py-3 text-right">
-                <button
-                  onClick={() => goDetail(r)}
-                  className="text-orange-600 font-semibold hover:underline"
-                >
-                  View
-                </button>
+            return (
+              <tr
+                key={b.bookingId ?? `${b.checkInDate}-${b.checkOutDate}`}
+                className="border-b last:border-none"
+              >
+                <td className="px-4 py-3">{b.checkInDate || "-"}</td>
+                <td className="px-4 py-3">{b.checkOutDate || "-"}</td>
+                <td className="px-4 py-3 font-medium">{b.status || "-"}</td>
+
+                <td className="px-4 py-3 text-right font-semibold">
+                  {fmtMoney(revenue)}
+                </td>
+              </tr>
+            );
+          })}
+
+          {data.length === 0 && (
+            <tr>
+              <td colSpan={4} className="px-4 py-6 text-center text-gray-500">
+                No bookings
               </td>
             </tr>
-          ))}
+          )}
         </tbody>
       </table>
     </div>

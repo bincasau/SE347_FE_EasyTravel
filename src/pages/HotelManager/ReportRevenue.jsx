@@ -16,66 +16,22 @@ function clampInt(n, min, max, fallback) {
   return Math.min(max, Math.max(min, x));
 }
 
-function decodeJwt(token) {
-  try {
-    const payload = token.split(".")[1];
-    if (!payload) return null;
-    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const json = decodeURIComponent(
-      atob(base64)
-        .split("")
-        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-        .join("")
-    );
-    return JSON.parse(json);
-  } catch {
-    return null;
-  }
-}
-
-function pickUsernameFromPayload(p) {
-  if (!p) return "";
-  return (
-    p.username ||
-    p.userName ||
-    p.preferred_username ||
-    p.sub ||
-    p.email ||
-    ""
+function calcStatsFromBookings(bookings = []) {
+  // ✅ chỉ tính SUCCESS cho hợp lý doanh thu
+  const success = bookings.filter(
+    (b) =>
+      String(b?.status || "").toLowerCase() === "success" ||
+      String(b?.payment?.status || "").toLowerCase() === "success"
   );
-}
 
-/** parse response mọi kiểu: Map | Array | text */
-function parseStatsAny(raw) {
-  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
-    return {
-      bookings: safeNumber(raw.totalBookings ?? 0),
-      revenue: safeNumber(raw.totalRevenue ?? 0),
-    };
-  }
+  const bookingsCount = success.length;
 
-  if (Array.isArray(raw)) {
-    return {
-      bookings: safeNumber(raw?.[0] ?? 0),
-      revenue: safeNumber(raw?.[1] ?? 0),
-    };
-  }
+  const revenue = success.reduce((sum, b) => {
+    const v = b?.payment?.totalPrice ?? b?.totalPrice ?? 0;
+    return sum + safeNumber(v, 0);
+  }, 0);
 
-  if (typeof raw === "string") {
-    const nums = raw
-      .split(/[,\n\r\s]+/)
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .map(Number)
-      .filter((x) => Number.isFinite(x));
-
-    return {
-      bookings: safeNumber(nums?.[0] ?? 0),
-      revenue: safeNumber(nums?.[1] ?? 0),
-    };
-  }
-
-  return { bookings: 0, revenue: 0 };
+  return { bookings: bookingsCount, revenue };
 }
 
 export default function RevenueReport() {
@@ -83,7 +39,6 @@ export default function RevenueReport() {
   const [month, setMonth] = useState(12);
   const [year, setYear] = useState(2025);
 
-  const [username, setUsername] = useState(""); // dùng ngầm, KHÔNG hiển thị
   const [stats, setStats] = useState({ bookings: 0, revenue: 0 });
   const [prevStats, setPrevStats] = useState(null);
 
@@ -116,49 +71,10 @@ export default function RevenueReport() {
     return { pm, py };
   }, [safeMonth, safeYear]);
 
-  /** ===== resolve username (ngầm) ===== */
-  useEffect(() => {
-    let alive = true;
-
-    const run = async () => {
-      const payload = decodeJwt(token);
-      const fromJwt = pickUsernameFromPayload(payload);
-
-      if (fromJwt) {
-        if (alive) setUsername(fromJwt);
-        return;
-      }
-
-      try {
-        const res = await fetch(`${API_BASE}/hotel_manager/test-user`, {
-          method: "GET",
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          cache: "no-store",
-        });
-
-        const txt = await res.text();
-        const m = txt.match(/Username hiện tại là:\s*(.+)$/i);
-        const u = m?.[1]?.trim() || "";
-        if (alive) setUsername(u);
-      } catch {
-        if (alive) setUsername("");
-      }
-    };
-
-    run();
-    return () => {
-      alive = false;
-    };
-  }, [token]);
-
-  /** ===== fetch stats ===== */
-  const fetchStatsByMonth = useCallback(
-    async ({ username, month, year }) => {
-      const url = `${API_BASE}/hotel-bookings/search/getStatsByMonth?username=${encodeURIComponent(
-        username
-      )}&month=${month}&year=${year}&_t=${Date.now()}`;
+  /** ===== fetch bookings by month/year (JWT) ===== */
+  const fetchBookingsByMonth = useCallback(
+    async ({ month, year }) => {
+      const url = `${API_BASE}/hotel_manager/bookings?month=${month}&year=${year}&_t=${Date.now()}`;
 
       const res = await fetch(url, {
         method: "GET",
@@ -169,19 +85,17 @@ export default function RevenueReport() {
       });
 
       const ct = res.headers.get("content-type") || "";
-      let raw;
+      const raw = ct.includes("application/json")
+        ? await res.json().catch(async () => await res.text())
+        : await res.text();
 
-      if (ct.includes("application/json")) {
-        raw = await res.json().catch(async () => await res.text());
-      } else {
-        raw = await res.text();
-      }
+      console.log("[RevenueReport] GET", { url, status: res.status, ct, raw });
 
       if (!res.ok) {
         throw new Error(typeof raw === "string" ? raw : JSON.stringify(raw));
       }
 
-      return parseStatsAny(raw);
+      return Array.isArray(raw?.content) ? raw.content : [];
     },
     [token]
   );
@@ -196,27 +110,32 @@ export default function RevenueReport() {
         setError("");
 
         if (!token) throw new Error("NO_TOKEN (Bạn chưa đăng nhập)");
-        if (!username) throw new Error("Không lấy được username");
 
-        const cur = await fetchStatsByMonth({
-          username,
+        // current month
+        const curBookings = await fetchBookingsByMonth({
           month: safeMonth,
           year: safeYear,
         });
-        if (alive) setStats(cur);
+        const curStats = calcStatsFromBookings(curBookings);
+        if (alive) setStats(curStats);
 
+        // prev month
         try {
-          const prev = await fetchStatsByMonth({
-            username,
+          const prevBookings = await fetchBookingsByMonth({
             month: prevParams.pm,
             year: prevParams.py,
           });
-          if (alive) setPrevStats(prev);
+          const pStats = calcStatsFromBookings(prevBookings);
+          if (alive) setPrevStats(pStats);
         } catch {
           if (alive) setPrevStats(null);
         }
       } catch (e) {
         if (alive) setError(e?.message || "Fetch failed");
+        if (alive) {
+          setStats({ bookings: 0, revenue: 0 });
+          setPrevStats(null);
+        }
       } finally {
         if (alive) setLoading(false);
       }
@@ -226,28 +145,25 @@ export default function RevenueReport() {
     return () => {
       alive = false;
     };
-  }, [
-    username,
-    token,
-    safeMonth,
-    safeYear,
-    prevParams.pm,
-    prevParams.py,
-    fetchStatsByMonth,
-  ]);
+  }, [token, safeMonth, safeYear, prevParams.pm, prevParams.py, fetchBookingsByMonth]);
 
   const changePercent = useMemo(() => {
     if (!prevStats || !prevStats.revenue) return null;
-    return (
-      ((stats.revenue - prevStats.revenue) / prevStats.revenue) *
-      100
-    ).toFixed(1);
+    const pct = ((stats.revenue - prevStats.revenue) / prevStats.revenue) * 100;
+    return Number.isFinite(pct) ? Number(pct.toFixed(1)) : null;
   }, [stats.revenue, prevStats]);
 
   const revenueText = useMemo(() => {
     return `${safeNumber(stats.revenue, 0).toLocaleString("vi-VN")}₫`;
   }, [stats.revenue]);
 
+  const avgRevenueText = useMemo(() => {
+    const avg =
+      stats.bookings > 0 ? Math.round(stats.revenue / stats.bookings) : 0;
+    return `${safeNumber(avg, 0).toLocaleString("vi-VN")}₫`;
+  }, [stats.revenue, stats.bookings]);
+
+  // (giữ demo distribution như bạn đang làm)
   const roomDistribution = useMemo(() => {
     if (!stats.revenue || stats.revenue <= 0) {
       return [
@@ -266,8 +182,9 @@ export default function RevenueReport() {
   const exportCSV = () => {
     let csv = "Metric,Value\n";
     csv += `Month,${monthLabel}\n`;
-    csv += `Bookings,${stats.bookings}\n`;
-    csv += `Total Revenue,${stats.revenue}\n`;
+    csv += `Bookings(Success),${stats.bookings}\n`;
+    csv += `Total Revenue(Success),${stats.revenue}\n`;
+    csv += `Avg/Booking,${stats.bookings > 0 ? Math.round(stats.revenue / stats.bookings) : 0}\n`;
     csv += `Change vs last month,${changePercent ?? "N/A"}%\n`;
 
     csv += `\nRoom Type,Percentage\n`;
@@ -363,9 +280,6 @@ export default function RevenueReport() {
               </button>
             </div>
           </div>
-
-          {/* ✅ BỎ DÒNG user/bookings/revenue dưới header */}
-          {/* Nếu bạn muốn giữ "Doanh thu: xxx" thôi thì nói mình, mình thêm đúng 1 dòng gọn */}
         </div>
       </div>
 
@@ -379,16 +293,14 @@ export default function RevenueReport() {
         ) : error ? (
           <div className="bg-white border rounded-2xl p-6 shadow-sm">
             <div className="text-lg font-semibold text-gray-900">Lỗi</div>
-            <div className="text-sm text-gray-600 mt-2 break-words">
-              {error}
-            </div>
+            <div className="text-sm text-gray-600 mt-2 break-words">{error}</div>
           </div>
         ) : (
           <ComparisonText
-            revenue={stats.revenue}
+            revenueText={revenueText}      // ✅ tổng tiền
+            bookings={stats.bookings}      // ✅ số booking success
+            avgRevenueText={avgRevenueText} // ✅ revenue/booking
             changePercent={changePercent}
-            bookings={stats.bookings}
-            revenueText={revenueText}
           />
         )}
       </div>

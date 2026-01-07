@@ -1,15 +1,27 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
+const API_BASE = "http://localhost:8080";
 
 const S3_ROOM_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/room";
 
 const FALLBACK_IMAGE = `${S3_ROOM_BASE}/standard_bed.jpg`;
 
-export default function RoomCard({ room }) {
+export default function RoomCard({ room, onDeleted }) {
   const navigate = useNavigate();
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  const token =
+    localStorage.getItem("jwt") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("accessToken") ||
+    "";
 
   const {
+    room_id,
+    roomId,
     room_number,
     room_type,
     number_of_guests,
@@ -21,12 +33,12 @@ export default function RoomCard({ room }) {
     status, // AVAILABLE / BOOKED / MAINTENANCE / INACTIVE
   } = room;
 
+  const id = room_id ?? roomId; // ✅ support both
+
   const imageUrl = useMemo(() => {
-    // lấy 1 ảnh bed/wc (string hoặc array)
     const bed = Array.isArray(image_bed) ? image_bed[0] : image_bed;
     const wc = Array.isArray(image_wc) ? image_wc[0] : image_wc;
 
-    // ✅ Nếu backend trả URL full thì dùng luôn, còn không thì ghép S3
     const toUrl = (v) => {
       if (!v) return "";
       const s = String(v);
@@ -73,6 +85,52 @@ export default function RoomCard({ room }) {
 
   const goEdit = () => {
     navigate("/hotel-manager/rooms/edit", { state: { room } });
+  };
+
+  const doDelete = async () => {
+    setDeleteError("");
+
+    if (!id) {
+      setDeleteError("Missing room id (room_id/roomId)");
+      return;
+    }
+    if (!token) {
+      setDeleteError("NO_TOKEN (Bạn chưa đăng nhập)");
+      return;
+    }
+
+    const ok = window.confirm(
+      `Delete room ${room_number || ""}? This action cannot be undone.`
+    );
+    if (!ok) return;
+
+    try {
+      setDeleting(true);
+
+      const url = `${API_BASE}/hotel_manager/rooms/${id}`;
+      const res = await fetch(url, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const ct = res.headers.get("content-type") || "";
+      const raw = ct.includes("application/json")
+        ? await res.json().catch(async () => await res.text())
+        : await res.text();
+
+      if (!res.ok) {
+        throw new Error(typeof raw === "string" ? raw : JSON.stringify(raw));
+      }
+
+      // ✅ notify parent to remove item
+      onDeleted?.(id);
+    } catch (e) {
+      setDeleteError(e?.message || "Delete failed");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -137,24 +195,42 @@ export default function RoomCard({ room }) {
             <p className="text-sm text-gray-600 mt-2 line-clamp-2">
               {description || "--"}
             </p>
+
+            {!!deleteError && (
+              <p className="text-xs text-red-600 mt-2 break-words">
+                {deleteError}
+              </p>
+            )}
           </div>
 
           {/* ACTIONS */}
           <div className="mt-3 flex justify-end gap-2">
             <button
               onClick={goView}
-              className="px-4 py-1.5 text-sm rounded-lg border border-gray-300 hover:bg-gray-50 transition
-                         active:scale-95"
+              className="px-4 py-1.5 text-sm rounded-lg border border-gray-300 hover:bg-gray-50 transition active:scale-95"
             >
               View
             </button>
 
             <button
               onClick={goEdit}
-              className="px-4 py-1.5 text-sm rounded-lg bg-orange-500 text-white hover:bg-orange-600 transition
-                         hover:-translate-y-[1px] active:scale-95"
+              className="px-4 py-1.5 text-sm rounded-lg bg-orange-500 text-white hover:bg-orange-600 transition hover:-translate-y-[1px] active:scale-95"
             >
               Edit
+            </button>
+
+            <button
+              onClick={doDelete}
+              disabled={deleting}
+              className={[
+                "px-4 py-1.5 text-sm rounded-lg border transition active:scale-95",
+                deleting
+                  ? "border-gray-200 text-gray-400 cursor-not-allowed"
+                  : "border-red-200 text-red-600 hover:bg-red-50",
+              ].join(" ")}
+              title={!id ? "Missing room id" : "Delete room"}
+            >
+              {deleting ? "Deleting..." : "Delete"}
             </button>
           </div>
         </div>
