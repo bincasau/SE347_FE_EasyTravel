@@ -9,12 +9,15 @@ const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=1200&q=80&auto=format&fit=crop";
 
 const API_MY_HOTEL = "http://localhost:8080/hotel_manager/my-hotel";
-const API_UPDATE_HOTEL = (id) => `http://localhost:8080/update-hotel/${id}`;
+const API_UPDATE_HOTEL_MANAGER = "http://localhost:8080/hotel_manager/update-hotel";
 
-// ✅ upload extra image entity
-const API_UPLOAD_EXTRA = "http://localhost:8080/auth/upload";
-// delete extra (nếu bạn muốn dùng sau)
-const API_DELETE_EXTRA = (id) => `http://localhost:8080/auth/${id}`;
+/**
+ * ✅ Theo screenshot backend:
+ * @PostMapping("/auth/upload")
+ * -> nhưng log của bạn có "/image/auth/upload"
+ * => bạn đang mount controller dưới "/image"
+ */
+const API_UPLOAD_EXTRA = "http://localhost:8080/image/auth/upload";
 
 export default function MyHotel() {
   const [hotel, setHotel] = useState(null);
@@ -22,19 +25,18 @@ export default function MyHotel() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
 
-  // ✅ view/edit mode
   const [isEditing, setIsEditing] = useState(false);
-
-  // preview ảnh
   const [previewUrl, setPreviewUrl] = useState("");
 
-  // upload modal
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadFile, setUploadFile] = useState(null);
+
+  const [cacheBuster, setCacheBuster] = useState(Date.now());
 
   const token =
     localStorage.getItem("jwt") ||
@@ -54,44 +56,70 @@ export default function MyHotel() {
       min_price: raw.min_price ?? raw.minPrice ?? null,
       created_at: raw.created_at ?? raw.createdAt ?? null,
       updated_at: raw.updated_at ?? raw.updatedAt ?? null,
-      images: Array.isArray(raw.images) ? raw.images : [],
+      images: Array.isArray(raw.images) ? raw.images : [], // nếu BE có trả
     };
   };
 
+  const toBackendHotelPayload = (h) => {
+    if (!h) return {};
+    return {
+      id: h.hotel_id,
+      hotelId: h.hotel_id,
+      name: h.name ?? "",
+      address: h.address ?? "",
+      phoneNumber: h.phone_number ?? "",
+      email: h.email ?? "",
+      description: h.description ?? "",
+      minPrice:
+        h.min_price === "" || h.min_price === null || h.min_price === undefined
+          ? null
+          : Number(h.min_price),
+      mainImage: h.main_image ?? "",
+    };
+  };
+
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(""), 2000);
+  };
+
+  const fetchMyHotel = async () => {
+    const res = await fetch(API_MY_HOTEL, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+
+    if (!res.ok) {
+      let msg = `Request failed: ${res.status}`;
+      try {
+        const e = await res.json();
+        msg = e?.message || e?.error || msg;
+      } catch {}
+      throw new Error(msg);
+    }
+
+    const data = await res.json();
+    const n = normalizeHotel(data);
+    setHotel(n);
+    setDraft(n);
+    return n;
+  };
+
   useEffect(() => {
-    const loadHotel = async () => {
+    (async () => {
       try {
         setLoading(true);
         setError("");
-        const res = await fetch(API_MY_HOTEL, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        });
-
-        if (!res.ok) {
-          let msg = `Request failed: ${res.status}`;
-          try {
-            const e = await res.json();
-            msg = e?.message || e?.error || msg;
-          } catch {}
-          throw new Error(msg);
-        }
-
-        const data = await res.json();
-        const n = normalizeHotel(data);
-        setHotel(n);
-        setDraft(n);
+        await fetchMyHotel();
       } catch (e) {
         setError(e?.message || "Fetch failed");
       } finally {
         setLoading(false);
       }
-    };
-
-    loadHotel();
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -103,63 +131,43 @@ export default function MyHotel() {
   };
 
   const priceText = useMemo(() => {
-    const v = hotel?.min_price ?? hotel?.minPrice;
+    const v = hotel?.min_price;
     if (v === null || v === undefined || v === "") return "--";
     const num = Number(v);
     if (Number.isNaN(num)) return String(v);
     return `${num.toLocaleString("vi-VN")}₫ / đêm`;
   }, [hotel]);
 
-  const mainImageUrl = (hotel?.main_image ?? hotel?.mainImage)
-    ? `${HOTEL_IMAGE_BASE}/${hotel?.main_image ?? hotel?.mainImage}`
+  const mainImageUrl = hotel?.main_image
+    ? `${HOTEL_IMAGE_BASE}/${hotel.main_image}`
     : FALLBACK_IMAGE;
 
-  // Ảnh phụ vẫn hiển thị theo pattern hotel_{id}_img_1..3 (như bạn nói)
+  /**
+   * ⚠️ Cái này chỉ đúng nếu S3 của bạn THỰC SỰ có file theo pattern:
+   * hotel_{id}_img_{1..3}.jpg
+   * Nhưng hiện bạn upload đang ra: hotel_extra_10_....jpg (random)
+   * => Pattern này sẽ KHÔNG thấy ảnh mới upload.
+   *
+   * Tạm thời vẫn giữ 3 ảnh hardcode để UI có cái hiển thị.
+   * Muốn thấy ảnh upload mới: cần API list images trả về key/url.
+   */
   const extraImageUrls = useMemo(() => {
     const id = hotel?.hotel_id;
     if (!id) return [];
     return [1, 2, 3].map(
-      (n) => `${HOTEL_EXTRA_IMAGE_BASE}/hotel_${id}_img_${n}.jpg`
+      (n) => `${HOTEL_EXTRA_IMAGE_BASE}/hotel_${id}_img_${n}.jpg?t=${cacheBuster}`
     );
-  }, [hotel?.hotel_id]);
+  }, [hotel?.hotel_id, cacheBuster]);
 
-  const onDraftChange = (key, value) => {
-    setDraft((prev) => ({ ...prev, [key]: value }));
-  };
+  const onDraftChange = (key, value) => setDraft((prev) => ({ ...prev, [key]: value }));
 
-  const showToast = (msg) => {
-    setToast(msg);
-    setTimeout(() => setToast(""), 2500);
-  };
-
-  // ✅ Update hotel info: PUT /update-hotel/{id}, multipart (hotel json + optional file)
-  const updateHotelInfo = async () => {
-    const id = hotel?.hotel_id;
-    if (!id) throw new Error("Missing hotel_id");
-
-    const payload = {
-      id,
-      hotel_id: id,
-      name: draft?.name ?? "",
-      address: draft?.address ?? "",
-      phone_number: draft?.phone_number ?? "",
-      email: draft?.email ?? "",
-      description: draft?.description ?? "",
-      min_price:
-        draft?.min_price === "" || draft?.min_price === null || draft?.min_price === undefined
-          ? null
-          : Number(draft?.min_price),
-      main_image: draft?.main_image ?? "",
-    };
-
+  const updateHotelByManager = async () => {
     const fd = new FormData();
-    fd.append(
-      "hotel",
-      new Blob([JSON.stringify(payload)], { type: "application/json" })
-    );
-    // (nếu sau này bạn cho đổi main image thì append("file", file) vào đây)
+    const payload = toBackendHotelPayload(draft);
 
-    const res = await fetch(API_UPDATE_HOTEL(id), {
+    fd.append("hotel", new Blob([JSON.stringify(payload)], { type: "application/json" }));
+
+    const res = await fetch(API_UPDATE_HOTEL_MANAGER, {
       method: "PUT",
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -181,26 +189,35 @@ export default function MyHotel() {
       data = await res.json();
     } catch {}
 
-    const next = normalizeHotel(data) || payload;
+    const next = normalizeHotel(data) || draft;
     setHotel(next);
     setDraft(next);
   };
 
-  // ✅ Upload extra image: POST /auth/upload?type=hotel&id=xxx (form-data file)
-  const uploadExtraImage = async () => {
+  /**
+   * ✅ UPLOAD ĐÚNG THEO BACKEND CHỤP:
+   * POST /image/auth/upload
+   * form-data: file
+   * query: type=hotel&id=<hotelId>
+   */
+  const uploadExtraImage = async (file) => {
     const id = hotel?.hotel_id;
     if (!id) throw new Error("Missing hotel_id");
-    if (!uploadFile) throw new Error("Bạn chưa chọn file ảnh.");
+    if (!file) throw new Error("Bạn chưa chọn file ảnh.");
 
     const fd = new FormData();
-    fd.append("file", uploadFile);
+    fd.append("file", file);
 
-    const url = `${API_UPLOAD_EXTRA}?type=hotel&id=${encodeURIComponent(id)}`;
+    const qs = new URLSearchParams({
+      type: "hotel",
+      id: String(id),
+    });
 
-    const res = await fetch(url, {
+    const res = await fetch(`${API_UPLOAD_EXTRA}?${qs.toString()}`, {
       method: "POST",
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        // ❌ KHÔNG set Content-Type khi dùng FormData
       },
       body: fd,
     });
@@ -213,28 +230,35 @@ export default function MyHotel() {
       } catch {}
       throw new Error(msg);
     }
+
+    // nếu BE có trả json thì đọc (optional)
+    try {
+      return await res.json();
+    } catch {
+      return null;
+    }
   };
 
   const onClickEdit = () => {
     setIsEditing(true);
     setError("");
-    showToast("Chế độ chỉnh sửa");
+    showToast("Edit mode");
   };
 
   const onCancel = () => {
     setDraft(hotel);
     setIsEditing(false);
     setError("");
-    showToast("Đã huỷ");
+    showToast("Cancelled");
   };
 
   const onSave = async () => {
     try {
       setSaving(true);
       setError("");
-      await updateHotelInfo();
+      await updateHotelByManager();
       setIsEditing(false);
-      showToast("✅ Lưu thành công");
+      showToast("✅ Saved");
     } catch (e) {
       setError(e?.message || "Save failed");
     } finally {
@@ -249,18 +273,34 @@ export default function MyHotel() {
 
   const onDoUpload = async () => {
     try {
-      setSaving(true);
+      setUploading(true);
       setError("");
-      await uploadExtraImage();
-      setUploadOpen(false);
-      showToast("✅ Upload ảnh thành công");
 
-      // refresh nhẹ để browser lấy ảnh mới (cache-bust)
-      setTimeout(() => window.location.reload(), 600);
+      const file = uploadFile;
+      await uploadExtraImage(file);
+
+      setUploadOpen(false);
+      setUploadFile(null);
+      showToast("✅ Uploaded");
+
+      // ✅ refresh lại data + cache buster (để 3 ảnh hardcode reload)
+      await fetchMyHotel();
+      setCacheBuster(Date.now());
+
+      /**
+       * ⚠️ Lưu ý quan trọng:
+       * Vì backend đang đặt tên random (hotel_extra_10_....jpg),
+       * nên dù cache buster có đổi thì 3 ảnh hotel_{id}_img_{1..3}.jpg
+       * vẫn không hiện ảnh mới upload.
+       *
+       * Muốn hiện ảnh mới upload ngay:
+       * - Backend cần trả về url/key ảnh vừa upload
+       * - hoặc có API list images theo (type, id)
+       */
     } catch (e) {
       setError(e?.message || "Upload failed");
     } finally {
-      setSaving(false);
+      setUploading(false);
     }
   };
 
@@ -299,22 +339,20 @@ export default function MyHotel() {
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-gray-50">
-      {/* toast */}
       {toast ? (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] bg-gray-900 text-white text-sm px-4 py-2 rounded-xl shadow">
           {toast}
         </div>
       ) : null}
 
-      {/* ===== HEADER ===== */}
+      {/* HEADER */}
       <div className="bg-white border-b">
         <div className="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
           <div className="text-left">
-            <h1 className="text-2xl font-semibold text-gray-900 items-center justify-between">My Hotel</h1>
-            <p className="text-sm text-gray-500 mt-1 items-center justify-between">Hotel Information</p>
+            <h1 className="text-2xl font-semibold text-gray-900">My Hotel</h1>
+            <p className="text-sm text-gray-500 mt-1">Hotel Information</p>
           </div>
 
-          {/* ✅ Edit button (chỉ hiện khi đang view) */}
           {!isEditing ? (
             <button
               onClick={onClickEdit}
@@ -323,27 +361,15 @@ export default function MyHotel() {
               Edit
             </button>
           ) : (
-            <div className="flex items-center gap-3">
-              <button
-                onClick={onCancel}
-                disabled={saving}
-                className="px-4 py-2 rounded-xl border bg-white text-sm hover:bg-gray-50 disabled:opacity-60"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={onSave}
-                disabled={saving}
-                className="px-4 py-2 rounded-xl bg-gray-900 text-white text-sm hover:opacity-90 disabled:opacity-60"
-              >
-                {saving ? "Saving..." : "Save"}
-              </button>
+            <div className="text-sm text-gray-600 flex items-center gap-2">
+              <span className="inline-block w-2 h-2 rounded-full bg-orange-500" />
+              Editing...
             </div>
           )}
         </div>
       </div>
 
-      {/* ===== CONTENT ===== */}
+      {/* CONTENT */}
       <div className="max-w-6xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* LEFT */}
         <div className="lg:col-span-1 space-y-6">
@@ -355,32 +381,23 @@ export default function MyHotel() {
               onClick={() => setPreviewUrl(mainImageUrl)}
               onError={(e) => (e.currentTarget.src = FALLBACK_IMAGE)}
             />
-
             <div className="p-5">
-              <div className="text-xl font-semibold text-gray-900">
-                {hotel?.name || "--"}
-              </div>
-              <div className="text-sm text-gray-600 mt-1">
-                {hotel?.address || "--"}
-              </div>
-              <div className="mt-4 text-orange-600 font-bold text-xl">
-                {priceText}
-              </div>
+              <div className="text-xl font-semibold text-gray-900">{hotel?.name || "--"}</div>
+              <div className="text-sm text-gray-600 mt-1">{hotel?.address || "--"}</div>
+              <div className="mt-4 text-orange-600 font-bold text-xl">{priceText}</div>
             </div>
           </div>
 
-          {/* ✅ Gallery + dấu cộng */}
+          {/* GALLERY */}
           <div className="bg-white border rounded-2xl p-5 shadow-sm">
             <div className="flex items-center justify-between mb-3">
               <div className="text-sm font-semibold text-gray-900">Gallery</div>
-
               <button
                 type="button"
                 onClick={onOpenUpload}
-                className="h-9 w-9 rounded-xl border bg-gray-50 text-gray-900 text-xl leading-none hover:bg-gray-100"
-                title="Thêm ảnh"
+                className="px-3 py-2 rounded-xl border bg-gray-50 text-gray-900 text-sm hover:bg-gray-100"
               >
-                +
+                + Add photo
               </button>
             </div>
 
@@ -391,26 +408,24 @@ export default function MyHotel() {
                   type="button"
                   onClick={() => setPreviewUrl(url)}
                   className="rounded-xl overflow-hidden border bg-gray-50 hover:opacity-90"
-                  title={`Xem ảnh ${idx + 1}`}
+                  title={`Ảnh ${idx + 1}`}
                 >
                   <img
                     src={url}
                     alt={`Hotel extra ${idx + 1}`}
-                    className="w-full h-20 object-cover"
+                    className="w-full h-24 object-cover"
                     onError={(e) => (e.currentTarget.src = FALLBACK_IMAGE)}
                   />
                 </button>
               ))}
             </div>
 
-            
+           
           </div>
 
-          {/* Quick info */}
+          {/* QUICK INFO */}
           <div className="bg-white border rounded-2xl p-5 shadow-sm">
-            <div className="text-sm font-semibold text-gray-900 mb-3">
-              Quick Info
-            </div>
+            <div className="text-sm font-semibold text-gray-900 mb-3">Quick Info</div>
 
             {!isEditing ? (
               <>
@@ -419,11 +434,7 @@ export default function MyHotel() {
               </>
             ) : (
               <>
-                <Field
-                  label="Email"
-                  value={draft.email}
-                  onChange={(v) => onDraftChange("email", v)}
-                />
+                <Field label="Email" value={draft.email} onChange={(v) => onDraftChange("email", v)} />
                 <Field
                   label="Phone"
                   value={draft.phone_number}
@@ -436,11 +447,8 @@ export default function MyHotel() {
 
         {/* RIGHT */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Hotel info */}
           <div className="bg-white border rounded-2xl p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Hotel Info
-            </h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Hotel Info</h2>
 
             {!isEditing ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -451,11 +459,7 @@ export default function MyHotel() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Field
-                  label="Name"
-                  value={draft.name}
-                  onChange={(v) => onDraftChange("name", v)}
-                />
+                <Field label="Name" value={draft.name} onChange={(v) => onDraftChange("name", v)} />
                 <Field
                   label="Min price"
                   type="number"
@@ -473,16 +477,11 @@ export default function MyHotel() {
             )}
           </div>
 
-          {/* Description */}
           <div className="bg-white border rounded-2xl p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">
-              Description
-            </h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">Description</h2>
 
             {!isEditing ? (
-              <p className="text-gray-700 leading-relaxed whitespace-pre-line">
-                {hotel?.description || "--"}
-              </p>
+              <p className="text-gray-700 leading-relaxed whitespace-pre-line">{hotel?.description || "--"}</p>
             ) : (
               <textarea
                 value={draft.description}
@@ -493,11 +492,8 @@ export default function MyHotel() {
             )}
           </div>
 
-          {/* System Info */}
           <div className="bg-white border rounded-2xl p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              System Info
-            </h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">System Info</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <InfoCard title="Created at" value={formatDate(hotel?.created_at)} />
@@ -507,8 +503,12 @@ export default function MyHotel() {
             </div>
           </div>
 
-          
-          {/* ✅ Save bar ở cuối đúng yêu cầu: chỉ hiện khi edit */}
+          {error ? (
+            <div className="bg-white border rounded-2xl p-4 shadow-sm">
+              <div className="text-sm text-red-600 break-words">{error}</div>
+            </div>
+          ) : null}
+
           {isEditing ? (
             <div className="bg-white border rounded-2xl p-5 shadow-sm flex items-center justify-end gap-3">
               <button
@@ -530,12 +530,12 @@ export default function MyHotel() {
         </div>
       </div>
 
-      {/* ✅ upload modal */}
+      {/* UPLOAD MODAL */}
       {uploadOpen ? (
         <Modal title="Upload ảnh Gallery" onClose={() => setUploadOpen(false)}>
           <div className="space-y-4">
             <div className="text-sm text-gray-600">
-              API: <b>/auth/upload</b> (type=hotel, id={hotel?.hotel_id})
+             
             </div>
 
             <input
@@ -548,24 +548,24 @@ export default function MyHotel() {
             <div className="flex items-center justify-end gap-3">
               <button
                 onClick={() => setUploadOpen(false)}
-                disabled={saving}
+                disabled={uploading}
                 className="px-4 py-2 rounded-xl border bg-white text-sm hover:bg-gray-50 disabled:opacity-60"
               >
                 Close
               </button>
               <button
                 onClick={onDoUpload}
-                disabled={saving}
+                disabled={uploading || !uploadFile}
                 className="px-4 py-2 rounded-xl bg-gray-900 text-white text-sm hover:opacity-90 disabled:opacity-60"
               >
-                {saving ? "Uploading..." : "Upload"}
+                {uploading ? "Uploading..." : "Upload"}
               </button>
             </div>
           </div>
         </Modal>
       ) : null}
 
-      {/* preview modal */}
+      {/* PREVIEW */}
       {previewUrl ? (
         <div
           className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
@@ -609,14 +609,7 @@ function Row({ label, value }) {
   );
 }
 
-function Field({
-  label,
-  value,
-  onChange,
-  type = "text",
-  placeholder,
-  className = "",
-}) {
+function Field({ label, value, onChange, type = "text", placeholder, className = "" }) {
   return (
     <div className={className}>
       <div className="text-xs text-gray-500 mb-1">{label}</div>
@@ -644,20 +637,14 @@ function InfoCard({ title, value }) {
 
 function Modal({ title, onClose, children }) {
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
       <div
         className="max-w-xl w-full bg-white rounded-2xl shadow-lg overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b">
           <div className="text-sm font-semibold text-gray-900">{title}</div>
-          <button
-            className="px-3 py-1 rounded-lg bg-gray-900 text-white text-sm"
-            onClick={onClose}
-          >
+          <button className="px-3 py-1 rounded-lg bg-gray-900 text-white text-sm" onClick={onClose}>
             Close
           </button>
         </div>
