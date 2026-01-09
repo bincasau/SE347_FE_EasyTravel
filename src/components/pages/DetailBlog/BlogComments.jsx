@@ -1,20 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
-
-const API_BASE = "http://localhost:8080";
-const USER_ENDPOINT = (id) => `/user/${id}`; // 🔁 nếu BE là /users/{id} thì đổi thành `/users/${id}`
-
-async function fetchWithJwt(url, options = {}) {
-  const token = localStorage.getItem("jwt");
-  const finalUrl = url.startsWith("http") ? url : `${API_BASE}${url}`;
-
-  return fetch(finalUrl, {
-    ...options,
-    headers: {
-      ...(options.headers || {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
-}
+import {
+  addComment,
+  deleteComment,
+  getCommentsByBlogId,
+  updateComment,
+} from "@/apis/CommentAPI";
 
 function AvatarLetter({ name }) {
   const initial = (name || "A").trim().charAt(0).toUpperCase();
@@ -25,145 +15,126 @@ function AvatarLetter({ name }) {
   );
 }
 
+function fmtDate(value) {
+  if (!value) return "--";
+  try {
+    return new Date(value).toLocaleString("vi-VN");
+  } catch {
+    return "--";
+  }
+}
+
 export default function BlogComments({ blogId }) {
   const [comments, setComments] = useState([]);
   const [visibleCount, setVisibleCount] = useState(4);
   const [loading, setLoading] = useState(true);
 
-  const [newComment, setNewComment] = useState({ name: "", content: "" });
+  const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // cache user theo userId
-  const [userMap, setUserMap] = useState({}); // { [userId]: userObj }
+  const [editingId, setEditingId] = useState(null);
+  const [editingContent, setEditingContent] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
 
-  // 1) Fetch comments
+  const visibleComments = useMemo(
+    () => comments.slice(0, visibleCount),
+    [comments, visibleCount]
+  );
+
+  const getId = (c, i) => c?.commentId ?? c?.comment_id ?? c?.id ?? i;
+  const getName = (c) =>
+    c?.user?.name || c?.user?.username || c?.name || "Anonymous";
+  const getTime = (c) => c?.createdAt || c?.created_at;
+  const getContent = (c) => c?.content || "";
+
+  // ✅ LOAD COMMENTS
   useEffect(() => {
-    const fetchComments = async () => {
+    const load = async () => {
+      if (!blogId) return;
+      setLoading(true);
       try {
-        setLoading(true);
-        const res = await fetchWithJwt(`/blogs/${blogId}/comments`);
-        if (!res.ok) throw new Error("Không thể tải bình luận");
-
-        const data = await res.json();
-        const list = data?._embedded?.comments || data || [];
-        setComments(list);
-      } catch (err) {
-        console.error("❌ Lỗi fetch bình luận:", err);
+        const list = await getCommentsByBlogId(blogId);
+        // list là array comment
+        setComments(Array.isArray(list) ? list : []);
+      } catch (e) {
+        console.error("Load comments failed:", e);
         setComments([]);
       } finally {
         setLoading(false);
       }
     };
-
-    if (blogId) fetchComments();
+    load();
   }, [blogId]);
 
-  // 2) Extract user ids from comments
-  const userIds = useMemo(() => {
-    const s = new Set();
-    for (const c of comments) {
-      // ✅ các key hay gặp
-      const uid =
-        c?.user_id ??
-        c?.userId ??
-        c?.user?.userId ??
-        c?.user?.id ??
-        null;
-
-      if (uid != null) s.add(String(uid));
-    }
-    return [...s];
-  }, [comments]);
-
-  // 3) Fetch users by ids
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const need = userIds.filter((id) => !userMap[id]);
-        if (!need.length) return;
-
-        const results = await Promise.all(
-          need.map(async (id) => {
-            const res = await fetchWithJwt(USER_ENDPOINT(id));
-            if (!res.ok) return [id, null];
-            const u = await res.json();
-            return [id, u];
-          })
-        );
-
-        setUserMap((prev) => {
-          const next = { ...prev };
-          results.forEach(([id, u]) => {
-            if (u) next[id] = u;
-          });
-          return next;
-        });
-      } catch (err) {
-        console.error("❌ Lỗi fetch users:", err);
-      }
-    };
-
-    if (userIds.length) fetchUsers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userIds]);
-
-  // Helpers
-  const visibleComments = comments.slice(0, visibleCount);
-
-  const getUserIdFromComment = (c) =>
-    c?.user_id ?? c?.userId ?? c?.user?.userId ?? c?.user?.id ?? null;
-
-  const getUserNameFromUserObj = (u) =>
-    u?.name || u?.fullName || u?.username || u?.email || null;
-
-  const getCommenterName = (c) => {
-    // nếu comment có lưu name text sẵn
-    if (c?.name && String(c.name).trim()) return c.name;
-
-    // lấy từ user fetch về theo user_id
-    const uid = getUserIdFromComment(c);
-    if (uid != null) {
-      const u = userMap[String(uid)];
-      const n = getUserNameFromUserObj(u);
-      if (n) return n;
-    }
-
-    return "Anonymous";
-  };
-
-  // 4) Submit comment mới
-  const handleSubmit = async (e) => {
+  // ✅ ADD
+  const onSubmit = async (e) => {
     e.preventDefault();
-    if (!newComment.name.trim() || !newComment.content.trim()) return;
+    if (!content.trim()) return;
 
     setSubmitting(true);
     try {
-      const res = await fetchWithJwt(`/blogs/${blogId}/comments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newComment),
-      });
-
-      if (!res.ok) throw new Error("Không thể gửi bình luận");
-
-      const created = await res.json();
+      const created = await addComment(blogId, content.trim());
       setComments((prev) => [created, ...prev]);
-      setNewComment({ name: "", content: "" });
       setVisibleCount(4);
-    } catch (err) {
-      console.error("❌ Lỗi khi gửi bình luận:", err);
-      alert("Không thể gửi bình luận, vui lòng thử lại.");
+      setContent("");
+    } catch (e) {
+      console.error(e);
+      alert(e.message || "Không thể gửi bình luận (cần đăng nhập?)");
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (loading)
+  // ✅ EDIT
+  const startEdit = (c) => {
+    const id = getId(c);
+    setEditingId(id);
+    setEditingContent(getContent(c));
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditingContent("");
+  };
+
+  const saveEdit = async () => {
+    if (!editingId) return;
+    if (!editingContent.trim()) return;
+
+    setSavingEdit(true);
+    try {
+      const updated = await updateComment(editingId, editingContent.trim());
+      setComments((prev) =>
+        prev.map((c) => (getId(c) === editingId ? updated : c))
+      );
+      cancelEdit();
+    } catch (e) {
+      console.error(e);
+      alert(e.message || "Không thể sửa bình luận");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  // ✅ DELETE
+  const onDelete = async (id) => {
+    if (!confirm("Xoá bình luận này?")) return;
+    try {
+      await deleteComment(id);
+      setComments((prev) => prev.filter((c) => getId(c) !== id));
+    } catch (e) {
+      console.error(e);
+      alert(e.message || "Không thể xoá bình luận");
+    }
+  };
+
+  if (loading) {
     return (
       <div className="text-center text-gray-400 italic py-5">
         Đang tải bình luận...
       </div>
     );
+  }
 
   return (
     <div>
@@ -171,7 +142,6 @@ export default function BlogComments({ blogId }) {
         Bình luận ({comments.length})
       </h3>
 
-      {/* --- Danh sách bình luận --- */}
       {comments.length === 0 ? (
         <p className="text-gray-500 text-center py-5">
           Chưa có bình luận nào. Hãy là người đầu tiên nhé!
@@ -179,42 +149,80 @@ export default function BlogComments({ blogId }) {
       ) : (
         <div className="space-y-4">
           {visibleComments.map((c, i) => {
-            const name = getCommenterName(c);
+            const id = getId(c, i);
+            const name = getName(c);
 
             return (
               <div
-                key={c.comment_id ?? c.commentId ?? c.id ?? i}
+                key={id}
                 className="bg-gray-50 p-4 rounded-xl shadow-sm border text-sm"
               >
-                <div className="flex justify-between items-center mb-2">
+                <div className="flex items-start justify-between gap-3 mb-2">
                   <div className="flex items-center gap-3">
                     <AvatarLetter name={name} />
                     <div>
                       <div className="font-semibold text-gray-800">{name}</div>
                       <div className="text-xs text-gray-400">
-                        {c.createdAt || c.created_at
-                          ? new Date(c.createdAt || c.created_at).toLocaleDateString(
-                              "vi-VN"
-                            )
-                          : "--"}
+                        {fmtDate(getTime(c))}
                       </div>
                     </div>
                   </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => startEdit(c)}
+                      className="text-xs px-3 py-1 rounded-full border hover:bg-white"
+                    >
+                      Sửa
+                    </button>
+                    <button
+                      onClick={() => onDelete(id)}
+                      className="text-xs px-3 py-1 rounded-full border border-red-300 text-red-600 hover:bg-red-50"
+                    >
+                      Xoá
+                    </button>
+                  </div>
                 </div>
 
-                <p className="text-gray-600">
-                  {c.content || "(Không có nội dung)"}
-                </p>
+                {editingId === id ? (
+                  <div className="mt-2">
+                    <textarea
+                      value={editingContent}
+                      onChange={(e) => setEditingContent(e.target.value)}
+                      className="w-full border rounded-xl px-3 py-2 text-sm h-24 resize-none outline-none focus:ring-2 focus:ring-orange-400"
+                    />
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        onClick={saveEdit}
+                        disabled={savingEdit}
+                        className={`px-4 py-2 rounded-full text-white text-sm ${
+                          savingEdit
+                            ? "bg-gray-400 cursor-not-allowed"
+                            : "bg-orange-500 hover:bg-orange-600"
+                        }`}
+                      >
+                        {savingEdit ? "Đang lưu..." : "Lưu"}
+                      </button>
+                      <button
+                        onClick={cancelEdit}
+                        className="px-4 py-2 rounded-full border text-sm hover:bg-white"
+                      >
+                        Huỷ
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-gray-600">{getContent(c) || "(Trống)"}</p>
+                )}
               </div>
             );
           })}
 
-          {/* Show more / Show less */}
           {comments.length > 4 && (
             <div className="text-center mt-5">
               {visibleCount < comments.length ? (
                 <button
-                  onClick={() => setVisibleCount((prev) => prev + 4)}
+                  onClick={() => setVisibleCount((p) => p + 4)}
                   className="px-5 py-2 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition"
                 >
                   Show more
@@ -232,29 +240,17 @@ export default function BlogComments({ blogId }) {
         </div>
       )}
 
-      {/* --- Form viết bình luận --- */}
+      {/* form */}
       <form
-        onSubmit={handleSubmit}
+        onSubmit={onSubmit}
         className="mt-8 bg-gray-50 p-5 rounded-xl shadow-sm border"
       >
         <h4 className="font-semibold text-gray-800 mb-3">Viết bình luận</h4>
 
-        <input
-          type="text"
-          placeholder="Tên của bạn"
-          value={newComment.name}
-          onChange={(e) =>
-            setNewComment({ ...newComment, name: e.target.value })
-          }
-          className="w-full border rounded-md px-3 py-2 text-sm mb-3 focus:ring-2 focus:ring-orange-400 outline-none"
-        />
-
         <textarea
           placeholder="Nội dung bình luận..."
-          value={newComment.content}
-          onChange={(e) =>
-            setNewComment({ ...newComment, content: e.target.value })
-          }
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
           className="w-full border rounded-md px-3 py-2 text-sm h-24 resize-none focus:ring-2 focus:ring-orange-400 outline-none"
         />
 
