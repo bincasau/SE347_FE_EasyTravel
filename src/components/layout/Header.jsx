@@ -4,6 +4,13 @@ import { useLang } from "@/contexts/LangContext";
 import Logo from "@/assets/images/logo.png";
 import { getAccountDetail, logout } from "@/apis/AccountAPI";
 import { getUserFromToken } from "@/utils/auth";
+import { Bell } from "lucide-react";
+
+import {
+  getMyNotifications,
+  getPublicNotifications,
+  markNotificationRead,
+} from "@/apis/NotificationAPI";
 
 const S3_USER_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/user";
@@ -19,6 +26,14 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
 
   // prevent redirect loop (chỉ dùng cho root redirect)
   const didRedirectRef = useRef(false);
+
+  // 🔔 Notifications
+  const [openNoti, setOpenNoti] = useState(false);
+  const notiRef = useRef(null);
+  const [notifications, setNotifications] = useState([]);
+  const [loadingNoti, setLoadingNoti] = useState(false);
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   const userMenu = [
     { to: "/", key: "home" },
@@ -71,17 +86,53 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     setLoadingUser(false);
   };
 
+  // 🔔 load notifications
+  const loadNotifications = async () => {
+    setLoadingNoti(true);
+    try {
+      const data = user
+        ? await getMyNotifications("ACTIVE")
+        : await getPublicNotifications();
+
+      // sort mới nhất lên đầu nếu createdAt là string ISO
+      const sorted = Array.isArray(data)
+        ? [...data].sort((a, b) => {
+            const ta = new Date(a.time).getTime();
+            const tb = new Date(b.time).getTime();
+            return (tb || 0) - (ta || 0);
+          })
+        : [];
+
+      setNotifications(sorted);
+    } catch (e) {
+      console.error("Load notifications failed:", e);
+      setNotifications([]);
+    }
+    setLoadingNoti(false);
+  };
+
   useEffect(() => {
     fetchUser();
 
     const handleJWT = () => fetchUser();
     window.addEventListener("jwt-changed", handleJWT);
-    window.addEventListener("storage", (e) => {
-      if (e.key === "jwt") fetchUser();
-    });
 
-    return () => window.removeEventListener("jwt-changed", handleJWT);
+    const storageHandler = (e) => {
+      if (e.key === "jwt") fetchUser();
+    };
+    window.addEventListener("storage", storageHandler);
+
+    return () => {
+      window.removeEventListener("jwt-changed", handleJWT);
+      window.removeEventListener("storage", storageHandler);
+    };
   }, []);
+
+  // khi user thay đổi -> load lại noti
+  useEffect(() => {
+    loadNotifications();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   // ✅ auto redirect by role (redirect ONLY on root pages)
   useEffect(() => {
@@ -130,6 +181,23 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     return () => window.removeEventListener("open-login", openLoginHandler);
   }, [onOpenLogin]);
 
+  // 🔔 close notifications dropdown when click outside / ESC
+  useEffect(() => {
+    const onDocClick = (e) => {
+      if (!notiRef.current) return;
+      if (!notiRef.current.contains(e.target)) setOpenNoti(false);
+    };
+    const onEsc = (e) => {
+      if (e.key === "Escape") setOpenNoti(false);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, []);
+
   const handleLogout = () => {
     if (!confirm("Bạn có chắc muốn đăng xuất?")) return;
     logout();
@@ -173,7 +241,6 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     location.pathname.startsWith("/guide/past-tours") ||
     location.pathname.startsWith("/detailtour");
 
-  // ✅ FIX: đang ở rooms/edit hoặc rooms/view thì vẫn active "Add Rooms"
   const isHotelManagerAddRoomActive =
     location.pathname.startsWith("/hotel-manager/hotels/addroom") ||
     location.pathname.startsWith("/hotel-manager/rooms/edit") ||
@@ -267,17 +334,8 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     ));
   };
 
-  const goToProfileByRole = () => {
-    navigate(
-      user.role === "ADMIN"
-        ? "/admin/dashboard"
-        : user.role === "HOTEL_MANAGER"
-        ? "/hotel-manager/hotels/addroom"
-        : user.role === "TOUR_GUIDE"
-        ? "/guide/schedule"
-        : "/profile"
-    );
-  };
+  // ✅ Avatar click => luôn về /profile cho mọi role
+  const goToProfileByRole = () => navigate("/profile");
 
   // ✅ LOGO: đi theo role
   const getHomeByRole = () => {
@@ -293,6 +351,25 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
       default:
         return "/";
     }
+  };
+
+  const handleClickNoti = async (n) => {
+    // public list không cần patch, my list thì patch
+    if (user && !n.read) {
+      try {
+        await markNotificationRead(n.id);
+      } catch (e) {
+        console.error("Mark read failed:", e);
+      }
+    }
+
+    setNotifications((prev) =>
+      prev.map((x) => (x.id === n.id ? { ...x, read: true } : x))
+    );
+  };
+
+  const markAllRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   };
 
   return (
@@ -312,6 +389,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
           </nav>
 
           <div className="hidden md:flex items-center gap-4">
+            {/* Language */}
             <div className="relative">
               <button
                 className="flex items-center gap-2 border px-3 py-2 rounded-xl bg-gray-50 hover:bg-gray-100"
@@ -340,6 +418,94 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
                   >
                     <Flag code="en" />
                   </button>
+                </div>
+              )}
+            </div>
+
+            {/* 🔔 Notifications */}
+            <div className="relative" ref={notiRef}>
+              <button
+                onClick={async () => {
+                  const next = !openNoti;
+                  setOpenNoti(next);
+                  if (next) await loadNotifications();
+                }}
+                className="relative w-10 h-10 grid place-items-center rounded-full border bg-white hover:bg-gray-50"
+                aria-label="Notifications"
+              >
+                <Bell className="w-5 h-5 text-gray-900" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 text-[11px] rounded-full bg-red-500 text-white grid place-items-center">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {openNoti && (
+                <div className="absolute right-0 mt-2 w-[360px] bg-white border rounded-2xl shadow-lg overflow-hidden">
+                  <div className="px-4 py-3 flex items-center justify-between border-b">
+                    <div className="font-semibold">Notifications</div>
+                    <button
+                      onClick={markAllRead}
+                      className="text-sm text-orange-600 hover:underline"
+                    >
+                      Mark all as read
+                    </button>
+                  </div>
+
+                  <div className="max-h-[360px] overflow-auto">
+                    {loadingNoti ? (
+                      <div className="p-6 text-gray-500 text-sm">Loading...</div>
+                    ) : notifications.length === 0 ? (
+                      <div className="p-6 text-gray-500 text-sm">
+                        No notifications.
+                      </div>
+                    ) : (
+                      notifications.map((n) => (
+                        <button
+                          key={n.id}
+                          onClick={() => handleClickNoti(n)}
+                          className={`w-full text-left px-4 py-3 border-b last:border-b-0 hover:bg-gray-50 ${
+                            n.read ? "opacity-80" : ""
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div
+                              className={`mt-1 w-2.5 h-2.5 rounded-full ${
+                                n.read ? "bg-gray-300" : "bg-orange-500"
+                              }`}
+                            />
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="font-medium">{n.title}</div>
+                                <div className="text-xs text-gray-400 shrink-0">
+                                  {n.time}
+                                </div>
+                              </div>
+                              <div className="text-sm text-gray-600 mt-1 line-clamp-2">
+                                {n.message}
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="px-4 py-3 border-t bg-gray-50 flex justify-between">
+                    <button
+                      onClick={() => setOpenNoti(false)}
+                      className="text-sm text-gray-600 hover:underline"
+                    >
+                      View all
+                    </button>
+                    <button
+                      onClick={() => setOpenNoti(false)}
+                      className="text-sm text-gray-600 hover:underline"
+                    >
+                      Close
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

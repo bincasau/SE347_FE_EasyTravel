@@ -15,6 +15,7 @@ import DetailTour from "./pages/DetailTour";
 import Booking from "./pages/BookingTour";
 import Verify from "./pages/Verify";
 import Profile from "./pages/Profile";
+import EditProfile from "./pages/EditProfile";
 
 import RequireRole from "./pages/TourGuide/RequireRole";
 import PastTours from "./pages/TourGuide/PastTours";
@@ -80,6 +81,8 @@ export default function App() {
           <Route path="/home" element={<Navigate to="/" replace />} />
           <Route path="/verify" element={<Verify />} />
           <Route path="/profile" element={<Profile />} />
+<Route path="/profile" element={<Profile />} />
+<Route path="/profile/edit" element={<EditProfile />} />
 
           <Route path="/403" element={<Forbidden403 />} />
 

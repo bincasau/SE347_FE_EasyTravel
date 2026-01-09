@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAccountDetail } from "@/apis/AccountAPI";
 
+const S3_USER_BASE =
+  "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/user";
+
 export default function Profile() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -14,17 +17,18 @@ export default function Profile() {
 
         setUser({
           avatar: data.avatar
-            ? `/images/Users/${data.avatar}`
-            : "/images/Users/default-avatar.png",
+            ? `${S3_USER_BASE}/${data.avatar}`
+            : `${S3_USER_BASE}/user_default.jpg`,
           username: data.username,
           name: data.name,
           email: data.email,
-          phone: data.phone,
+          phone: data.phone,     // ✅ đúng field backend trả về
           address: data.address,
           gender: data.gender,
-          birth: data.birth,
+          birth: data.birth,     // ✅ đúng field backend trả về
         });
-      } catch {
+      } catch (e) {
+        console.error(e);
         navigate("/");
       } finally {
         setLoading(false);
@@ -59,6 +63,7 @@ export default function Profile() {
           <img
             src={user.avatar}
             className="w-24 h-24 rounded-full border object-cover"
+            alt="avatar"
           />
           <div>
             <h2 className="text-xl font-bold">{user.name}</h2>
@@ -73,19 +78,16 @@ export default function Profile() {
           <Info label="Address" value={user.address || "—"} />
           <Info
             label="Gender"
-            value={
-              user.gender === "M"
-                ? "Male"
-                : user.gender === "F"
-                ? "Female"
-                : "—"
-            }
+            value={user.gender === "M" ? "Male" : user.gender === "F" ? "Female" : "—"}
           />
           <Info label="Date of Birth" value={user.birth || "—"} />
         </div>
 
         <div className="text-center mt-10">
-          <button className="bg-orange-500 text-white px-6 py-3 rounded-full hover:bg-orange-400">
+          <button
+            onClick={() => navigate("/profile/edit")}
+            className="bg-orange-500 text-white px-6 py-3 rounded-full hover:bg-orange-400"
+          >
             Edit Profile
           </button>
         </div>
@@ -98,7 +100,7 @@ function Info({ label, value }) {
   return (
     <div className="space-y-1">
       <p className="text-sm text-gray-500">{label}</p>
-      <p className="font-medium text-gray-900">{value}</p>
+      <p className="font-medium text-gray-900 break-words">{value}</p>
     </div>
   );
 }
