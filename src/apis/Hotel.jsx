@@ -111,3 +111,83 @@ export const fetchHotelImages = async (hotelId) => {
   const data = await res.json();
   return data?._embedded?.images || [];
 };
+
+export async function addHotel({ hotelData, imageFile, managerUsername }) {
+  const token = localStorage.getItem("jwt");
+  if (!token) throw new Error("Missing JWT (localStorage key: jwt)");
+
+  const formData = new FormData();
+  formData.append(
+    "hotel",
+    new Blob([JSON.stringify(hotelData)], { type: "application/json" })
+  );
+  if (imageFile) formData.append("file", imageFile);
+
+  formData.append("managerUsername", managerUsername);
+
+  const res = await fetch(`${API_BASE}/admin/add-hotel`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  const text = await res.text(); 
+  if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
+
+  // nếu backend trả JSON
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+const API_URL = "http://localhost:8080";
+
+export async function updateHotel(hotelId, hotelData, file) {
+  const formData = new FormData();
+  formData.append(
+    "hotel",
+    new Blob([JSON.stringify(hotelData)], { type: "application/json" })
+  );
+  if (file) formData.append("file", file);
+
+  const token = localStorage.getItem("jwt");
+
+  const res = await fetch(`${API_URL}/admin/update-hotel/${hotelId}`, {
+    method: "PUT",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const msg = await res.text();
+    throw new Error(msg || "Update hotel failed");
+  }
+
+  return res.json();
+}
+
+export async function deleteHotel(id) {
+  const token = localStorage.getItem("jwt");
+
+  const res = await fetch(`${API_URL}/admin/delete-hotel/${id}`, {
+    method: "DELETE",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  const text = await res.text();
+  if (!res.ok) throw new Error(text || "Delete hotel failed");
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}

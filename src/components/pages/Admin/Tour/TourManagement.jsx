@@ -1,19 +1,30 @@
 import React, { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import AdminTourCard from "./AdminTourCard";
 import Pagination from "@/utils/Pagination";
 import { getAllTours } from "@/apis/Tour";
 
 export default function TourManagement() {
   const [tours, setTours] = useState([]);
-  const [currentPage, setCurrentPage] = useState(1);
+
+  // thêm query param page
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pageFromUrl = Number(searchParams.get("page")) || 1;
+
+  const [currentPage, setCurrentPage] = useState(pageFromUrl);
 
   const pageSize = 5;
 
-useEffect(() => {
-  getAllTours().then((list) => {
-    setTours(list); 
-  });
-}, []);
+  useEffect(() => {
+    getAllTours().then((list) => {
+      setTours(list);
+    });
+  }, []);
+
+  // sync state theo URL (khi user sửa URL hoặc back/forward)
+  useEffect(() => {
+    setCurrentPage(pageFromUrl);
+  }, [pageFromUrl]);
 
   // paging
   const totalPages = Math.ceil(tours.length / pageSize);
@@ -25,9 +36,13 @@ useEffect(() => {
       {/* PAGE HEADER */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">Tour Management</h1>
-        <button className="px-5 py-2 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition">
-          + Add tour
-        </button>
+
+        {/* giữ nguyên link add, chỉ thêm page nếu bạn muốn */}
+        <Link to={`/admin/tours/new?page=${currentPage}`}>
+          <button className="px-5 py-2 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition">
+            + Add Tour
+          </button>
+        </Link>
       </div>
 
       {/* TOUR LIST */}
@@ -52,7 +67,10 @@ useEffect(() => {
         totalPages={totalPages}
         currentPage={currentPage}
         visiblePages={null}
-        onPageChange={(page) => setCurrentPage(page)}
+        onPageChange={(page) => {
+          setCurrentPage(page);
+          setSearchParams({ page: String(page) }); 
+        }}
       />
     </div>
   );

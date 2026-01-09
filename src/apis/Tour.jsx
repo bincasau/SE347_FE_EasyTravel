@@ -123,3 +123,70 @@ export async function getAllTours() {
     return [];
   }
 }
+
+
+function getAuthHeaders() {
+  const token = localStorage.getItem("jwt");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function fetchJsonPublic(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function fetchJsonAuth(url, options = {}) {
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      ...getAuthHeaders(),
+    },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+/* GET public */
+export async function getTourFullById(id) {
+  const [tour, itRes, imgRes] = await Promise.all([
+    fetchJsonPublic(`${API_BASE}/tours/${id}`),
+    fetchJsonPublic(`${API_BASE}/tours/${id}/itineraries`),
+    fetchJsonPublic(`${API_BASE}/tours/${id}/images`),
+  ]);
+
+  return {
+    tour,
+    itineraries: itRes?._embedded?.itineraries ?? [],
+    images: imgRes?._embedded?.images ?? [],
+  };
+}
+
+/* POST auth (upsert) */
+export async function saveTourUpsert(tour, file) {
+  const formData = new FormData();
+
+  formData.append(
+    "tour",
+    new Blob([JSON.stringify(tour)], { type: "application/json" })
+  );
+
+  if (file) formData.append("file", file);
+
+  return fetchJsonAuth(`${API_BASE}/admin/tour/save`, {
+    method: "POST",
+    body: formData,
+  });
+}
+
+/* DELETE auth */
+export async function deleteTour(tourId) {
+  const res = await fetch(`${API_BASE}/admin/tour/${tourId}`, {
+    method: "DELETE",
+    headers: { ...getAuthHeaders() },
+  });
+
+  if (!res.ok) throw new Error(await res.text());
+  return true;
+}

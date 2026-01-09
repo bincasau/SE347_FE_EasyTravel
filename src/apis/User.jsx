@@ -22,10 +22,10 @@ export async function getAllUsers(page = 0, size = 20) {
 
 /**
  * @param {Object} params
- * @param {number} params.page   UI page (1-based)
+ * @param {number} params.page 
  * @param {number} params.size
- * @param {string} params.role   ADMIN | TOUR_GUIDE | HOTEL_MANAGER | CUSTOMER | ALL
- * @param {string} params.status ACTIVE | INACTIVE | ALL
+ * @param {string} params.role  
+ * @param {string} params.status 
  */
 export async function getUsers({
   page = 1,
@@ -63,7 +63,6 @@ export async function getUsers({
     method: "GET",
     headers: getAuthHeaders(),
   });
-
   if (!res.ok) {
     throw new Error(await res.text());
   }

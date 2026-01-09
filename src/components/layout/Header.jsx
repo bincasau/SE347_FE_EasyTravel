@@ -532,7 +532,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
                   onClick={handleLogout}
                   className="min-w-[110px] border border-red-400 text-red-500 px-3 py-1.5 rounded-full hover:bg-red-50"
                 >
-                  {t("Log Out")}
+                  {t("header.logout")}
                 </button>
               </div>
             ) : (
@@ -541,13 +541,13 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
                   onClick={() => onOpenLogin()}
                   className="border border-orange-500 text-orange-600 px-4 py-2 rounded-full hover:bg-orange-50"
                 >
-                  {t("Login")}
+                  {t("header.login")}
                 </button>
                 <button
                   onClick={() => onOpenSignup()}
                   className="bg-orange-500 text-white px-5 py-2 rounded-full hover:bg-orange-400 shadow"
                 >
-                  {t("Sign Up")}
+                  {t("header.signup")}
                 </button>
               </>
             )}

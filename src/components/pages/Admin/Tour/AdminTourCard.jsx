@@ -1,3 +1,5 @@
+// src/components/admin/AdminTourCard.jsx (hoặc đúng path bạn đang dùng)
+import { useNavigate } from "react-router-dom";
 import {
   CalendarDaysIcon,
   UsersIcon,
@@ -6,12 +8,16 @@ import {
   ClockIcon,
   CurrencyDollarIcon,
 } from "@heroicons/react/24/outline";
+import { deleteTour } from "@/apis/Tour";
 
 const S3_TOUR_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/tour";
 
 export default function AdminTourCard({ tour, onEdit, onRemove }) {
+  const navigate = useNavigate();
+
   const {
+    tourId,
     title,
     mainImage,
     startDate,
@@ -31,6 +37,25 @@ export default function AdminTourCard({ tour, onEdit, onRemove }) {
   const imageUrl = mainImage?.startsWith("http")
     ? mainImage
     : `${S3_TOUR_BASE}/${mainImage}`;
+
+
+  const handleEdit = () => {
+    navigate(`/admin/tours/edit/${tourId}`);
+    if (typeof onEdit === "function") onEdit(tour);
+  };
+
+  // remove dùng API deleteTour + confirm
+  const handleRemove = async () => {
+    const ok = window.confirm("Bạn có chắc chắn muốn xóa tour này không?");
+    if (!ok) return;
+
+    try {
+      await deleteTour(Number(tourId));
+      if (typeof onRemove === "function") onRemove(tour);
+    } catch (e) {
+      alert(e?.message || "Xóa thất bại");
+    }
+  };
 
   return (
     <div className="flex items-center gap-8 bg-white p-6 rounded-2xl shadow-md w-full">
@@ -103,7 +128,7 @@ export default function AdminTourCard({ tour, onEdit, onRemove }) {
               <CurrencyDollarIcon className="w-5 h-5 text-orange-400 mt-0.5" />
               <p>
                 <span className="font-semibold">Adult:</span>{" "}
-                {priceAdult.toLocaleString()} đ
+                {Number(priceAdult || 0).toLocaleString()} đ
               </p>
             </div>
 
@@ -111,7 +136,7 @@ export default function AdminTourCard({ tour, onEdit, onRemove }) {
               <CurrencyDollarIcon className="w-5 h-5 text-orange-400 mt-0.5" />
               <p>
                 <span className="font-semibold">Child:</span>{" "}
-                {priceChild?.toLocaleString()} đ
+                {Number(priceChild || 0).toLocaleString()} đ
               </p>
             </div>
           </div>
@@ -123,19 +148,19 @@ export default function AdminTourCard({ tour, onEdit, onRemove }) {
         <div className="text-sm text-gray-700">
           from{" "}
           <span className="text-xl font-bold text-gray-900">
-            {finalPriceAdult.toLocaleString()} đ
+            {Number(finalPriceAdult || 0).toLocaleString()} đ
           </span>
         </div>
 
         <button
-          onClick={onEdit}
+          onClick={handleEdit}
           className="border border-orange-500 text-orange-500 px-8 py-2 rounded-full hover:bg-orange-50 transition font-medium"
         >
           Edit
         </button>
 
         <button
-          onClick={onRemove}
+          onClick={handleRemove}
           className="bg-orange-500 text-white px-8 py-2 rounded-full hover:bg-orange-600 transition font-medium"
         >
           Remove

@@ -76,7 +76,6 @@ export default function UserManagement() {
 
   useEffect(() => {
     loadUsers(currentPage, roleFilter);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, roleFilter]);
 
   const handlePageChange = (pageUI) => {

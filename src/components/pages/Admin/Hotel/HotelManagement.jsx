@@ -1,22 +1,25 @@
 import { useEffect, useState } from "react";
-import { getHotels } from "@/apis/Hotel"; 
+import { Link, useSearchParams } from "react-router-dom";
+import { getHotels } from "@/apis/Hotel";
 import AdminHotelCard from "@/components/pages/Admin/Hotel/AdminHotelCard";
+import Pagination from "@/utils/Pagination";
 
 export default function HotelManagement() {
   const [hotels, setHotels] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const [page, setPage] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pageFromUrl = Number(searchParams.get("page")) || 1;
+
+  const [page, setPage] = useState(pageFromUrl - 1);
   const [totalPages, setTotalPages] = useState(1);
 
-  // Gọi API lấy danh sách có phân trang
   async function loadHotels(currentPage = 0) {
     setLoading(true);
-
     try {
       const data = await getHotels({
         page: currentPage,
-        size: 5, // mỗi trang 5 khách sạn
+        size: 5,
         sort: "hotelId,asc",
       });
 
@@ -26,20 +29,16 @@ export default function HotelManagement() {
     } catch (error) {
       console.error("Error loading hotels:", error);
     }
-
     setLoading(false);
   }
 
   useEffect(() => {
-    loadHotels(page);
-  }, []);
+    loadHotels(pageFromUrl - 1);
+  }, [pageFromUrl]);
 
-  const goPrev = () => {
-    if (page > 0) loadHotels(page - 1);
-  };
 
-  const goNext = () => {
-    if (page < totalPages - 1) loadHotels(page + 1);
+  const handlePageChange = (p) => {
+    setSearchParams({ page: p });
   };
 
   return (
@@ -48,9 +47,11 @@ export default function HotelManagement() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">Hotel management</h1>
 
-        <button className="px-5 py-2 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition">
-          + Add Hotel
-        </button>
+        <Link to="/admin/hotels/add">
+          <button className="px-5 py-2 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition">
+            + Add Hotel
+          </button>
+        </Link>
       </div>
 
       {/* LIST */}
@@ -72,33 +73,14 @@ export default function HotelManagement() {
       )}
 
       {/* PAGINATION */}
-      <div className="flex justify-center items-center gap-3 mt-8">
-        <button
-          onClick={goPrev}
-          disabled={page === 0}
-          className={`px-4 py-2 border rounded-full ${
-            page === 0 ? "opacity-40 cursor-not-allowed" : "hover:bg-gray-100"
-          }`}
-        >
-          Prev
-        </button>
-
-        <span className="font-medium">
-          Page {page + 1} / {totalPages}
-        </span>
-
-        <button
-          onClick={goNext}
-          disabled={page >= totalPages - 1}
-          className={`px-4 py-2 border rounded-full ${
-            page >= totalPages - 1
-              ? "opacity-40 cursor-not-allowed"
-              : "hover:bg-gray-100"
-          }`}
-        >
-          Next
-        </button>
-      </div>
+      {totalPages > 1 && (
+        <Pagination
+          totalPages={totalPages}
+          currentPage={page + 1} 
+          visiblePages={null}
+          onPageChange={handlePageChange} 
+        />
+      )}
     </div>
   );
 }

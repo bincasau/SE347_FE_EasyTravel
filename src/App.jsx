@@ -27,8 +27,12 @@ import TourScheduleDetail from "./pages/TourGuide/TourScheduleDetail";
 //  ADMIN
 import AdminUserManagementPage from "./pages/Admin/UserManagementPage";
 import AdminTourManagementPage from "./pages/Admin/TourManagementPage";
+import AdminTourUpsertPage from "./pages/Admin/AdminTourUpsertPage";
 import AdminHotelManagementPage from "./pages/Admin/HotelManagementPage";
+import AddHotel from "./components/pages/Admin/Hotel/AddHotel";
+import UpdateHotel from "./components/pages/Admin/Hotel/UpdateHotel";
 import AdminBlogManagementPage from "./pages/Admin/BlogManagementPage";
+import AdminBlogUpsertPage from "./pages/Admin/AdminBlogUpsertPage";
 
 // ✅ HOTEL MANAGER
 import AddRoom from "./pages/HotelManager/AddRoom";
@@ -212,10 +216,42 @@ export default function App() {
             }
           />
           <Route
+            path="/Admin/Tours/new"
+            element={
+              <RequireRole role="ADMIN">
+                <AdminTourUpsertPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/Admin/Tours/edit/:id"
+            element={
+              <RequireRole role="ADMIN">
+                <AdminTourUpsertPage />
+              </RequireRole>
+            }
+          />
+          <Route
             path="/Admin/hotels"
             element={
               <RequireRole role="ADMIN">
                 <AdminHotelManagementPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/Admin/hotels/add"
+            element={
+              <RequireRole role="ADMIN">
+                <AddHotel />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/Admin/hotels/update/:id"
+            element={
+              <RequireRole role="ADMIN">
+                <UpdateHotel />
               </RequireRole>
             }
           />
@@ -232,6 +268,22 @@ export default function App() {
             element={
               <RequireRole role="ADMIN">
                 <AdminBlogManagementPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/admin/blogs/new"
+            element={
+              <RequireRole role="ADMIN">
+                <AdminBlogUpsertPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/admin/blogs/edit/:id"
+            element={
+              <RequireRole role="ADMIN">
+                <AdminBlogUpsertPage />
               </RequireRole>
             }
           />
