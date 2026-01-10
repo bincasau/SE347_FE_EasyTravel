@@ -3,6 +3,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getTourFullById, saveTourUpsert, deleteTour } from "@/apis/Tour";
 
+import TourCurrentInfoCard from "@/components/pages/admin/Tour/TourCurrentInfoCard";
+import TourItineraryEditor from "@/components/pages/admin/Tour/TourItineraryEditor";
+import ExtraImagesManager from "@/components/pages/admin/Common/ExtraImagesManager";
+
 const S3_TOUR_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/tour";
 
@@ -22,7 +26,7 @@ function buildEmptyForm() {
     availableSeats: 0,
     limitSeats: 0,
     mainImage: "",
-    status: "Pending", // backend: Pending | Passed | Activated
+    status: "Pending",
   };
 }
 
@@ -121,19 +125,14 @@ export default function AdminTourUpsert() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-
   const [err, setErr] = useState("");
 
   const [form, setForm] = useState(buildEmptyForm());
   const [fieldErrors, setFieldErrors] = useState(() =>
     validateForm(buildEmptyForm())
   );
-
   const [touched, setTouched] = useState({});
   const [submitted, setSubmitted] = useState(false);
-
-  const [itineraries, setItineraries] = useState([]);
-  const [images, setImages] = useState([]);
 
   const [pickedFile, setPickedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState("");
@@ -167,8 +166,6 @@ export default function AdminTourUpsert() {
     setTouched({});
     setSubmitted(false);
 
-    setItineraries([]);
-    setImages([]);
     setPickedFile(null);
     setPreviewUrl("");
     setErr("");
@@ -201,8 +198,6 @@ export default function AdminTourUpsert() {
         setTouched({});
         setSubmitted(false);
 
-        setItineraries(data.itineraries ?? []);
-        setImages(data.images ?? []);
         setPickedFile(null);
         setPreviewUrl("");
       })
@@ -340,14 +335,13 @@ export default function AdminTourUpsert() {
       const savedId =
         saved?.tourId ?? saved?.id ?? (isEdit ? Number(id) : null);
 
-      // EDIT: lưu xong quay lại trang edit (đúng route bạn dùng)
       if (isEdit) {
         if (savedId) navigate(`/admin/tours/edit/${savedId}`);
         else navigate("/admin/tours");
         return;
       }
 
-      // CREATE: mở modal success để chọn
+      // create: mở modal success
       setOpenSuccess(true);
     } catch (e2) {
       setErr(e2?.message || "Lưu thất bại.");
@@ -450,7 +444,6 @@ export default function AdminTourUpsert() {
             </button>
           ) : null}
 
-          {/* back: đi thẳng về list, không dùng -1 để khỏi phải bấm 2 lần */}
           <button
             type="button"
             onClick={() => navigate("/admin/tours")}
@@ -475,7 +468,7 @@ export default function AdminTourUpsert() {
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* form */}
+          {/* LEFT: form */}
           <form
             onSubmit={onSubmit}
             className="lg:col-span-2 p-5 rounded-2xl border bg-white space-y-5"
@@ -750,97 +743,28 @@ export default function AdminTourUpsert() {
             </div>
           </form>
 
-          {/* right side */}
+          {/* RIGHT: 3 components */}
           <div className="lg:col-span-1 space-y-6">
-            <div className="p-5 rounded-2xl border bg-white">
-              <div className="font-semibold mb-3">Thông tin hiện tại</div>
+            <TourCurrentInfoCard
+              title={form.title}
+              imageUrl={currentMainImageUrl}
+              finalPriceAdult={finalPriceAdult}
+              startDate={form.startDate}
+              endDate={form.endDate}
+              durationDays={toNumberSafe(form.durationDays, 1)}
+              availableSeats={toNumberSafe(form.availableSeats, 0)}
+              limitSeats={toNumberSafe(form.limitSeats, 0)}
+              statusLabel={statusLabel}
+            />
 
-              <div className="text-sm text-gray-700 space-y-3">
-                <div>
-                  <div className="text-gray-500">Trạng thái</div>
-                  <div className="font-medium">{statusLabel}</div>
-                </div>
+            <TourItineraryEditor tourId={id} />
 
-                <div>
-                  <div className="text-gray-500">Giá người lớn sau giảm</div>
-                  <div className="font-medium">{finalPriceAdult}</div>
-                </div>
-
-                <div>
-                  <div className="text-gray-500">Tên ảnh đại diện</div>
-                  <div className="font-medium break-words">
-                    {form.mainImage || "-"}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-5 rounded-2xl border bg-white">
-              <div className="font-semibold mb-3">
-                Lịch trình ({itineraries.length})
-              </div>
-
-              {itineraries.length === 0 ? (
-                <div className="text-sm text-gray-500">Chưa có dữ liệu</div>
-              ) : (
-                <div className="space-y-3">
-                  {itineraries
-                    .slice()
-                    .sort((a, b) => (a.dayNumber ?? 0) - (b.dayNumber ?? 0))
-                    .map((it) => (
-                      <div
-                        key={it.itineraryId ?? `${it.dayNumber}-${it.title}`}
-                        className="border rounded-xl p-3"
-                      >
-                        <div className="text-xs text-gray-500 mb-1">
-                          Ngày {it.dayNumber}
-                        </div>
-                        <div className="font-medium leading-snug">
-                          {it.title}
-                        </div>
-                        <div className="text-sm text-gray-600 mt-2 line-clamp-4">
-                          {it.activities}
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )}
-            </div>
-
-            <div className="p-5 rounded-2xl border bg-white">
-              <div className="font-semibold mb-3">
-                Ảnh tour ({images.length})
-              </div>
-
-              {images.length === 0 ? (
-                <div className="text-sm text-gray-500">Chưa có dữ liệu</div>
-              ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  {images.map((img) => {
-                    const src = img.url?.startsWith("http")
-                      ? img.url
-                      : `${S3_TOUR_BASE}/${img.url}`;
-                    return (
-                      <div
-                        key={img.imageId ?? img.url}
-                        className="border rounded-xl overflow-hidden"
-                      >
-                        <img
-                          src={src}
-                          alt={img.altText || img.title || "Ảnh tour"}
-                          className="w-full h-24 object-cover bg-gray-100"
-                        />
-                        <div className="p-2">
-                          <div className="text-xs font-medium line-clamp-1">
-                            {img.title || "Ảnh"}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            <ExtraImagesManager
+              type="tour"
+              ownerId={id}
+              baseUrl={S3_TOUR_BASE}
+              readOnly={!isEdit}
+            />
           </div>
         </div>
       )}

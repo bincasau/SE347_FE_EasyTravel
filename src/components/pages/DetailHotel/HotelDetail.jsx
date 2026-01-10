@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchHotelById, fetchHotelImages } from "@/apis/hotel";
+import { getHotelById, fetchHotelImages } from "@/apis/hotel";
 
 const HOTEL_IMAGE_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/hotel";
@@ -22,7 +22,7 @@ const HotelDetail = ({ hotelId }) => {
 
     const fetchData = async () => {
       try {
-        const hotelData = await fetchHotelById(hotelId);
+        const hotelData = await getHotelById(hotelId);
         const imageList = await fetchHotelImages(hotelId);
 
         setHotel(hotelData);

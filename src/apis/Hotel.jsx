@@ -93,14 +93,6 @@ export async function getAllHotels(sort = "hotelId,asc") {
   return data._embedded?.hotels ?? [];
 }
 
-// Lấy thông tin chi tiết khách sạn theo id
-export const fetchHotelById = async (hotelId) => {
-  const res = await fetch(`${API_BASE}/hotels/${hotelId}`);
-  if (!res.ok) {
-    throw new Error("Không lấy được thông tin khách sạn");
-  }
-  return res.json();
-};
 
 // Lấy danh sách ảnh của khách sạn
 export const fetchHotelImages = async (hotelId) => {

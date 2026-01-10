@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { updateHotel } from "@/apis/Hotel";
+import { useNavigate, useParams } from "react-router-dom";
+import { updateHotel, getHotelById } from "@/apis/Hotel";
 
 const S3_HOTEL_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/hotel";
 
 export default function AdminHotelEdit() {
-  const { id } = useParams(); 
+  const { id } = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
-  const initialHotel = location.state || null;
+
+  const [initialHotel, setInitialHotel] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const [form, setForm] = useState({
     name: "",
@@ -29,30 +30,55 @@ export default function AdminHotelEdit() {
   const [err, setErr] = useState("");
 
   useEffect(() => {
-    if (!initialHotel) return;
+    let mounted = true;
 
-    setForm({
-      name: initialHotel.name || "",
-      address: initialHotel.address || "",
-      description: initialHotel.description || "",
-      email: initialHotel.email || "",
-      phone_number: initialHotel.phone_number || "",
-      manager_id:
-        initialHotel.manager_id === null ||
-        initialHotel.manager_id === undefined
-          ? ""
-          : String(initialHotel.manager_id),
-      min_price:
-        initialHotel.min_price === null || initialHotel.min_price === undefined
-          ? ""
-          : String(initialHotel.min_price),
-    });
+    (async () => {
+      try {
+        setLoading(true);
+        setErr("");
 
-    const img = initialHotel.main_image || "";
-    if (img) {
-      setCurrentImage(img.startsWith("http") ? img : `${S3_HOTEL_BASE}/${img}`);
-    }
-  }, [initialHotel]);
+        const data = await getHotelById(id);
+        if (!mounted) return;
+
+        setInitialHotel(data);
+
+        setForm({
+          name: data?.name || "",
+          address: data?.address || "",
+          description: data?.description || "",
+          email: data?.email || "",
+          phone_number: data?.phoneNumber || data?.phone_number || "",
+          manager_id:
+            data?.managerId ?? data?.manager_id ?? data?.managerID ?? ""
+              ? String(data?.managerId ?? data?.manager_id ?? data?.managerID)
+              : "",
+          min_price:
+            data?.minPrice ?? data?.min_price ?? null
+              ? String(data?.minPrice ?? data?.min_price)
+              : "",
+        });
+
+        const img = data?.mainImage || data?.main_image || "";
+        if (img) {
+          setCurrentImage(
+            img.startsWith("http") ? img : `${S3_HOTEL_BASE}/${img}`
+          );
+        } else {
+          setCurrentImage("");
+        }
+      } catch (e) {
+        if (!mounted) return;
+        setErr(e?.message || "Không tải được dữ liệu hotel");
+      } finally {
+        if (!mounted) return;
+        setLoading(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [id]);
 
   useEffect(() => {
     if (!file) return setPreview("");
@@ -87,7 +113,6 @@ export default function AdminHotelEdit() {
       setSaving(true);
 
       const payload = {
-        // giữ đúng key BE/DB
         name: form.name.trim(),
         address: form.address.trim(),
         description: form.description?.trim() || null,
@@ -106,14 +131,30 @@ export default function AdminHotelEdit() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="p-6">
+        <div className="bg-white rounded-2xl shadow p-6">
+          <h2 className="text-xl font-semibold">Update Hotel #{id}</h2>
+          <p className="mt-2 text-gray-600">Đang tải dữ liệu...</p>
+          <button
+            onClick={() => navigate(-1)}
+            className="mt-4 px-4 py-2 rounded-xl bg-gray-900 text-white"
+          >
+            Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!initialHotel) {
     return (
       <div className="p-6">
         <div className="bg-white rounded-2xl shadow p-6">
-          <h2 className="text-xl font-semibold">Update Hotel</h2>
+          <h2 className="text-xl font-semibold">Update Hotel #{id}</h2>
           <p className="mt-2 text-gray-600">
-            Chưa có dữ liệu hotel. Hãy vào từ trang list và bấm Edit (truyền
-            location.state).
+            {err || "Không có dữ liệu hotel."}
           </p>
           <button
             onClick={() => navigate(-1)}
@@ -147,7 +188,6 @@ export default function AdminHotelEdit() {
         )}
 
         <form onSubmit={onSubmit} className="mt-6 grid grid-cols-12 gap-6">
-          {/* LEFT */}
           <div className="col-span-12 lg:col-span-7 space-y-4">
             <Field label="Name" required>
               <input
@@ -231,7 +271,6 @@ export default function AdminHotelEdit() {
             </div>
           </div>
 
-          {/* RIGHT: image */}
           <div className="col-span-12 lg:col-span-5">
             <div className="rounded-2xl border border-gray-200 p-4">
               <div className="text-sm font-semibold mb-3">Main image</div>
