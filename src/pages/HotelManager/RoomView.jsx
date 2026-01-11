@@ -5,6 +5,18 @@ const S3_ROOM_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/room";
 const FALLBACK_IMAGE = `${S3_ROOM_BASE}/standard_bed.jpg`;
 
+/** ✅ helpers */
+function safeNumber(v, fallback = 0) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function formatVND(v) {
+  const n = safeNumber(v, NaN);
+  if (!Number.isFinite(n) || n <= 0) return "--";
+  return `${n.toLocaleString("vi-VN")}₫`;
+}
+
 export default function RoomView() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -53,10 +65,7 @@ export default function RoomView() {
       ? [image_wc]
       : [];
 
-    const all = [...bedArr, ...wcArr]
-      .map(toAwsUrl)
-      .filter(Boolean);
-
+    const all = [...bedArr, ...wcArr].map(toAwsUrl).filter(Boolean);
     return all.length ? all : [FALLBACK_IMAGE];
   }, [image_bed, image_wc]);
 
@@ -182,7 +191,7 @@ export default function RoomView() {
             <Info label="Room Type" value={room_type} />
             <Info label="Guests" value={number_of_guests} />
             <Info label="Floor" value={floor} />
-            <Info label="Price" value={price ? `$${price}` : "--"} highlight />
+            <Info label="Price" value={formatVND(price)} highlight />
           </div>
 
           {/* DESCRIPTION */}

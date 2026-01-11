@@ -20,6 +20,23 @@ function safeNumber(v, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+// ✅ parse VND input: "7.200.000₫" -> 7200000
+function parseVNDToNumber(v) {
+  if (v === null || v === undefined) return NaN;
+  const s = String(v).trim();
+  if (!s) return NaN;
+  const cleaned = s.replace(/[^\d.-]/g, ""); // keep digits, dot, minus
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : NaN;
+}
+
+// ✅ format: 7200000 -> "7.200.000₫"
+function formatVND(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "--";
+  return `${n.toLocaleString("vi-VN")}₫`;
+}
+
 async function readResponseSmart(res) {
   const ct = res.headers.get("content-type") || "";
   if (ct.includes("application/json")) {
@@ -51,7 +68,9 @@ async function apiFetch(url, { token, method = "GET", body } = {}) {
         : typeof raw === "object"
         ? JSON.stringify(raw)
         : "";
-    const err = new Error(`${method} ${url} failed (${res.status})${msg ? ` - ${msg}` : ""}`);
+    const err = new Error(
+      `${method} ${url} failed (${res.status})${msg ? ` - ${msg}` : ""}`
+    );
     err.status = res.status;
     err.raw = raw;
     throw err;
@@ -86,9 +105,9 @@ export default function RoomEdit() {
     room_number: "",
     room_type: "",
     number_of_guests: "",
-    price: "",
+    price: "", // ✅ lưu dạng string số thô để edit
     description: "",
-    status: "AVAILABLE", // UI có thì giữ, BE có thể ignore
+    status: "AVAILABLE",
   });
 
   // ✅ single image (bedFile/wcFile)
@@ -114,8 +133,12 @@ export default function RoomEdit() {
       room_id: String(roomId ?? ""),
       room_number: String(room.room_number ?? room.roomNumber ?? ""),
       room_type: String(room.room_type ?? room.roomType ?? ""),
-      number_of_guests: String(room.number_of_guests ?? room.numberOfGuest ?? ""),
-      price: room.price === null || room.price === undefined ? "" : String(room.price),
+      number_of_guests: String(
+        room.number_of_guests ?? room.numberOfGuest ?? ""
+      ),
+      // ✅ giữ raw number string để edit
+      price:
+        room.price === null || room.price === undefined ? "" : String(room.price),
       description: String(room.description ?? room.desc ?? ""),
       status: String(room.status ?? "AVAILABLE"),
     };
@@ -143,8 +166,18 @@ export default function RoomEdit() {
   }, [room]);
 
   /** ---------- handlers ---------- */
-  const setField = (key, value) => setForm((p) => ({ ...p, [key]: value ?? "" }));
+  const setField = (key, value) =>
+    setForm((p) => ({ ...p, [key]: value ?? "" }));
+
   const handleChange = (e) => setField(e.target.name, e.target.value);
+
+  // ✅ price handler: cho phép paste "7.200.000₫" -> tự làm sạch
+  const handlePriceChange = (e) => {
+    const v = e.target.value ?? "";
+    // cho gõ bình thường, nhưng nếu có ký tự lạ thì làm sạch
+    const cleaned = String(v).replace(/[^\d]/g, "");
+    setField("price", cleaned);
+  };
 
   const pickBed = () => isEditing && bedInputRef.current?.click();
   const pickWc = () => isEditing && wcInputRef.current?.click();
@@ -152,7 +185,6 @@ export default function RoomEdit() {
   const setSingleImage = (file, setFile, previewSetter) => {
     if (!file) {
       setFile(null);
-      // preview giữ ảnh cũ, không reset ở đây
       return;
     }
     setFile(file);
@@ -176,7 +208,6 @@ export default function RoomEdit() {
   const onCancel = () => {
     if (!original) return setIsEditing(false);
 
-    // revoke blob previews
     if (bedPreview?.startsWith("blob:")) URL.revokeObjectURL(bedPreview);
     if (wcPreview?.startsWith("blob:")) URL.revokeObjectURL(wcPreview);
 
@@ -194,7 +225,8 @@ export default function RoomEdit() {
     if (!form.room_id) return "Missing roomId (state room bị thiếu id)";
     if (!String(form.room_number).trim()) return "Room number is required.";
     if (!String(form.room_type).trim()) return "Room type is required.";
-    if (!String(form.number_of_guests).trim()) return "Number of guests is required.";
+    if (!String(form.number_of_guests).trim())
+      return "Number of guests is required.";
     if (!String(form.price).trim()) return "Price is required.";
     return null;
   };
@@ -204,16 +236,17 @@ export default function RoomEdit() {
     const err = validate();
     if (err) return alert(err);
 
+    const priceNum = parseVNDToNumber(form.price);
+    if (!Number.isFinite(priceNum)) return alert("Price invalid.");
+
     // ✅ JSON gửi vào @RequestPart("room") phải match entity Room
     const roomPayload = {
       roomId: safeNumber(form.room_id, 0),
       roomNumber: safeNumber(form.room_number, 0),
       roomType: String(form.room_type).trim(),
       numberOfGuest: safeNumber(form.number_of_guests, 0),
-      price: safeNumber(form.price, 0),
+      price: priceNum, // ✅ gửi số
       desc: String(form.description || "").trim(),
-      // ✅ hotel bắt buộc trong entity, nên gửi lại nếu có
-      // nếu room state có hotelId thì dùng, không thì bỏ (BE có thể tự map theo roomId)
       ...(room?.hotel?.hotelId
         ? { hotel: { hotelId: Number(room.hotel.hotelId) } }
         : room?.hotelId
@@ -222,17 +255,17 @@ export default function RoomEdit() {
     };
 
     const fd = new FormData();
-    fd.append("room", new Blob([JSON.stringify(roomPayload)], { type: "application/json" }));
+    fd.append(
+      "room",
+      new Blob([JSON.stringify(roomPayload)], { type: "application/json" })
+    );
 
-    // ✅ đúng tên backend
     if (bedFile) fd.append("bedFile", bedFile);
     if (wcFile) fd.append("wcFile", wcFile);
 
     try {
       setSubmitting(true);
 
-      // ✅ đa số BE dùng POST để saveOrUpdate (như bạn gửi screenshot: @PostMapping("/rooms"))
-      // Nếu BE bạn là PUT mapping thì đổi method: "PUT"
       await apiFetch(UPDATE_ROOM_URL, {
         token,
         method: "POST",
@@ -241,9 +274,12 @@ export default function RoomEdit() {
 
       alert("Updated room success!");
 
-      // cập nhật original
-      const bedOld = bedPreview?.startsWith("blob:") ? bedPreview : (original?.bedOld || "");
-      const wcOld = wcPreview?.startsWith("blob:") ? wcPreview : (original?.wcOld || "");
+      const bedOld = bedPreview?.startsWith("blob:")
+        ? bedPreview
+        : original?.bedOld || "";
+      const wcOld = wcPreview?.startsWith("blob:")
+        ? wcPreview
+        : original?.wcOld || "";
 
       setOriginal({
         form: { ...form },
@@ -273,6 +309,12 @@ export default function RoomEdit() {
   const inputBase =
     "w-full border rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-200";
   const inputReadonly = isEditing ? "" : "bg-gray-50 text-gray-700 border-gray-200";
+
+  // ✅ display text cho read-only
+  const priceDisplay = useMemo(() => {
+    const n = parseVNDToNumber(form.price);
+    return Number.isFinite(n) ? formatVND(n) : "--";
+  }, [form.price]);
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-gray-50">
@@ -349,14 +391,29 @@ export default function RoomEdit() {
             </Field>
 
             <Field label="Price" required>
-              <input
-                name="price"
-                value={form.price}
-                onChange={handleChange}
-                className={`${inputBase} ${inputReadonly}`}
-                disabled={!isEditing}
-                inputMode="decimal"
-              />
+              {/* ✅ Edit: input raw number; Read-only: show VND */}
+              {isEditing ? (
+                <input
+                  name="price"
+                  value={form.price}
+                  onChange={handlePriceChange}
+                  className={`${inputBase} ${inputReadonly}`}
+                  disabled={!isEditing}
+                  inputMode="numeric"
+                  placeholder="VD: 7200000"
+                />
+              ) : (
+                <div className={`${inputBase} ${inputReadonly} flex items-center`}>
+                  <span className="font-semibold text-orange-600">
+                    {priceDisplay}
+                  </span>
+                </div>
+              )}
+              {isEditing ? (
+                <div className="text-xs text-gray-500 mt-1">
+                  Preview: <span className="font-medium">{priceDisplay}</span>
+                </div>
+              ) : null}
             </Field>
 
             <Field label="Status">
@@ -390,7 +447,7 @@ export default function RoomEdit() {
             <SingleImage
               title="Bed Image (bedFile)"
               preview={bedPreview || FALLBACK_IMAGE}
-              onPick={pickBed}
+              onPick={() => isEditing && bedInputRef.current?.click()}
               onClear={clearBed}
               inputRef={bedInputRef}
               onChange={(e) => {
@@ -405,7 +462,7 @@ export default function RoomEdit() {
             <SingleImage
               title="WC Image (wcFile)"
               preview={wcPreview || FALLBACK_IMAGE}
-              onPick={pickWc}
+              onPick={() => isEditing && wcInputRef.current?.click()}
               onClear={clearWc}
               inputRef={wcInputRef}
               onChange={(e) => {
@@ -470,7 +527,15 @@ function Field({ label, required, children, className = "" }) {
   );
 }
 
-function SingleImage({ title, preview, onPick, onClear, inputRef, onChange, disabled }) {
+function SingleImage({
+  title,
+  preview,
+  onPick,
+  onClear,
+  inputRef,
+  onChange,
+  disabled,
+}) {
   return (
     <div className="bg-gray-50 border rounded-xl p-4">
       <div className="flex items-center justify-between gap-2">
@@ -506,7 +571,13 @@ function SingleImage({ title, preview, onPick, onClear, inputRef, onChange, disa
           </button>
         </div>
 
-        <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={onChange} />
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={onChange}
+        />
       </div>
 
       <div className="mt-3">

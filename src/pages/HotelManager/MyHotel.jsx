@@ -9,23 +9,29 @@ const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=1200&q=80&auto=format&fit=crop";
 
 const API_MY_HOTEL = "http://localhost:8080/hotel_manager/my-hotel";
-const API_UPDATE_HOTEL_MANAGER = "http://localhost:8080/hotel_manager/update-hotel";
+const API_UPDATE_HOTEL_MANAGER =
+  "http://localhost:8080/hotel_manager/update-hotel";
 
-/**
- * ✅ Theo screenshot backend:
- * @PostMapping("/auth/upload")
- * -> nhưng log của bạn có "/image/auth/upload"
- * => bạn đang mount controller dưới "/image"
- */
+// upload: POST /image/auth/upload?type=hotel&id=7
 const API_UPLOAD_EXTRA = "http://localhost:8080/image/auth/upload";
+
+// list: GET /hotels/7/images
+const API_HOTEL_IMAGES = (hotelId) =>
+  `http://localhost:8080/hotels/${hotelId}/images`;
+
+// delete: DELETE /image/auth/{imageId}
+const API_DELETE_IMAGE = (imageId) =>
+  `http://localhost:8080/image/auth/${imageId}`;
 
 export default function MyHotel() {
   const [hotel, setHotel] = useState(null);
   const [draft, setDraft] = useState(null);
 
+  const [images, setImages] = useState([]); // [{imageId, url, ...}]
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
@@ -33,15 +39,26 @@ export default function MyHotel() {
   const [isEditing, setIsEditing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
 
+  // upload modal
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadFile, setUploadFile] = useState(null);
 
+  // delete confirm
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTarget, setConfirmTarget] = useState(null); // image object
+
+  // cache bust for S3 images
   const [cacheBuster, setCacheBuster] = useState(Date.now());
 
   const token =
     localStorage.getItem("jwt") ||
     localStorage.getItem("token") ||
     localStorage.getItem("accessToken");
+
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(""), 2000);
+  };
 
   const normalizeHotel = (raw) => {
     if (!raw) return null;
@@ -56,7 +73,6 @@ export default function MyHotel() {
       min_price: raw.min_price ?? raw.minPrice ?? null,
       created_at: raw.created_at ?? raw.createdAt ?? null,
       updated_at: raw.updated_at ?? raw.updatedAt ?? null,
-      images: Array.isArray(raw.images) ? raw.images : [], // nếu BE có trả
     };
   };
 
@@ -76,11 +92,6 @@ export default function MyHotel() {
           : Number(h.min_price),
       mainImage: h.main_image ?? "",
     };
-  };
-
-  const showToast = (msg) => {
-    setToast(msg);
-    setTimeout(() => setToast(""), 2000);
   };
 
   const fetchMyHotel = async () => {
@@ -108,12 +119,80 @@ export default function MyHotel() {
     return n;
   };
 
+  /**
+   * ✅ fetch images từ endpoint bạn đang mở trên browser
+   * GET /hotels/{id}/images
+   *
+   * Response có thể là HAL:
+   * { _embedded: { images: [...] } }
+   * hoặc list luôn: [...]
+   */
+  const fetchHotelImages = async (hotelId) => {
+    const res = await fetch(API_HOTEL_IMAGES(hotelId), {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+
+    if (!res.ok) {
+      let msg = `Fetch images failed: ${res.status}`;
+      try {
+        const e = await res.json();
+        msg = e?.message || e?.error || msg;
+      } catch {}
+      throw new Error(msg);
+    }
+
+    const data = await res.json();
+
+    // HAL format or raw array
+    let list = [];
+    if (Array.isArray(data)) {
+      list = data;
+    } else if (data?._embedded) {
+      // guess key name
+      const embeddedKey =
+        Object.keys(data._embedded)[0] || "images";
+      list = data._embedded?.[embeddedKey] || [];
+    } else {
+      list = [];
+    }
+
+    // normalize item
+    const normalized = list
+      .map((it) => ({
+        imageId: it.imageId ?? it.id,
+        url: it.url ?? it.key ?? "",
+        title: it.title ?? null,
+        altText: it.altText ?? null,
+        createdAt: it.createdAt ?? null,
+        _links: it._links ?? null,
+      }))
+      .filter((x) => x.imageId && x.url);
+
+    // sort mới nhất lên đầu (nếu có createdAt)
+    normalized.sort((a, b) => {
+      const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return tb - ta;
+    });
+
+    setImages(normalized);
+    return normalized;
+  };
+
   useEffect(() => {
     (async () => {
       try {
         setLoading(true);
         setError("");
-        await fetchMyHotel();
+
+        const h = await fetchMyHotel();
+        if (h?.hotel_id) {
+          await fetchHotelImages(h.hotel_id);
+        }
       } catch (e) {
         setError(e?.message || "Fetch failed");
       } finally {
@@ -139,33 +218,25 @@ export default function MyHotel() {
   }, [hotel]);
 
   const mainImageUrl = hotel?.main_image
-    ? `${HOTEL_IMAGE_BASE}/${hotel.main_image}`
+    ? `${HOTEL_IMAGE_BASE}/${hotel.main_image}?t=${cacheBuster}`
     : FALLBACK_IMAGE;
 
-  /**
-   * ⚠️ Cái này chỉ đúng nếu S3 của bạn THỰC SỰ có file theo pattern:
-   * hotel_{id}_img_{1..3}.jpg
-   * Nhưng hiện bạn upload đang ra: hotel_extra_10_....jpg (random)
-   * => Pattern này sẽ KHÔNG thấy ảnh mới upload.
-   *
-   * Tạm thời vẫn giữ 3 ảnh hardcode để UI có cái hiển thị.
-   * Muốn thấy ảnh upload mới: cần API list images trả về key/url.
-   */
-  const extraImageUrls = useMemo(() => {
-    const id = hotel?.hotel_id;
-    if (!id) return [];
-    return [1, 2, 3].map(
-      (n) => `${HOTEL_EXTRA_IMAGE_BASE}/hotel_${id}_img_${n}.jpg?t=${cacheBuster}`
-    );
-  }, [hotel?.hotel_id, cacheBuster]);
-
-  const onDraftChange = (key, value) => setDraft((prev) => ({ ...prev, [key]: value }));
+  const gallery = useMemo(() => {
+    // convert url key -> full S3 url
+    return images.map((img) => ({
+      ...img,
+      src: `${HOTEL_EXTRA_IMAGE_BASE}/${img.url}?t=${cacheBuster}`,
+    }));
+  }, [images, cacheBuster]);
 
   const updateHotelByManager = async () => {
     const fd = new FormData();
     const payload = toBackendHotelPayload(draft);
 
-    fd.append("hotel", new Blob([JSON.stringify(payload)], { type: "application/json" }));
+    fd.append(
+      "hotel",
+      new Blob([JSON.stringify(payload)], { type: "application/json" })
+    );
 
     const res = await fetch(API_UPDATE_HOTEL_MANAGER, {
       method: "PUT",
@@ -195,10 +266,8 @@ export default function MyHotel() {
   };
 
   /**
-   * ✅ UPLOAD ĐÚNG THEO BACKEND CHỤP:
-   * POST /image/auth/upload
-   * form-data: file
-   * query: type=hotel&id=<hotelId>
+   * ✅ POST /image/auth/upload?type=hotel&id=7
+   * body: form-data file
    */
   const uploadExtraImage = async (file) => {
     const id = hotel?.hotel_id;
@@ -217,7 +286,6 @@ export default function MyHotel() {
       method: "POST",
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        // ❌ KHÔNG set Content-Type khi dùng FormData
       },
       body: fd,
     });
@@ -231,12 +299,35 @@ export default function MyHotel() {
       throw new Error(msg);
     }
 
-    // nếu BE có trả json thì đọc (optional)
+    // optional json
     try {
       return await res.json();
     } catch {
       return null;
     }
+  };
+
+  /**
+   * ✅ DELETE /image/auth/{imageId}
+   */
+  const deleteImage = async (imageId) => {
+    const res = await fetch(API_DELETE_IMAGE(imageId), {
+      method: "DELETE",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+
+    if (!res.ok) {
+      let msg = `Delete failed: ${res.status}`;
+      try {
+        const e = await res.json();
+        msg = e?.message || e?.error || msg;
+      } catch {}
+      throw new Error(msg);
+    }
+
+    return true;
   };
 
   const onClickEdit = () => {
@@ -276,31 +367,49 @@ export default function MyHotel() {
       setUploading(true);
       setError("");
 
-      const file = uploadFile;
-      await uploadExtraImage(file);
+      await uploadExtraImage(uploadFile);
 
       setUploadOpen(false);
       setUploadFile(null);
       showToast("✅ Uploaded");
 
-      // ✅ refresh lại data + cache buster (để 3 ảnh hardcode reload)
-      await fetchMyHotel();
-      setCacheBuster(Date.now());
+      // ✅ reload gallery thật từ BE
+      await fetchHotelImages(hotel.hotel_id);
 
-      /**
-       * ⚠️ Lưu ý quan trọng:
-       * Vì backend đang đặt tên random (hotel_extra_10_....jpg),
-       * nên dù cache buster có đổi thì 3 ảnh hotel_{id}_img_{1..3}.jpg
-       * vẫn không hiện ảnh mới upload.
-       *
-       * Muốn hiện ảnh mới upload ngay:
-       * - Backend cần trả về url/key ảnh vừa upload
-       * - hoặc có API list images theo (type, id)
-       */
+      // ✅ bust cache để S3 show ảnh mới
+      setCacheBuster(Date.now());
     } catch (e) {
       setError(e?.message || "Upload failed");
     } finally {
       setUploading(false);
+    }
+  };
+
+  const onAskDelete = (img) => {
+    setConfirmTarget(img);
+    setConfirmOpen(true);
+  };
+
+  const onConfirmDelete = async () => {
+    if (!confirmTarget?.imageId) return;
+    const id = confirmTarget.imageId;
+
+    try {
+      setDeletingId(id);
+      setError("");
+
+      await deleteImage(id);
+
+      setConfirmOpen(false);
+      setConfirmTarget(null);
+      showToast("✅ Deleted");
+
+      await fetchHotelImages(hotel.hotel_id);
+      setCacheBuster(Date.now());
+    } catch (e) {
+      setError(e?.message || "Delete failed");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -381,10 +490,17 @@ export default function MyHotel() {
               onClick={() => setPreviewUrl(mainImageUrl)}
               onError={(e) => (e.currentTarget.src = FALLBACK_IMAGE)}
             />
+
             <div className="p-5">
-              <div className="text-xl font-semibold text-gray-900">{hotel?.name || "--"}</div>
-              <div className="text-sm text-gray-600 mt-1">{hotel?.address || "--"}</div>
-              <div className="mt-4 text-orange-600 font-bold text-xl">{priceText}</div>
+              <div className="text-xl font-semibold text-gray-900">
+                {hotel?.name || "--"}
+              </div>
+              <div className="text-sm text-gray-600 mt-1">
+                {hotel?.address || "--"}
+              </div>
+              <div className="mt-4 text-orange-600 font-bold text-xl">
+                {priceText}
+              </div>
             </div>
           </div>
 
@@ -392,6 +508,7 @@ export default function MyHotel() {
           <div className="bg-white border rounded-2xl p-5 shadow-sm">
             <div className="flex items-center justify-between mb-3">
               <div className="text-sm font-semibold text-gray-900">Gallery</div>
+
               <button
                 type="button"
                 onClick={onOpenUpload}
@@ -401,31 +518,53 @@ export default function MyHotel() {
               </button>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
-              {extraImageUrls.map((url, idx) => (
-                <button
-                  key={url}
-                  type="button"
-                  onClick={() => setPreviewUrl(url)}
-                  className="rounded-xl overflow-hidden border bg-gray-50 hover:opacity-90"
-                  title={`Ảnh ${idx + 1}`}
-                >
-                  <img
-                    src={url}
-                    alt={`Hotel extra ${idx + 1}`}
-                    className="w-full h-24 object-cover"
-                    onError={(e) => (e.currentTarget.src = FALLBACK_IMAGE)}
-                  />
-                </button>
-              ))}
-            </div>
+            {/* ✅ hiển thị đúng ảnh đã upload */}
+            {gallery.length === 0 ? (
+              <div className="text-sm text-gray-500">
+                Chưa có ảnh gallery. Bấm “Add photo” để thêm.
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-3">
+                {gallery.map((img) => (
+                  <div
+                    key={img.imageId}
+                    className="rounded-xl overflow-hidden border bg-gray-50 relative group"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setPreviewUrl(img.src)}
+                      className="block w-full"
+                      title="Xem ảnh"
+                    >
+                      <img
+                        src={img.src}
+                        alt={img.altText || `Image ${img.imageId}`}
+                        className="w-full h-24 object-cover"
+                        onError={(e) => (e.currentTarget.src = FALLBACK_IMAGE)}
+                      />
+                    </button>
 
-           
+                    {/* ✅ nút delete (hover mới hiện) */}
+                    <button
+                      type="button"
+                      onClick={() => onAskDelete(img)}
+                      className="absolute top-2 right-2 h-8 w-8 rounded-full bg-black/60 text-white text-lg leading-none hidden group-hover:flex items-center justify-center"
+                      title="Xoá ảnh"
+                      disabled={deletingId === img.imageId}
+                    >
+                      {deletingId === img.imageId ? "…" : "−"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* QUICK INFO */}
           <div className="bg-white border rounded-2xl p-5 shadow-sm">
-            <div className="text-sm font-semibold text-gray-900 mb-3">Quick Info</div>
+            <div className="text-sm font-semibold text-gray-900 mb-3">
+              Quick Info
+            </div>
 
             {!isEditing ? (
               <>
@@ -434,11 +573,17 @@ export default function MyHotel() {
               </>
             ) : (
               <>
-                <Field label="Email" value={draft.email} onChange={(v) => onDraftChange("email", v)} />
+                <Field
+                  label="Email"
+                  value={draft.email}
+                  onChange={(v) => setDraft((p) => ({ ...p, email: v }))}
+                />
                 <Field
                   label="Phone"
                   value={draft.phone_number}
-                  onChange={(v) => onDraftChange("phone_number", v)}
+                  onChange={(v) =>
+                    setDraft((p) => ({ ...p, phone_number: v }))
+                  }
                 />
               </>
             )}
@@ -448,7 +593,9 @@ export default function MyHotel() {
         {/* RIGHT */}
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white border rounded-2xl p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Hotel Info</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              Hotel Info
+            </h2>
 
             {!isEditing ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -459,18 +606,22 @@ export default function MyHotel() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Field label="Name" value={draft.name} onChange={(v) => onDraftChange("name", v)} />
+                <Field
+                  label="Name"
+                  value={draft.name}
+                  onChange={(v) => setDraft((p) => ({ ...p, name: v }))}
+                />
                 <Field
                   label="Min price"
                   type="number"
                   value={draft.min_price ?? ""}
-                  onChange={(v) => onDraftChange("min_price", v)}
+                  onChange={(v) => setDraft((p) => ({ ...p, min_price: v }))}
                   placeholder="VD: 500000"
                 />
                 <Field
                   label="Address"
                   value={draft.address}
-                  onChange={(v) => onDraftChange("address", v)}
+                  onChange={(v) => setDraft((p) => ({ ...p, address: v }))}
                   className="md:col-span-2"
                 />
               </div>
@@ -478,14 +629,20 @@ export default function MyHotel() {
           </div>
 
           <div className="bg-white border rounded-2xl p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">Description</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">
+              Description
+            </h2>
 
             {!isEditing ? (
-              <p className="text-gray-700 leading-relaxed whitespace-pre-line">{hotel?.description || "--"}</p>
+              <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+                {hotel?.description || "--"}
+              </p>
             ) : (
               <textarea
                 value={draft.description}
-                onChange={(e) => onDraftChange("description", e.target.value)}
+                onChange={(e) =>
+                  setDraft((p) => ({ ...p, description: e.target.value }))
+                }
                 className="w-full min-h-[140px] border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-gray-200"
                 placeholder="Nhập mô tả..."
               />
@@ -493,7 +650,9 @@ export default function MyHotel() {
           </div>
 
           <div className="bg-white border rounded-2xl p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">System Info</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              System Info
+            </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <InfoCard title="Created at" value={formatDate(hotel?.created_at)} />
@@ -535,7 +694,8 @@ export default function MyHotel() {
         <Modal title="Upload ảnh Gallery" onClose={() => setUploadOpen(false)}>
           <div className="space-y-4">
             <div className="text-sm text-gray-600">
-             
+              Upload vào: <b>/image/auth/upload</b> với query{" "}
+              <b>?type=hotel&id={hotel.hotel_id}</b>
             </div>
 
             <input
@@ -559,6 +719,34 @@ export default function MyHotel() {
                 className="px-4 py-2 rounded-xl bg-gray-900 text-white text-sm hover:opacity-90 disabled:opacity-60"
               >
                 {uploading ? "Uploading..." : "Upload"}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
+
+      {/* DELETE CONFIRM */}
+      {confirmOpen ? (
+        <Modal title="Xoá ảnh?" onClose={() => setConfirmOpen(false)}>
+          <div className="space-y-4">
+            <div className="text-sm text-gray-700">
+              Bạn muốn xoá ảnh <b>#{confirmTarget?.imageId}</b> không?
+            </div>
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => setConfirmOpen(false)}
+                disabled={deletingId != null}
+                className="px-4 py-2 rounded-xl border bg-white text-sm hover:bg-gray-50 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={onConfirmDelete}
+                disabled={deletingId != null}
+                className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm hover:opacity-90 disabled:opacity-60"
+              >
+                {deletingId ? "Deleting..." : "Delete"}
               </button>
             </div>
           </div>
@@ -609,7 +797,14 @@ function Row({ label, value }) {
   );
 }
 
-function Field({ label, value, onChange, type = "text", placeholder, className = "" }) {
+function Field({
+  label,
+  value,
+  onChange,
+  type = "text",
+  placeholder,
+  className = "",
+}) {
   return (
     <div className={className}>
       <div className="text-xs text-gray-500 mb-1">{label}</div>
@@ -637,14 +832,20 @@ function InfoCard({ title, value }) {
 
 function Modal({ title, onClose, children }) {
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
       <div
         className="max-w-xl w-full bg-white rounded-2xl shadow-lg overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b">
           <div className="text-sm font-semibold text-gray-900">{title}</div>
-          <button className="px-3 py-1 rounded-lg bg-gray-900 text-white text-sm" onClick={onClose}>
+          <button
+            className="px-3 py-1 rounded-lg bg-gray-900 text-white text-sm"
+            onClick={onClose}
+          >
             Close
           </button>
         </div>

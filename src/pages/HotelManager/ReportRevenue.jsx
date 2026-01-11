@@ -9,29 +9,19 @@ function safeNumber(v, fallback = 0) {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
 }
-
 function clampInt(n, min, max, fallback) {
   const x = Math.trunc(safeNumber(n, fallback));
   if (!Number.isFinite(x)) return fallback;
   return Math.min(max, Math.max(min, x));
 }
 
-function calcStatsFromBookings(bookings = []) {
-  // ✅ chỉ tính SUCCESS cho hợp lý doanh thu
-  const success = bookings.filter(
-    (b) =>
-      String(b?.status || "").toLowerCase() === "success" ||
-      String(b?.payment?.status || "").toLowerCase() === "success"
-  );
-
-  const bookingsCount = success.length;
-
-  const revenue = success.reduce((sum, b) => {
-    const v = b?.payment?.totalPrice ?? b?.totalPrice ?? 0;
-    return sum + safeNumber(v, 0);
-  }, 0);
-
-  return { bookings: bookingsCount, revenue };
+// normalize response /hotel_manager/stats
+function normalizeStats(raw) {
+  return {
+    allTypeRevenue: safeNumber(raw?.allTypeRevenue, 0),
+    allTypeBookings: safeNumber(raw?.allTypeBookings, 0),
+    details: Array.isArray(raw?.details) ? raw.details : [],
+  };
 }
 
 export default function RevenueReport() {
@@ -39,7 +29,7 @@ export default function RevenueReport() {
   const [month, setMonth] = useState(12);
   const [year, setYear] = useState(2025);
 
-  const [stats, setStats] = useState({ bookings: 0, revenue: 0 });
+  const [stats, setStats] = useState(null);      // raw stats object
   const [prevStats, setPrevStats] = useState(null);
 
   const [loading, setLoading] = useState(true);
@@ -71,10 +61,10 @@ export default function RevenueReport() {
     return { pm, py };
   }, [safeMonth, safeYear]);
 
-  /** ===== fetch bookings by month/year (JWT) ===== */
-  const fetchBookingsByMonth = useCallback(
+  /** ✅ fetch stats by month/year */
+  const fetchStatsByMonth = useCallback(
     async ({ month, year }) => {
-      const url = `${API_BASE}/hotel_manager/bookings?month=${month}&year=${year}&_t=${Date.now()}`;
+      const url = `${API_BASE}/hotel_manager/stats?month=${month}&year=${year}&_t=${Date.now()}`;
 
       const res = await fetch(url, {
         method: "GET",
@@ -95,7 +85,7 @@ export default function RevenueReport() {
         throw new Error(typeof raw === "string" ? raw : JSON.stringify(raw));
       }
 
-      return Array.isArray(raw?.content) ? raw.content : [];
+      return normalizeStats(raw);
     },
     [token]
   );
@@ -111,29 +101,19 @@ export default function RevenueReport() {
 
         if (!token) throw new Error("NO_TOKEN (Bạn chưa đăng nhập)");
 
-        // current month
-        const curBookings = await fetchBookingsByMonth({
-          month: safeMonth,
-          year: safeYear,
-        });
-        const curStats = calcStatsFromBookings(curBookings);
-        if (alive) setStats(curStats);
+        const cur = await fetchStatsByMonth({ month: safeMonth, year: safeYear });
+        if (alive) setStats(cur);
 
-        // prev month
         try {
-          const prevBookings = await fetchBookingsByMonth({
-            month: prevParams.pm,
-            year: prevParams.py,
-          });
-          const pStats = calcStatsFromBookings(prevBookings);
-          if (alive) setPrevStats(pStats);
+          const prev = await fetchStatsByMonth({ month: prevParams.pm, year: prevParams.py });
+          if (alive) setPrevStats(prev);
         } catch {
           if (alive) setPrevStats(null);
         }
       } catch (e) {
         if (alive) setError(e?.message || "Fetch failed");
         if (alive) {
-          setStats({ bookings: 0, revenue: 0 });
+          setStats(null);
           setPrevStats(null);
         }
       } finally {
@@ -145,51 +125,44 @@ export default function RevenueReport() {
     return () => {
       alive = false;
     };
-  }, [token, safeMonth, safeYear, prevParams.pm, prevParams.py, fetchBookingsByMonth]);
-
-  const changePercent = useMemo(() => {
-    if (!prevStats || !prevStats.revenue) return null;
-    const pct = ((stats.revenue - prevStats.revenue) / prevStats.revenue) * 100;
-    return Number.isFinite(pct) ? Number(pct.toFixed(1)) : null;
-  }, [stats.revenue, prevStats]);
+  }, [token, safeMonth, safeYear, prevParams.pm, prevParams.py, fetchStatsByMonth]);
 
   const revenueText = useMemo(() => {
-    return `${safeNumber(stats.revenue, 0).toLocaleString("vi-VN")}₫`;
-  }, [stats.revenue]);
+    const r = safeNumber(stats?.allTypeRevenue, 0);
+    return `${r.toLocaleString("vi-VN")}₫`;
+  }, [stats]);
+
+  const bookings = useMemo(() => safeNumber(stats?.allTypeBookings, 0), [stats]);
 
   const avgRevenueText = useMemo(() => {
-    const avg =
-      stats.bookings > 0 ? Math.round(stats.revenue / stats.bookings) : 0;
-    return `${safeNumber(avg, 0).toLocaleString("vi-VN")}₫`;
-  }, [stats.revenue, stats.bookings]);
+    const r = safeNumber(stats?.allTypeRevenue, 0);
+    const b = safeNumber(stats?.allTypeBookings, 0);
+    const avg = b > 0 ? Math.round(r / b) : 0;
+    return `${avg.toLocaleString("vi-VN")}₫`;
+  }, [stats]);
 
-  // (giữ demo distribution như bạn đang làm)
-  const roomDistribution = useMemo(() => {
-    if (!stats.revenue || stats.revenue <= 0) {
-      return [
-        { type: "Deluxe", value: 0 },
-        { type: "Standard", value: 0 },
-        { type: "Suite", value: 0 },
-      ];
-    }
-    return [
-      { type: "Deluxe", value: 45 },
-      { type: "Standard", value: 35 },
-      { type: "Suite", value: 20 },
-    ];
-  }, [stats.revenue]);
+  const changePercent = useMemo(() => {
+    const cur = safeNumber(stats?.allTypeRevenue, 0);
+    const prev = safeNumber(prevStats?.allTypeRevenue, 0);
+    if (!prevStats || prev <= 0) return null;
+    const pct = ((cur - prev) / prev) * 100;
+    return Number.isFinite(pct) ? Number(pct.toFixed(1)) : null;
+  }, [stats, prevStats]);
 
   const exportCSV = () => {
+    const curRevenue = safeNumber(stats?.allTypeRevenue, 0);
+    const curBookings = safeNumber(stats?.allTypeBookings, 0);
+
     let csv = "Metric,Value\n";
     csv += `Month,${monthLabel}\n`;
-    csv += `Bookings(Success),${stats.bookings}\n`;
-    csv += `Total Revenue(Success),${stats.revenue}\n`;
-    csv += `Avg/Booking,${stats.bookings > 0 ? Math.round(stats.revenue / stats.bookings) : 0}\n`;
+    csv += `Bookings,${curBookings}\n`;
+    csv += `Total Revenue,${curRevenue}\n`;
+    csv += `Avg/Booking,${curBookings > 0 ? Math.round(curRevenue / curBookings) : 0}\n`;
     csv += `Change vs last month,${changePercent ?? "N/A"}%\n`;
 
-    csv += `\nRoom Type,Percentage\n`;
-    roomDistribution.forEach((r) => {
-      csv += `${r.type},${r.value}%\n`;
+    csv += `\nRoomType,Count,Revenue\n`;
+    (stats?.details || []).forEach((d) => {
+      csv += `${d.roomType},${safeNumber(d.count, 0)},${safeNumber(d.revenue, 0)}\n`;
     });
 
     const blob = new Blob([csv], { type: "text/csv" });
@@ -205,9 +178,7 @@ export default function RevenueReport() {
     <div className="min-h-[calc(100vh-64px)] bg-gray-50">
       <div className="bg-white border-b">
         <div className="max-w-6xl mx-auto px-6 py-6">
-          <h1 className="text-2xl font-semibold text-gray-900 text-center">
-            Revenue Report
-          </h1>
+          <h1 className="text-2xl font-semibold text-gray-900 text-center">Revenue Report</h1>
           <p className="text-sm text-gray-500 text-center mt-1">
             Room distribution & monthly comparison
           </p>
@@ -275,6 +246,7 @@ export default function RevenueReport() {
               <button
                 onClick={exportCSV}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm"
+                disabled={!stats}
               >
                 Export Report
               </button>
@@ -284,7 +256,14 @@ export default function RevenueReport() {
       </div>
 
       <div className="max-w-6xl mx-auto px-6 py-10 grid grid-cols-1 md:grid-cols-2 gap-8">
-        <RoomTypePie data={roomDistribution} />
+        {/* ✅ Pie từ stats thật */}
+        {loading ? (
+          <div className="bg-white border rounded-2xl p-6 shadow-sm">
+            <div className="text-gray-600">Đang tải biểu đồ...</div>
+          </div>
+        ) : (
+          <RoomTypePie stats={stats} />
+        )}
 
         {loading ? (
           <div className="bg-white border rounded-2xl p-6 shadow-sm">
@@ -297,9 +276,9 @@ export default function RevenueReport() {
           </div>
         ) : (
           <ComparisonText
-            revenueText={revenueText}      // ✅ tổng tiền
-            bookings={stats.bookings}      // ✅ số booking success
-            avgRevenueText={avgRevenueText} // ✅ revenue/booking
+            revenueText={revenueText}
+            bookings={bookings}
+            avgRevenueText={avgRevenueText}
             changePercent={changePercent}
           />
         )}

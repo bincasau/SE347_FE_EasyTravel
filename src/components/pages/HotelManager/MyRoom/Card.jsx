@@ -26,6 +26,17 @@ async function readResponseSmart(res) {
   return res.text();
 }
 
+function safeNumber(v, fallback = 0) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function formatVND(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "--";
+  return `${n.toLocaleString("vi-VN")}₫`;
+}
+
 export default function RoomCard({ room, onDeleted }) {
   const navigate = useNavigate();
   const [deleting, setDeleting] = useState(false);
@@ -61,11 +72,11 @@ export default function RoomCard({ room, onDeleted }) {
   const imageUrl = useMemo(() => {
     const bed = Array.isArray(image_bed ?? imageBed)
       ? (image_bed ?? imageBed)[0]
-      : (image_bed ?? imageBed);
+      : image_bed ?? imageBed;
 
     const wc = Array.isArray(image_wc ?? imageWC)
       ? (image_wc ?? imageWC)[0]
-      : (image_wc ?? imageWC);
+      : image_wc ?? imageWC;
 
     const toUrl = (v) => {
       if (!v) return "";
@@ -140,7 +151,6 @@ export default function RoomCard({ room, onDeleted }) {
         credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`,
-          // ❌ không set Content-Type ở DELETE (không có body)
         },
       });
 
@@ -157,7 +167,6 @@ export default function RoomCard({ room, onDeleted }) {
         throw new Error(typeof raw === "string" ? raw : JSON.stringify(raw));
       }
 
-      // ✅ notify parent to remove item
       onDeleted?.(id);
     } catch (e) {
       setDeleteError(e?.message || "Delete failed");
@@ -213,9 +222,10 @@ export default function RoomCard({ room, onDeleted }) {
                 </div>
               </div>
 
+              {/* ✅ VND */}
               <span className="text-orange-600 font-bold text-xl whitespace-nowrap">
                 {price !== null && price !== undefined && price !== ""
-                  ? `$${price}`
+                  ? formatVND(safeNumber(price, NaN))
                   : "--"}
               </span>
             </div>

@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import RoomCard from "@/components/pages/HotelManager/MyRoom/Card.jsx";
 
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
+
 export default function MyRooms() {
   const navigate = useNavigate();
 
@@ -157,19 +160,99 @@ export default function MyRooms() {
     }
   }, [filteredRooms, sortBy]);
 
+  // ---------- EXPORT EXCEL ----------
+  const formatVND = (v) => {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return "";
+    return `${n.toLocaleString("vi-VN")}₫`;
+  };
+
+  const handleExportExcel = useCallback(() => {
+    // Export đúng những gì đang hiển thị (đã search + sort)
+    const dataToExport = sortedRooms;
+
+    if (!dataToExport || dataToExport.length === 0) {
+      alert("Không có phòng nào để export.");
+      return;
+    }
+
+    const rows = dataToExport.map((r, idx) => ({
+      "No.": idx + 1,
+      "Room ID": r.room_id ?? "",
+      "Room Number": r.room_number ?? "",
+      Type: r.room_type ?? "",
+      Guests: r.number_of_guests ?? "",
+      Floor: r.floor ?? "",
+      Status: r.status ?? "",
+      "Price (VND)": r.price ?? "",
+      "Price (Formatted)": formatVND(r.price),
+      Description: r.description ?? "",
+      "Image Bed": Array.isArray(r.image_bed)
+        ? r.image_bed.join(", ")
+        : r.image_bed ?? "",
+      "Image WC": Array.isArray(r.image_wc)
+        ? r.image_wc.join(", ")
+        : r.image_wc ?? "",
+      "Created At": r.created_at ?? "",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Rooms");
+
+    // optional: width cột cho đẹp
+    ws["!cols"] = [
+      { wch: 6 }, // No.
+      { wch: 10 }, // Room ID
+      { wch: 14 }, // Room Number
+      { wch: 16 }, // Type
+      { wch: 8 }, // Guests
+      { wch: 8 }, // Floor
+      { wch: 12 }, // Status
+      { wch: 12 }, // Price
+      { wch: 16 }, // Price formatted
+      { wch: 40 }, // Description
+      { wch: 30 }, // Image bed
+      { wch: 30 }, // Image wc
+      { wch: 22 }, // Created at
+    ];
+
+    const fileName = `rooms_export_${new Date()
+      .toISOString()
+      .slice(0, 10)}.xlsx`;
+
+    const out = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    saveAs(new Blob([out], { type: "application/octet-stream" }), fileName);
+  }, [sortedRooms]);
+  // ---------- END EXPORT EXCEL ----------
+
   return (
     <div className="min-h-[calc(100vh-64px)] bg-gray-50">
       {/* ===== HEADER ===== */}
       <div className="bg-white border-b">
         <div className="max-w-6xl mx-auto px-6 py-6 relative">
-          {/* ✅ Left: Add Room button */}
-          <div className="absolute left-6 top-1/2 -translate-y-1/2">
+          {/* ✅ Left: Add Room + Export */}
+          <div className="absolute left-6 top-1/2 -translate-y-1/2 flex flex-col gap-2">
             <button
               onClick={() => navigate("/hotel-manager/hotels/addroom/new")}
               className="px-4 py-2 rounded-lg bg-orange-500 text-white text-sm font-semibold
                          hover:bg-orange-600 transition hover:-translate-y-[1px] active:scale-95"
             >
               + Add Room
+            </button>
+
+            <button
+              onClick={handleExportExcel}
+              disabled={loading || sortedRooms.length === 0}
+              className={[
+                "px-4 py-2 rounded-lg text-sm font-semibold border transition active:scale-95",
+                loading || sortedRooms.length === 0
+                  ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                  : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50",
+              ].join(" ")}
+              title="Export danh sách phòng (đang hiển thị) ra Excel"
+            >
+              Export to Excel
             </button>
           </div>
 
@@ -247,7 +330,7 @@ export default function MyRooms() {
                 key={room.room_id ?? room.roomId}
                 room={room}
                 onEdit={() => goEditRoom(room)}
-                onDeleted={handleDeleted}   // ✅ đây là cái thiếu
+                onDeleted={handleDeleted}
               />
             ))}
           </div>
