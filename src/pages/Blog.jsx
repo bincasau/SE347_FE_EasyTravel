@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import BlogCard from "../components/pages/Blog/BlogCard";
 import BlogSidebar from "../components/pages/Blog/BlogSiderbar";
 
 export default function Blog() {
-  const [blogs, setBlogs] = useState([]);
-  const [filteredBlogs, setFilteredBlogs] = useState([]);
+  const [blogs, setBlogs] = useState([]); // list gốc (dùng cho sidebar recent/gallery)
+  const [filteredBlogs, setFilteredBlogs] = useState([]); // list hiển thị bên trái
 
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -13,15 +13,35 @@ export default function Blog() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterDate, setFilterDate] = useState("");
 
+  const [selectedTag, setSelectedTag] = useState(""); // ✅ tag đang chọn
   const [loading, setLoading] = useState(true);
 
   const blogsPerPage = 5;
+
+  const BASE_URL = "http://localhost:8080";
 
   // ✅ S3 base for blog images
   const S3_BLOG_BASE =
     "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/blog";
 
   const getBlogImage = (blogId) => `${S3_BLOG_BASE}/blog_${blogId}.jpg`;
+
+  // ✅ format desc
+  const toDesc = (details) => {
+    const text = details || "";
+    if (!text) return "Không có mô tả.";
+    return text.slice(0, 200) + (text.length > 200 ? "..." : "");
+  };
+
+  // ✅ Map API blog -> UI blog card
+  const mapBlog = (b, fallbackIndex = 0) => ({
+    id: b.blogId ?? b.id ?? fallbackIndex,
+    title: b.title ?? "",
+    date: b.createdAt ? new Date(b.createdAt).toLocaleDateString("vi-VN") : "",
+    description: toDesc(b.details),
+    image: getBlogImage(b.blogId ?? b.id ?? fallbackIndex),
+    createdAt: b.createdAt ?? null,
+  });
 
   /* ----------------------------------------------
    *  DEBOUNCE SEARCH (0.7s)
@@ -41,59 +61,68 @@ export default function Blog() {
       setLoading(true);
 
       const res = await fetch(
-        `http://localhost:8080/blogs?page=${page - 1}&size=${blogsPerPage}`
+        `${BASE_URL}/blogs?page=${page - 1}&size=${blogsPerPage}`
       );
       if (!res.ok) throw new Error("Không thể tải danh sách blog");
 
       const data = await res.json();
       const items = data._embedded?.blogs || [];
 
-      const formatted = items.map((b, index) => ({
-        id: b.blogId || index,
-        title: b.title,
-        date: new Date(b.createdAt).toLocaleDateString("vi-VN"),
-        description:
-          (b.details?.slice(0, 200) || "") + (b.details?.length > 200 ? "..." : "") ||
-          "Không mo ta",
-        // ✅ đổi sang AWS S3
-        image: getBlogImage(b.blogId),
-        createdAt: b.createdAt,
-      }));
+      const formatted = items.map((b, index) => mapBlog(b, index));
 
+      // blogs: dùng cho sidebar recent/gallery
       setBlogs(formatted);
+
+      // nếu không có filter nào thì list hiển thị = default page
       setFilteredBlogs(formatted);
+
       setTotalPages(data.page?.totalPages || 1);
     } catch (err) {
       console.error("❌ Lỗi fetch blogs:", err);
+      setBlogs([]);
+      setFilteredBlogs([]);
+      setTotalPages(1);
     } finally {
       setLoading(false);
     }
   };
 
-  // Load mặc định theo page
+  // Load mặc định theo page (chỉ khi KHÔNG có search/date/tag)
   useEffect(() => {
-    if (debouncedSearch !== "" || filterDate !== "") return;
+    if (debouncedSearch !== "" || filterDate !== "" || selectedTag !== "") return;
     fetchBlogs(currentPage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage]);
+  }, [currentPage, debouncedSearch, filterDate, selectedTag]);
 
   /* ----------------------------------------------
    *  SEARCH + FILTER DATE COMBO API
+   *  (chỉ chạy khi không chọn TAG)
    * ---------------------------------------------- */
   useEffect(() => {
     const fetchFiltered = async () => {
+      // nếu đang lọc TAG thì không chạy search/date combo ở đây
+      if (selectedTag) return;
+
       try {
         setLoading(true);
 
         let url = "";
 
         if (debouncedSearch.trim() !== "" && filterDate !== "") {
-          url = `http://localhost:8080/blogs/search/findByTitleContainingIgnoreCaseAndCreatedAtGreaterThanEqual?keyword=${debouncedSearch}&startDate=${filterDate}&sort=createdAt,asc`;
+          url = `${BASE_URL}/blogs/search/findByTitleContainingIgnoreCaseAndCreatedAtGreaterThanEqual?keyword=${encodeURIComponent(
+            debouncedSearch
+          )}&startDate=${encodeURIComponent(filterDate)}&sort=createdAt,asc`;
         } else if (debouncedSearch.trim() !== "") {
-          url = `http://localhost:8080/blogs/search/findByTitleContainingIgnoreCase?keyword=${debouncedSearch}`;
+          url = `${BASE_URL}/blogs/search/findByTitleContainingIgnoreCase?keyword=${encodeURIComponent(
+            debouncedSearch
+          )}`;
         } else if (filterDate !== "") {
-          url = `http://localhost:8080/blogs/search/findByCreatedAtGreaterThanEqual?startDate=${filterDate}`;
+          url = `${BASE_URL}/blogs/search/findByCreatedAtGreaterThanEqual?startDate=${encodeURIComponent(
+            filterDate
+          )}`;
         } else {
+          // không filter gì => về default list page 1
+          setCurrentPage(1);
           fetchBlogs(1);
           return;
         }
@@ -104,23 +133,21 @@ export default function Blog() {
         const data = await res.json();
         const items = data._embedded?.blogs || [];
 
-        const formatted = items.map((b) => ({
-          id: b.blogId,
-          title: b.title,
-          date: new Date(b.createdAt).toLocaleDateString("vi-VN"),
-          description:
-            (b.details?.slice(0, 200) || "") + (b.details?.length > 200 ? "..." : "") ||
-            "Không có mô tả.",
-          // ✅ đổi sang AWS S3
-          image: getBlogImage(b.blogId),
-          createdAt: b.createdAt,
-        }));
+        const formatted = items.map((b, index) => mapBlog(b, index));
 
+        // với search/date: list bên trái thay đổi
         setFilteredBlogs(formatted);
+
+        // sidebar recent/gallery nên lấy theo data đang hiển thị cũng ok
+        setBlogs(formatted);
+
         setTotalPages(1);
         setCurrentPage(1);
       } catch (err) {
         console.error("❌ Filter error:", err);
+        setFilteredBlogs([]);
+        setBlogs([]);
+        setTotalPages(1);
       } finally {
         setLoading(false);
       }
@@ -128,7 +155,64 @@ export default function Blog() {
 
     fetchFiltered();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, filterDate]);
+  }, [debouncedSearch, filterDate, selectedTag]);
+
+  /* ----------------------------------------------
+   *  FILTER BY TAG API
+   * ---------------------------------------------- */
+  const fetchByTag = async (tag) => {
+    try {
+      setLoading(true);
+
+      const url = `${BASE_URL}/blogs/search/findByTagContainingIgnoreCase?tag=${encodeURIComponent(
+        tag
+      )}`;
+
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Error filter by tag");
+
+      const data = await res.json();
+      const items = data._embedded?.blogs || [];
+
+      const formatted = items.map((b, index) => mapBlog(b, index));
+
+      setSelectedTag(tag);
+
+      // tag filter: update list bên trái
+      setFilteredBlogs(formatted);
+
+      // sidebar recent/gallery theo list này cho hợp lý
+      setBlogs(formatted);
+
+      // tag filter => không pagination
+      setTotalPages(1);
+      setCurrentPage(1);
+
+      // clear các filter khác để tránh “đánh nhau”
+      setSearchTerm("");
+      setDebouncedSearch("");
+      setFilterDate("");
+    } catch (err) {
+      console.error("❌ Tag filter error:", err);
+      setFilteredBlogs([]);
+      setBlogs([]);
+      setTotalPages(1);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTagSelect = (tag) => {
+    if (!tag) return;
+    fetchByTag(tag);
+  };
+
+  const clearTag = () => {
+    setSelectedTag("");
+    setCurrentPage(1);
+    // quay lại default list
+    fetchBlogs(1);
+  };
 
   /* ----------------------------------------------
    *  PAGINATION SLIDE (kiểu Tour)
@@ -170,10 +254,28 @@ export default function Blog() {
     return pages;
   };
 
+  const showPagination =
+    debouncedSearch === "" && filterDate === "" && selectedTag === "" && totalPages > 1;
+
   return (
     <div className="max-w-[1150px] mx-auto px-[70px] py-12 lg:flex gap-8">
       {/* LEFT: LIST */}
       <div className="lg:w-[68%] w-full">
+        {/* Tag label */}
+        {selectedTag && (
+          <div className="mb-6 flex items-center gap-3">
+            <div className="text-sm text-gray-600">
+              Filtered by tag: <b>{selectedTag}</b>
+            </div>
+            <button
+              onClick={clearTag}
+              className="text-orange-600 hover:underline text-sm"
+            >
+              Clear tag
+            </button>
+          </div>
+        )}
+
         {loading ? (
           <div className="text-center py-10 text-gray-500">
             Đang tải bài viết...
@@ -187,7 +289,7 @@ export default function Blog() {
         )}
 
         {/* PAGINATION only for default listing */}
-        {debouncedSearch === "" && filterDate === "" && totalPages > 1 && (
+        {showPagination && (
           <div className="flex justify-center items-center gap-2 mt-10">
             {/* Prev */}
             <button
@@ -219,7 +321,9 @@ export default function Blog() {
 
             {/* Next */}
             <button
-              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+              onClick={() =>
+                setCurrentPage(Math.min(totalPages, currentPage + 1))
+              }
               disabled={currentPage === totalPages}
               className={`px-5 py-2 rounded-full text-sm font-semibold border ${
                 currentPage === totalPages
@@ -237,7 +341,7 @@ export default function Blog() {
       <BlogSidebar
         blogs={blogs}
         onSearch={setSearchTerm}
-        onTagSelect={() => {}}
+        onTagSelect={handleTagSelect}      // ✅ TAG FILTER
         onDateFilter={setFilterDate}
       />
     </div>

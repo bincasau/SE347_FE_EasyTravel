@@ -6,11 +6,6 @@ const API_BASE = "http://localhost:8080";
 const MY_HOTEL_URL = `${API_BASE}/hotel_manager/my-hotel`;
 const CREATE_ROOM_URL = `${API_BASE}/hotel_manager/rooms`;
 
-function safeNumber(v, fallback = 0) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : fallback;
-}
-
 function readResponseSmart(res) {
   const ct = res.headers.get("content-type") || "";
   if (ct.includes("application/json")) return res.json().catch(() => res.text());
@@ -18,7 +13,6 @@ function readResponseSmart(res) {
 }
 
 function extractHotelId(raw) {
-  // tùy response BE bạn
   const id =
     raw?.hotelId ??
     raw?.hotel_id ??
@@ -29,6 +23,13 @@ function extractHotelId(raw) {
 
   const n = Number(id);
   return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function cleanNumberString(v) {
+  if (v === null || v === undefined) return "";
+  const s = String(v).trim();
+  if (!s) return "";
+  return s.replace(/[^\d]/g, "");
 }
 
 export default function AddRoom() {
@@ -44,28 +45,45 @@ export default function AddRoom() {
   const [loadingHotel, setLoadingHotel] = useState(true);
   const [hotelError, setHotelError] = useState("");
 
-  // UI form (snake_case) nhưng khi gửi lên BE sẽ map sang camelCase theo entity
+  // UI form (snake_case)
   const [form, setForm] = useState({
+    room_id: "",
     room_number: "",
     room_type: "",
     number_of_guests: "",
     price: "",
     description: "",
+    image_bed: "",
+    image_wc: "",
   });
 
-  // ✅ BE đang yêu cầu 2 file: bedFile, wcFile (mỗi loại 1 file)
+  // ✅ Single create images
   const [bedFile, setBedFile] = useState(null);
   const [bedPreview, setBedPreview] = useState("");
   const [wcFile, setWcFile] = useState(null);
   const [wcPreview, setWcPreview] = useState("");
 
+  // ✅ Bulk default images
+  const [bulkBedFile, setBulkBedFile] = useState(null);
+  const [bulkBedPreview, setBulkBedPreview] = useState("");
+  const [bulkWcFile, setBulkWcFile] = useState(null);
+  const [bulkWcPreview, setBulkWcPreview] = useState("");
+
   const [submitting, setSubmitting] = useState(false);
 
   const excelInputRef = useRef(null);
+
   const bedInputRef = useRef(null);
   const wcInputRef = useRef(null);
 
-  /** ===== 1) Fetch hotelId từ /hotel_manager/my-hotel ===== */
+  const bulkBedInputRef = useRef(null);
+  const bulkWcInputRef = useRef(null);
+
+  // ✅ Excel rows preview
+  const [excelRows, setExcelRows] = useState([]);
+  const isBulkMode = excelRows.length > 0;
+
+  /** ===== 1) Fetch hotelId ===== */
   const fetchMyHotel = useCallback(async () => {
     if (!token) throw new Error("NO_TOKEN (Bạn chưa đăng nhập)");
 
@@ -77,11 +95,14 @@ export default function AddRoom() {
     });
 
     const raw = await readResponseSmart(res);
-    console.log("[AddRoom] GET my-hotel", { url, status: res.status, ok: res.ok, raw });
+    console.log("[AddRoom] GET my-hotel", {
+      url,
+      status: res.status,
+      ok: res.ok,
+      raw,
+    });
 
-    if (!res.ok) {
-      throw new Error(`Fetch /my-hotel failed (${res.status})`);
-    }
+    if (!res.ok) throw new Error(`Fetch /my-hotel failed (${res.status})`);
 
     const id = extractHotelId(raw);
     if (!id) throw new Error("Không lấy được hotelId từ /my-hotel");
@@ -95,7 +116,6 @@ export default function AddRoom() {
       try {
         setLoadingHotel(true);
         setHotelError("");
-
         const id = await fetchMyHotel();
         if (alive) setHotelId(id);
       } catch (e) {
@@ -114,17 +134,27 @@ export default function AddRoom() {
   }, [fetchMyHotel]);
 
   /** ===== 2) Form helpers ===== */
-  const setField = (key, value) => setForm((p) => ({ ...p, [key]: value ?? "" }));
+  const setField = (key, value) =>
+    setForm((p) => ({ ...p, [key]: value ?? "" }));
   const handleChange = (e) => setField(e.target.name, e.target.value);
 
-  /** ===== 3) Excel import (optional) ===== */
+  /** ===== 3) Excel import ===== */
   const normalizedHeaders = useMemo(
     () => ({
+      room_id: ["room_id", "id", "roomid"],
+      description: ["description", "desc", "details"],
+      image_bed: ["image_bed", "bed_image", "bed", "image bed"],
+      image_wc: ["image_wc", "wc_image", "toilet", "image wc"],
+      number_of_guests: [
+        "number_of_guest",
+        "number_of_guests",
+        "guests",
+        "guest",
+        "max_guests",
+      ],
+      price: ["price", "room_price", "cost"],
       room_number: ["room_number", "roomnumber", "room no", "room_no", "number"],
       room_type: ["room_type", "roomtype", "type"],
-      number_of_guests: ["number_of_guests", "guests", "guest", "max_guests", "max guests"],
-      price: ["price", "room_price", "cost"],
-      description: ["description", "desc", "details"],
     }),
     []
   );
@@ -132,12 +162,58 @@ export default function AddRoom() {
   const handlePickExcel = () => excelInputRef.current?.click();
 
   const findHeaderKey = (headerRaw) => {
-    const h = String(headerRaw ?? "").trim().toLowerCase();
+    const h = String(headerRaw ?? "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .replace(/[_-]/g, "_");
+
     for (const targetKey of Object.keys(normalizedHeaders)) {
       if (normalizedHeaders[targetKey].includes(h)) return targetKey;
     }
+
+    if (h.includes("room") && h.includes("number")) return "room_number";
+    if (h.includes("room") && h.includes("type")) return "room_type";
+    if (h.includes("guest")) return "number_of_guests";
+    if (h.includes("price")) return "price";
+    if (h.includes("image") && h.includes("bed")) return "image_bed";
+    if (h.includes("image") && (h.includes("wc") || h.includes("toilet")))
+      return "image_wc";
+    if (h.includes("desc")) return "description";
+    if (h.includes("id")) return "room_id";
     return null;
   };
+
+  const resetBulkState = () => {
+    setExcelRows([]);
+    setBulkBedFile(null);
+    setBulkWcFile(null);
+    if (bulkBedPreview) URL.revokeObjectURL(bulkBedPreview);
+    if (bulkWcPreview) URL.revokeObjectURL(bulkWcPreview);
+    setBulkBedPreview("");
+    setBulkWcPreview("");
+  };
+
+  const setSingleImage = (file, setFile, preview, setPreview) => {
+    if (preview) URL.revokeObjectURL(preview);
+    if (!file) {
+      setFile(null);
+      setPreview("");
+      return;
+    }
+    setFile(file);
+    setPreview(URL.createObjectURL(file));
+  };
+
+  const clearBed = () =>
+    setSingleImage(null, setBedFile, bedPreview, setBedPreview);
+  const clearWc = () =>
+    setSingleImage(null, setWcFile, wcPreview, setWcPreview);
+
+  const clearBulkBed = () =>
+    setSingleImage(null, setBulkBedFile, bulkBedPreview, setBulkBedPreview);
+  const clearBulkWc = () =>
+    setSingleImage(null, setBulkWcFile, bulkWcPreview, setBulkWcPreview);
 
   const handleExcelFile = async (e) => {
     const file = e.target.files?.[0];
@@ -153,11 +229,12 @@ export default function AddRoom() {
       const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true });
 
       if (!rows || rows.length < 2) {
-        throw new Error("Excel must contain a header row and at least one data row.");
+        throw new Error(
+          "Excel must contain a header row and at least one data row."
+        );
       }
 
       const headerRow = rows[0];
-      const dataRow = rows[1];
 
       const colIndexByField = {};
       headerRow.forEach((h, idx) => {
@@ -165,25 +242,59 @@ export default function AddRoom() {
         if (key) colIndexByField[key] = idx;
       });
 
-      const next = { ...form };
-      Object.keys(normalizedHeaders).forEach((field) => {
-        const idx = colIndexByField[field];
-        if (idx === undefined) return;
+      const parsed = rows
+        .slice(1)
+        .map((row) => {
+          const rec = {
+            room_id: "",
+            room_number: "",
+            room_type: "",
+            number_of_guests: "",
+            price: "",
+            description: "",
+            image_bed: "",
+            image_wc: "",
+          };
 
-        const value = dataRow?.[idx];
+          Object.keys(rec).forEach((field) => {
+            const idx = colIndexByField[field];
+            if (idx === undefined) return;
 
-        if (["number_of_guests", "price"].includes(field)) {
-          next[field] =
-            value === null || value === undefined || value === ""
-              ? ""
-              : String(value).replace(/[^\d.]/g, "");
-          return;
-        }
+            const value = row?.[idx];
 
-        next[field] = value === null || value === undefined ? "" : String(value);
-      });
+            if (
+              field === "price" ||
+              field === "number_of_guests" ||
+              field === "room_number" ||
+              field === "room_id"
+            ) {
+              rec[field] = cleanNumberString(value);
+              return;
+            }
 
-      setForm(next);
+            rec[field] =
+              value === null || value === undefined ? "" : String(value).trim();
+          });
+
+          if (!String(rec.room_number || "").trim()) return null;
+          return rec;
+        })
+        .filter(Boolean);
+
+      if (parsed.length === 0) throw new Error("No valid rows found in Excel.");
+
+      // ✅ Không popup nữa — set list luôn
+      setExcelRows(parsed);
+
+      // auto fill dòng đầu tiên
+      setForm((prev) => ({ ...prev, ...parsed[0] }));
+
+      // clear single images để UI khỏi rối
+      clearBed();
+      clearWc();
+
+      // scroll lên bulk list cho dễ thấy
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       alert(err?.message || "Import failed. Please check your Excel format.");
     } finally {
@@ -191,71 +302,75 @@ export default function AddRoom() {
     }
   };
 
-  /** ===== 4) Image pickers (single file each) ===== */
+  /** ===== 4) Image pickers ===== */
   const pickBed = () => bedInputRef.current?.click();
   const pickWc = () => wcInputRef.current?.click();
-
-  const setSingleImage = (file, setFile, preview, setPreview) => {
-    if (preview) URL.revokeObjectURL(preview);
-    if (!file) {
-      setFile(null);
-      setPreview("");
-      return;
-    }
-    setFile(file);
-    setPreview(URL.createObjectURL(file));
-  };
-
-  const clearBed = () => setSingleImage(null, setBedFile, bedPreview, setBedPreview);
-  const clearWc = () => setSingleImage(null, setWcFile, wcPreview, setWcPreview);
+  const pickBulkBed = () => bulkBedInputRef.current?.click();
+  const pickBulkWc = () => bulkWcInputRef.current?.click();
 
   /** ===== 5) Validate ===== */
-  const validate = () => {
+  const validateOne = (payload) => {
     if (!token) return "NO_TOKEN (Bạn chưa đăng nhập)";
     if (loadingHotel) return "Đang lấy hotelId...";
     if (hotelError) return hotelError;
     if (!hotelId) return "Không lấy được hotelId";
 
-    if (!String(form.room_number).trim()) return "Room number is required.";
-    if (!String(form.room_type).trim()) return "Room type is required.";
-    if (!String(form.number_of_guests).trim()) return "Number of guests is required.";
-    if (!String(form.price).trim()) return "Price is required.";
+    if (!String(payload.room_number).trim()) return "Room number is required.";
+    if (!String(payload.room_type).trim()) return "Room type is required.";
+    if (!String(payload.number_of_guests).trim())
+      return "Number of guests is required.";
+    if (!String(payload.price).trim()) return "Price is required.";
     return null;
   };
 
-  /** ===== 6) Submit: đúng @RequestPart("room") Room + bedFile + wcFile ===== */
-  const handleSubmit = async () => {
-    const err = validate();
-    if (err) return alert(err);
-
-    // ✅ map đúng field của entity Room (camelCase)
+  /** ===== 6) Build FormData ===== */
+  const buildFormData = (
+    { room_number, room_type, number_of_guests, price, description },
+    bed,
+    wc
+  ) => {
     const roomPayload = {
-      roomNumber: Number(form.room_number),
-      roomType: String(form.room_type).trim(),
-      numberOfGuest: Number(form.number_of_guests),
-      price: Number(form.price),
-      desc: String(form.description || "").trim(),
-      hotel: { hotelId: Number(hotelId) }, // ✅ quan trọng: entity có Hotel hotel
+      roomNumber: Number(cleanNumberString(room_number)),
+      roomType: String(room_type).trim(),
+      numberOfGuest: Number(cleanNumberString(number_of_guests)),
+      price: Number(cleanNumberString(price)),
+      desc: String(description || "").trim(),
+      hotel: { hotelId: Number(hotelId) },
     };
 
     const fd = new FormData();
+    fd.append(
+      "room",
+      new Blob([JSON.stringify(roomPayload)], { type: "application/json" })
+    );
+    if (bed) fd.append("bedFile", bed);
+    if (wc) fd.append("wcFile", wc);
+    return fd;
+  };
 
-    // ✅ Spring @RequestPart("room") Room room => phải gửi JSON part
-    fd.append("room", new Blob([JSON.stringify(roomPayload)], { type: "application/json" }));
+  /** ===== 7) Submit single ===== */
+  const handleSubmit = async () => {
+    const err = validateOne(form);
+    if (err) return alert(err);
 
-    // ✅ đúng key backend yêu cầu
-    if (bedFile) fd.append("bedFile", bedFile);
-    if (wcFile) fd.append("wcFile", wcFile);
+    if (isBulkMode) {
+      return alert(
+        "Bạn đã import Excel rồi. Hãy dùng Bulk Create ở trên để tạo hàng loạt."
+      );
+    }
+
+    if (!bedFile || !wcFile) {
+      return alert("Single add cần chọn Bed Image và WC Image.");
+    }
+
+    const fd = buildFormData(form, bedFile, wcFile);
 
     try {
       setSubmitting(true);
 
       const res = await fetch(CREATE_ROOM_URL, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          // ❌ không set Content-Type khi dùng FormData
-        },
+        headers: { Authorization: `Bearer ${token}` },
         body: fd,
       });
 
@@ -269,7 +384,9 @@ export default function AddRoom() {
 
       if (!res.ok) {
         throw new Error(
-          `POST /rooms failed (${res.status}) - ${typeof raw === "string" ? raw : JSON.stringify(raw)}`
+          `POST /rooms failed (${res.status}) - ${
+            typeof raw === "string" ? raw : JSON.stringify(raw)
+          }`
         );
       }
 
@@ -280,6 +397,72 @@ export default function AddRoom() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  /** ===== 8) Bulk create from Excel ===== */
+  const handleBulkCreate = async () => {
+    if (!excelRows.length) return alert("Bạn chưa import Excel.");
+    if (!bulkBedFile || !bulkWcFile) {
+      return alert("Bulk create cần chọn Default Bed Image và Default WC Image.");
+    }
+    if (!token) return alert("Bạn chưa đăng nhập.");
+    if (!hotelId) return alert("Chưa có hotelId.");
+
+    const ok = confirm(`Create ${excelRows.length} rooms from Excel?`);
+    if (!ok) return;
+
+    try {
+      setSubmitting(true);
+
+      let success = 0;
+      let fail = 0;
+
+      for (let i = 0; i < excelRows.length; i++) {
+        const r = excelRows[i];
+        const err = validateOne(r);
+        if (err) {
+          fail++;
+          console.warn("[Bulk] skip row invalid", { i, r, err });
+          continue;
+        }
+
+        const fd = buildFormData(r, bulkBedFile, bulkWcFile);
+
+        const res = await fetch(CREATE_ROOM_URL, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: fd,
+        });
+
+        if (res.ok) {
+          success++;
+        } else {
+          fail++;
+          const raw = await readResponseSmart(res);
+          console.warn("[Bulk] row failed", { i, status: res.status, raw, r });
+        }
+      }
+
+      alert(`Bulk done ✅ Success: ${success} | Failed: ${fail}`);
+
+      // ✅ Bulk xong -> reset về trạng thái Add Room + scroll lên
+      resetBulkState();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (e) {
+      alert(e?.message || "Bulk create failed");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  /** ===== Row actions ===== */
+  const removeExcelRow = (idx) => {
+    setExcelRows((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const useRow = (row) => {
+    setForm((prev) => ({ ...prev, ...row }));
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   /** ===== UI ===== */
@@ -300,12 +483,12 @@ export default function AddRoom() {
             Add Room
           </h1>
 
-          <div className="flex-1 flex justify-end">
+          <div className="flex-1 flex justify-end gap-2">
             <button
               onClick={handlePickExcel}
               className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium"
             >
-              Import from Excel
+              Import Excel
             </button>
 
             <input
@@ -327,10 +510,164 @@ export default function AddRoom() {
             ) : hotelError ? (
               <span className="text-red-600">Lỗi: {hotelError}</span>
             ) : (
-              <span className="text-gray-500">Hotel loaded.</span>
+              <span className="text-gray-500"></span>
             )}
           </div>
 
+          {/* ✅ BULK + LIST lên đầu */}
+          {excelRows.length > 0 && (
+            <div className="mb-6 bg-orange-50 border border-orange-100 rounded-2xl p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="font-semibold text-gray-900">
+                    Bulk create from Excel ({excelRows.length} rows)
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    Chọn ảnh mặc định (Bed/WC) rồi bấm Bulk Create.
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      resetBulkState();
+                    }}
+                    disabled={submitting}
+                    className={[
+                      "px-4 py-2 rounded-xl font-semibold border",
+                      submitting
+                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                        : "bg-white text-gray-700 hover:bg-gray-50",
+                    ].join(" ")}
+                  >
+                    Clear Import
+                  </button>
+
+                  <button
+                    onClick={handleBulkCreate}
+                    disabled={submitting}
+                    className={[
+                      "px-4 py-2 rounded-xl font-semibold",
+                      submitting
+                        ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                        : "bg-orange-500 hover:bg-orange-600 text-white",
+                    ].join(" ")}
+                  >
+                    Bulk Create
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <SingleImage
+                  title="Default Bed Image (for bulk)"
+                  preview={bulkBedPreview}
+                  onPick={() => bulkBedInputRef.current?.click()}
+                  onClear={clearBulkBed}
+                  inputRef={bulkBedInputRef}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] || null;
+                    setSingleImage(
+                      f,
+                      setBulkBedFile,
+                      bulkBedPreview,
+                      setBulkBedPreview
+                    );
+                    e.target.value = "";
+                  }}
+                />
+
+                <SingleImage
+                  title="Default WC Image (for bulk)"
+                  preview={bulkWcPreview}
+                  onPick={() => bulkWcInputRef.current?.click()}
+                  onClear={clearBulkWc}
+                  inputRef={bulkWcInputRef}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] || null;
+                    setSingleImage(
+                      f,
+                      setBulkWcFile,
+                      bulkWcPreview,
+                      setBulkWcPreview
+                    );
+                    e.target.value = "";
+                  }}
+                />
+              </div>
+
+              {/* ✅ LIST rows + delete */}
+              <div className="mt-4 bg-white border rounded-2xl overflow-hidden">
+                <div className="px-4 py-3 border-b flex items-center justify-between">
+                  <div className="font-semibold">
+                    Imported Rooms ({excelRows.length})
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Click “Use” để đổ dữ liệu xuống form bên dưới.
+                  </div>
+                </div>
+
+                <div className="overflow-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 text-gray-600">
+                      <tr>
+                        <th className="p-3 text-left">room_number</th>
+                        <th className="p-3 text-left">room_type</th>
+                        <th className="p-3 text-left">guests</th>
+                        <th className="p-3 text-left">price</th>
+                        <th className="p-3 text-left">image_bed</th>
+                        <th className="p-3 text-left">image_wc</th>
+                        <th className="p-3 text-left">description</th>
+                        <th className="p-3"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {excelRows.map((r, idx) => (
+                        <tr key={idx} className="border-t align-top">
+                          <td className="p-3">{r.room_number}</td>
+                          <td className="p-3">{r.room_type}</td>
+                          <td className="p-3">{r.number_of_guests}</td>
+                          <td className="p-3">{r.price}</td>
+                          <td className="p-3">{r.image_bed}</td>
+                          <td className="p-3">{r.image_wc}</td>
+                          <td className="p-3 max-w-[420px]">
+                            <div className="line-clamp-2">{r.description}</div>
+                          </td>
+                          <td className="p-3 text-right whitespace-nowrap">
+                            <button
+                              className="text-orange-600 hover:underline mr-3"
+                              onClick={() => useRow(r)}
+                            >
+                              Use
+                            </button>
+                            <button
+                              className="text-red-600 hover:underline"
+                              onClick={() => removeExcelRow(idx)}
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+
+                      {excelRows.length === 0 && (
+                        <tr>
+                          <td
+                            colSpan={8}
+                            className="p-6 text-center text-gray-500"
+                          >
+                            No rows.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* FORM */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <Field label="Room Number" required>
               <input
@@ -349,7 +686,7 @@ export default function AddRoom() {
                 value={form.room_type}
                 onChange={handleChange}
                 className="w-full border rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-200"
-                placeholder="e.g. Deluxe"
+                placeholder="e.g. Standard"
               />
             </Field>
 
@@ -370,9 +707,12 @@ export default function AddRoom() {
                 value={form.price}
                 onChange={handleChange}
                 className="w-full border rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-200"
-                placeholder="e.g. 590000"
-                inputMode="decimal"
+                placeholder="e.g. 2,500,000"
+                inputMode="numeric"
               />
+              <div className="text-xs text-gray-500 mt-1">
+                Bạn có thể nhập <b>2,500,000</b> hoặc <b>2500000</b> đều được.
+              </div>
             </Field>
 
             <Field label="Description" className="md:col-span-2">
@@ -386,34 +726,36 @@ export default function AddRoom() {
             </Field>
           </div>
 
-          {/* images */}
-          <div className="mt-8 border-t pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <SingleImage
-              title="Bed Image (bedFile)"
-              preview={bedPreview}
-              onPick={pickBed}
-              onClear={clearBed}
-              inputRef={bedInputRef}
-              onChange={(e) => {
-                const f = e.target.files?.[0] || null;
-                setSingleImage(f, setBedFile, bedPreview, setBedPreview);
-                e.target.value = "";
-              }}
-            />
+          {/* ✅ Single images: ẨN khi bulk mode */}
+          {!isBulkMode && (
+            <div className="mt-8 border-t pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+              <SingleImage
+                title="Bed Image (bedFile)"
+                preview={bedPreview}
+                onPick={() => bedInputRef.current?.click()}
+                onClear={clearBed}
+                inputRef={bedInputRef}
+                onChange={(e) => {
+                  const f = e.target.files?.[0] || null;
+                  setSingleImage(f, setBedFile, bedPreview, setBedPreview);
+                  e.target.value = "";
+                }}
+              />
 
-            <SingleImage
-              title="WC Image (wcFile)"
-              preview={wcPreview}
-              onPick={pickWc}
-              onClear={clearWc}
-              inputRef={wcInputRef}
-              onChange={(e) => {
-                const f = e.target.files?.[0] || null;
-                setSingleImage(f, setWcFile, wcPreview, setWcPreview);
-                e.target.value = "";
-              }}
-            />
-          </div>
+              <SingleImage
+                title="WC Image (wcFile)"
+                preview={wcPreview}
+                onPick={() => wcInputRef.current?.click()}
+                onClear={clearWc}
+                inputRef={wcInputRef}
+                onChange={(e) => {
+                  const f = e.target.files?.[0] || null;
+                  setSingleImage(f, setWcFile, wcPreview, setWcPreview);
+                  e.target.value = "";
+                }}
+              />
+            </div>
+          )}
 
           <div className="mt-8 flex justify-end">
             <button
@@ -429,11 +771,6 @@ export default function AddRoom() {
               {submitting ? "Adding..." : "Add"}
             </button>
           </div>
-        </div>
-
-        <div className="mt-4 text-sm text-gray-600">
-          <span className="font-medium">Excel format:</span>{" "}
-          <code>room_number, room_type, number_of_guests, price, description</code>
         </div>
       </div>
     </div>

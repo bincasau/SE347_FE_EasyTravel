@@ -16,6 +16,8 @@ import Booking from "./pages/BookingTour";
 import Verify from "./pages/Verify";
 import Profile from "./pages/Profile";
 import EditProfile from "./pages/EditProfile";
+import BookingHistoryTours from "./pages/BookingHistoryTours";
+import BookingHistoryHotels from "./pages/BookingHistoryHotels";
 
 import RequireRole from "./pages/TourGuide/RequireRole";
 import PastTours from "./pages/TourGuide/PastTours";
@@ -85,9 +87,10 @@ export default function App() {
           <Route path="/home" element={<Navigate to="/" replace />} />
           <Route path="/verify" element={<Verify />} />
           <Route path="/profile" element={<Profile />} />
-<Route path="/profile" element={<Profile />} />
-<Route path="/profile/edit" element={<EditProfile />} />
-
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/profile/edit" element={<EditProfile />} />
+          <Route path="/booking-history/tours" element={<BookingHistoryTours />} />
+          <Route path="/booking-history/hotels" element={<BookingHistoryHotels />} />
           <Route path="/403" element={<Forbidden403 />} />
 
           {/* TourGuide */}

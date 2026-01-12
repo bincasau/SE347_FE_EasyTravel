@@ -33,7 +33,24 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
   const [notifications, setNotifications] = useState([]);
   const [loadingNoti, setLoadingNoti] = useState(false);
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  // 👤 User dropdown (chỉ cho CUSTOMER)
+  const [openUserMenu, setOpenUserMenu] = useState(false);
+  const userMenuRef = useRef(null);
+
+  const normalizeNoti = (n) => ({
+    ...n,
+    // phòng BE trả isRead
+    read: n.read ?? n.isRead ?? false,
+  });
+
+  const sortNoti = (arr) =>
+    [...arr].sort((a, b) => {
+      const ta = new Date(a.time || a.createdAt || a.updatedAt).getTime();
+      const tb = new Date(b.time || b.createdAt || b.updatedAt).getTime();
+      return (tb || 0) - (ta || 0);
+    });
+
+  const unreadCount = notifications.filter((n) => !normalizeNoti(n).read).length;
 
   const userMenu = [
     { to: "/", key: "home" },
@@ -86,7 +103,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     setLoadingUser(false);
   };
 
-  // 🔔 load notifications
+  // 🔔 load notifications (merge để không “đỏ lại” khi mở chuông)
   const loadNotifications = async () => {
     setLoadingNoti(true);
     try {
@@ -94,16 +111,17 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
         ? await getMyNotifications("ACTIVE")
         : await getPublicNotifications();
 
-      // sort mới nhất lên đầu nếu createdAt là string ISO
-      const sorted = Array.isArray(data)
-        ? [...data].sort((a, b) => {
-            const ta = new Date(a.time).getTime();
-            const tb = new Date(b.time).getTime();
-            return (tb || 0) - (ta || 0);
-          })
-        : [];
+      const incoming = Array.isArray(data) ? data.map(normalizeNoti) : [];
 
-      setNotifications(sorted);
+      setNotifications((prev) => {
+        const prevMap = new Map(prev.map((x) => [x.id, normalizeNoti(x)]));
+        const merged = incoming.map((n) => {
+          const old = prevMap.get(n.id);
+          if (!old) return n;
+          return { ...n, read: Boolean(old.read) || Boolean(n.read) };
+        });
+        return sortNoti(merged);
+      });
     } catch (e) {
       console.error("Load notifications failed:", e);
       setNotifications([]);
@@ -198,11 +216,30 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     };
   }, []);
 
+  // 👤 close user menu dropdown when click outside / ESC
+  useEffect(() => {
+    const onDocClick = (e) => {
+      if (!userMenuRef.current) return;
+      if (!userMenuRef.current.contains(e.target)) setOpenUserMenu(false);
+    };
+    const onEsc = (e) => {
+      if (e.key === "Escape") setOpenUserMenu(false);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, []);
+
   const handleLogout = () => {
     if (!confirm("Bạn có chắc muốn đăng xuất?")) return;
     logout();
     setUser(null);
     didRedirectRef.current = false;
+    setOpenUserMenu(false);
+    setOpenNoti(false);
     navigate("/");
   };
 
@@ -334,9 +371,6 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     ));
   };
 
-  // ✅ Avatar click => luôn về /profile cho mọi role
-  const goToProfileByRole = () => navigate("/profile");
-
   // ✅ LOGO: đi theo role
   const getHomeByRole = () => {
     if (!user?.role) return "/";
@@ -354,22 +388,58 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
   };
 
   const handleClickNoti = async (n) => {
-    // public list không cần patch, my list thì patch
-    if (user && !n.read) {
+    const nn = normalizeNoti(n);
+
+    // public list không cần patch
+    if (!user) {
+      setNotifications((prev) =>
+        prev.map((x) => (x.id === nn.id ? { ...x, read: true } : x))
+      );
+      return;
+    }
+
+    // my list: patch nếu chưa read
+    if (!nn.read) {
       try {
-        await markNotificationRead(n.id);
+        await markNotificationRead(nn.id);
+        setNotifications((prev) =>
+          prev.map((x) => (x.id === nn.id ? { ...x, read: true } : x))
+        );
       } catch (e) {
         console.error("Mark read failed:", e);
       }
     }
-
-    setNotifications((prev) =>
-      prev.map((x) => (x.id === n.id ? { ...x, read: true } : x))
-    );
   };
 
-  const markAllRead = () => {
+  const markAllRead = async () => {
+    if (!user) {
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      return;
+    }
+
+    const unread = notifications.map(normalizeNoti).filter((n) => !n.read);
+    if (unread.length === 0) return;
+
+    // optimistic
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+
+    try {
+      await Promise.all(unread.map((n) => markNotificationRead(n.id)));
+    } catch (e) {
+      console.error("Mark all read failed:", e);
+      await loadNotifications();
+    }
+  };
+
+  const goProfile = () => {
+    setOpenUserMenu(false);
+    navigate("/profile");
+  };
+
+  const goBookingHistory = () => {
+    setOpenUserMenu(false);
+    // bạn có thể đổi sang "/booking-history" nếu muốn 1 trang tổng
+    navigate("/booking-history/tours");
   };
 
   return (
@@ -461,34 +531,37 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
                         No notifications.
                       </div>
                     ) : (
-                      notifications.map((n) => (
-                        <button
-                          key={n.id}
-                          onClick={() => handleClickNoti(n)}
-                          className={`w-full text-left px-4 py-3 border-b last:border-b-0 hover:bg-gray-50 ${
-                            n.read ? "opacity-80" : ""
-                          }`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <div
-                              className={`mt-1 w-2.5 h-2.5 rounded-full ${
-                                n.read ? "bg-gray-300" : "bg-orange-500"
-                              }`}
-                            />
-                            <div className="flex-1">
-                              <div className="flex items-center justify-between gap-3">
-                                <div className="font-medium">{n.title}</div>
-                                <div className="text-xs text-gray-400 shrink-0">
-                                  {n.time}
+                      notifications.map((n) => {
+                        const nn = normalizeNoti(n);
+                        return (
+                          <button
+                            key={nn.id}
+                            onClick={() => handleClickNoti(nn)}
+                            className={`w-full text-left px-4 py-3 border-b last:border-b-0 hover:bg-gray-50 ${
+                              nn.read ? "opacity-80" : ""
+                            }`}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div
+                                className={`mt-1 w-2.5 h-2.5 rounded-full ${
+                                  nn.read ? "bg-gray-300" : "bg-orange-500"
+                                }`}
+                              />
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="font-medium">{nn.title}</div>
+                                  <div className="text-xs text-gray-400 shrink-0">
+                                    {nn.time}
+                                  </div>
+                                </div>
+                                <div className="text-sm text-gray-600 mt-1 line-clamp-2">
+                                  {nn.message}
                                 </div>
                               </div>
-                              <div className="text-sm text-gray-600 mt-1 line-clamp-2">
-                                {n.message}
-                              </div>
                             </div>
-                          </div>
-                        </button>
-                      ))
+                          </button>
+                        );
+                      })
                     )}
                   </div>
 
@@ -513,20 +586,57 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
             {loadingUser ? (
               <div className="text-gray-400">Loading...</div>
             ) : user ? (
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={goToProfileByRole}
-                  className="flex items-center gap-2 group"
-                >
-                  <img
-                    src={user.avatar}
-                    className="w-9 h-9 rounded-full border"
-                    alt="avatar"
-                  />
-                  <span className="font-medium group-hover:text-orange-500">
-                    {user.name}
-                  </span>
-                </button>
+              <div className="flex items-center gap-3" ref={userMenuRef}>
+                {/* CUSTOMER: dropdown */}
+                {user.role === "CUSTOMER" ? (
+                  <div className="relative">
+                    <button
+                      onClick={() => setOpenUserMenu((v) => !v)}
+                      className="flex items-center gap-2 group"
+                    >
+                      <img
+                        src={user.avatar}
+                        className="w-9 h-9 rounded-full border"
+                        alt="avatar"
+                      />
+                      <span className="font-medium group-hover:text-orange-500">
+                        {user.name}
+                      </span>
+                    </button>
+
+                    {openUserMenu && (
+                      <div className="absolute right-0 mt-2 w-44 bg-white border rounded-xl shadow-lg overflow-hidden">
+                        <button
+                          onClick={goProfile}
+                          className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm"
+                        >
+                          View profile
+                        </button>
+                        <button
+                          onClick={goBookingHistory}
+                          className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm"
+                        >
+                          Booking history
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  // ADMIN / TOUR_GUIDE / HOTEL_MANAGER: click thẳng profile
+                  <button
+                    onClick={() => navigate("/profile")}
+                    className="flex items-center gap-2 group"
+                  >
+                    <img
+                      src={user.avatar}
+                      className="w-9 h-9 rounded-full border"
+                      alt="avatar"
+                    />
+                    <span className="font-medium group-hover:text-orange-500">
+                      {user.name}
+                    </span>
+                  </button>
+                )}
 
                 <button
                   onClick={handleLogout}
