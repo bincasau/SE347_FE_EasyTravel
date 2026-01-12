@@ -7,14 +7,30 @@ import {
   FaRegClock,
 } from "react-icons/fa";
 import { FaPlus } from "react-icons/fa6";
+import { useNavigate } from "react-router-dom";
 
 const S3_USER_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/user";
 
-export default function AdminUserCard({ user, onEdit, onRemove }) {
+export default function AdminUserCard({ user, onRemove }) {
+  const navigate = useNavigate();
+
   const avatarSrc = user?.avatar
     ? `${S3_USER_BASE}/${user.avatar}`
     : `${S3_USER_BASE}/user_default.jpg`;
+
+  const handleEdit = () => {
+    navigate(`/admin/users/edit/${user.userId}`);
+  };
+
+  const handleRemove = () => {
+    const ok = window.confirm(
+      `Are you sure you want to remove user "${user?.username}"?`
+    );
+    if (!ok) return;
+
+    onRemove?.(user.userId);
+  };
 
   return (
     <div className="flex items-center gap-8 bg-white p-6 rounded-2xl shadow-md w-full">
@@ -34,43 +50,28 @@ export default function AdminUserCard({ user, onEdit, onRemove }) {
 
         <div className="flex gap-12 text-sm text-gray-700">
           <div className="space-y-2">
-            <div className="flex items-start gap-2">
-              <FaUserAlt className="w-5 h-5 text-orange-400 mt-0.5" />
-              <p className="min-w-0">
-                <span className="font-semibold">Username:</span>{" "}
-                <span className="break-words">{user?.username ?? "—"}</span>
-              </p>
-            </div>
-
-            <div className="flex items-start gap-2">
-              <FaEnvelope className="w-5 h-5 text-orange-400 mt-0.5" />
-              <p className="min-w-0">
-                <span className="font-semibold">Email:</span>{" "}
-                <span className="break-words">{user?.email ?? "—"}</span>
-              </p>
-            </div>
-
-            <div className="flex items-start gap-2">
-              <FaPhoneAlt className="w-5 h-5 text-orange-400 mt-0.5" />
-              <p className="min-w-0">
-                <span className="font-semibold">Phone:</span>{" "}
-                <span className="break-words">{user?.phoneNumber ?? "—"}</span>
-              </p>
-            </div>
-
-            <div className="flex items-start gap-2">
-              <FaMapMarkerAlt className="w-5 h-5 text-orange-400 mt-0.5" />
-              <p className="min-w-0">
-                <span className="font-semibold">Address:</span>{" "}
-                <span className="break-words">{user?.address ?? "—"}</span>
-              </p>
-            </div>
+            <Info
+              icon={<FaUserAlt />}
+              label="Username"
+              value={user?.username}
+            />
+            <Info icon={<FaEnvelope />} label="Email" value={user?.email} />
+            <Info
+              icon={<FaPhoneAlt />}
+              label="Phone"
+              value={user?.phoneNumber}
+            />
+            <Info
+              icon={<FaMapMarkerAlt />}
+              label="Address"
+              value={user?.address}
+            />
           </div>
 
           <div className="space-y-2">
             <div className="flex items-start gap-2">
               <FaUserShield className="w-5 h-5 text-orange-400 mt-0.5" />
-              <p className="min-w-0">
+              <p>
                 <span className="font-semibold">Role:</span>{" "}
                 <RoleBadge value={user?.role} />
               </p>
@@ -78,46 +79,53 @@ export default function AdminUserCard({ user, onEdit, onRemove }) {
 
             <div className="flex items-start gap-2">
               <FaUserShield className="w-5 h-5 text-orange-400 mt-0.5" />
-              <p className="min-w-0">
+              <p>
                 <span className="font-semibold">Status:</span>{" "}
                 <StatusBadge value={user?.status} />
               </p>
             </div>
 
-            <div className="flex items-start gap-2">
-              <FaPlus className="w-5 h-5 text-orange-400 mt-0.5" />
-              <p className="min-w-0">
-                <span className="font-semibold">Added on:</span>{" "}
-                {user?.createdAt ? formatDate(user.createdAt) : "—"}
-              </p>
-            </div>
-
-            <div className="flex items-start gap-2">
-              <FaRegClock className="w-5 h-5 text-orange-400 mt-0.5" />
-              <p className="min-w-0">
-                <span className="font-semibold">Update:</span>{" "}
-                {user?.updatedAt ? formatDate(user.updatedAt) : "—"}
-              </p>
-            </div>
+            <Info
+              icon={<FaPlus />}
+              label="Added on"
+              value={user?.createdAt ? formatDate(user.createdAt) : null}
+            />
+            <Info
+              icon={<FaRegClock />}
+              label="Update"
+              value={user?.updatedAt ? formatDate(user.updatedAt) : null}
+            />
           </div>
         </div>
       </div>
 
       <div className="flex flex-col items-end gap-4 ml-4">
         <button
-          onClick={() => onEdit?.(user)}
+          onClick={handleEdit}
           className="border border-orange-500 text-orange-500 px-8 py-2 rounded-full hover:bg-orange-50 transition font-medium"
         >
           Edit
         </button>
 
         <button
-          onClick={() => onRemove?.(user.userId)}
+          onClick={handleRemove}
           className="bg-orange-500 text-white px-8 py-2 rounded-full hover:bg-orange-600 transition font-medium"
         >
           Remove
         </button>
       </div>
+    </div>
+  );
+}
+
+function Info({ icon, label, value }) {
+  return (
+    <div className="flex items-start gap-2">
+      <span className="w-5 h-5 text-orange-400 mt-0.5">{icon}</span>
+      <p className="min-w-0">
+        <span className="font-semibold">{label}:</span>{" "}
+        <span className="break-words">{value ?? "—"}</span>
+      </p>
     </div>
   );
 }
@@ -151,13 +159,11 @@ function StatusBadge({ value }) {
   const raw = String(value || "ACTIVE").toUpperCase();
   const isActive = raw === "ACTIVE" || raw === "ACTIVATED";
 
-  const cls = isActive
-    ? "bg-green-100 text-green-700"
-    : "bg-gray-200 text-gray-700";
-
   return (
     <span
-      className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${cls}`}
+      className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
+        isActive ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-700"
+      }`}
     >
       {isActive ? "Activated" : "Not activated"}
     </span>

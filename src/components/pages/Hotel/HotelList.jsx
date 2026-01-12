@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   FaFilter,
   FaSearch,
@@ -40,7 +40,7 @@ export default function HotelList() {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  const [sortOrder, setSortOrder] = useState(null);
+  const [sortOrder, setSortOrder] = useState(null); // null | "asc" | "desc"
   const [province, setProvince] = useState("");
   const [provinces, setProvinces] = useState([]);
 
@@ -49,29 +49,36 @@ export default function HotelList() {
 
   const [isLoading, setIsLoading] = useState(true);
 
+  // desktop dropdown
   const [showFilter, setShowFilter] = useState(false);
   const [showSort, setShowSort] = useState(false);
-
-  //  ADD: refs to close dropdown when clicking outside
   const filterRef = useRef(null);
   const sortRef = useRef(null);
 
+  // ✅ mobile fullscreen panel
+  const [mobilePanel, setMobilePanel] = useState(null); // "filter" | "sort" | null
+
+  // click outside (desktop dropdown)
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (
-        filterRef.current &&
-        !filterRef.current.contains(e.target) &&
-        sortRef.current &&
-        !sortRef.current.contains(e.target)
-      ) {
+      const inFilter = filterRef.current && filterRef.current.contains(e.target);
+      const inSort = sortRef.current && sortRef.current.contains(e.target);
+      if (!inFilter && !inSort) {
         setShowFilter(false);
         setShowSort(false);
       }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // lock scroll on mobile panel
+  useEffect(() => {
+    document.body.style.overflow = mobilePanel ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobilePanel]);
 
   // Debounce search
   useEffect(() => {
@@ -84,7 +91,7 @@ export default function HotelList() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Đồng bộ page từ URL khi Back
+  // Sync page from URL when back
   useEffect(() => {
     const urlPage = parseInt(searchParams.get("page")) || 1;
     if (urlPage !== page) setPage(urlPage);
@@ -150,143 +157,228 @@ export default function HotelList() {
     return Array.from({ length: end - start + 1 }, (_, i) => start + i);
   };
 
-  return (
-    <div className="bg-gray-50 py-12 flex flex-col items-center min-h-screen">
-      <div className="w-full max-w-7xl mx-auto px-4 relative z-30">
-        <h2 className="text-4xl font-podcast text-gray-800 mb-6">
-          {t("hotelPage.title")}
-        </h2>
+  const clearAll = () => {
+    setProvince("");
+    setSortOrder(null);
+    setSearchTerm("");
+    setDebouncedSearch("");
+    setPage(1);
+    setShowFilter(false);
+    setShowSort(false);
+    setMobilePanel(null);
+  };
 
-        {/* SEARCH / FILTER / SORT */}
-        <div className="flex items-center justify-between gap-3 mb-10">
-          <div className="flex items-center flex-1 bg-white border border-gray-300 rounded-full px-5 py-2 shadow-sm">
+  const activeCount = (province ? 1 : 0) + (sortOrder ? 1 : 0);
+
+  return (
+    <div className="bg-gray-50 py-10 sm:py-12 flex flex-col items-center min-h-screen">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 relative z-30">
+        <div className="flex items-center justify-between gap-3 mb-6">
+          <h2 className="text-3xl sm:text-4xl font-podcast text-gray-800">
+            {t("hotelPage.title")}
+          </h2>
+
+          {activeCount > 0 && (
+            <button
+              onClick={clearAll}
+              className="hidden sm:inline-flex px-3 py-2 rounded-full bg-orange-100 text-orange-700 text-sm hover:bg-orange-200"
+            >
+              Clear ({activeCount})
+            </button>
+          )}
+        </div>
+
+        {/* SEARCH + ACTIONS */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-8 sm:mb-10">
+          {/* SEARCH */}
+          <div className="flex items-center w-full sm:flex-1 bg-white border border-gray-300 rounded-full px-5 py-2 shadow-sm">
             <input
               type="text"
               placeholder={t("hotelPage.searchPlaceholder")}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1 text-sm outline-none"
+              className="flex-1 text-sm outline-none bg-transparent"
             />
             <FaSearch size={16} className="text-gray-600" />
           </div>
 
-          {/* FILTER */}
-          <div className="relative" ref={filterRef}>
+          {/* ✅ MOBILE: 2 nút to */}
+          <div className="grid grid-cols-2 gap-2 sm:hidden">
             <button
-              onClick={() => {
-                setShowFilter(!showFilter);
-                setShowSort(false);
-              }}
-              className="bg-white border border-gray-300 rounded-lg w-10 h-10 flex justify-center items-center hover:bg-orange-50"
+              onClick={() => setMobilePanel("filter")}
+              className="bg-white border border-gray-300 rounded-xl py-2 flex items-center justify-center gap-2 relative"
             >
-              <FaFilter size={16} />
-            </button>
-
-            {showFilter && (
-              <div className="absolute right-0 mt-2 w-60 bg-white border rounded-lg shadow-xl p-4 z-50  max-h-64 overflow-y-auto pointer-events-auto">
-                <p className="font-semibold mb-2">
-                  {t("hotelPage.filterByProvince")}
-                </p>
-
-                {["", ...provinces].map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => {
-                      if (province !== p) {
-                        setProvince(p);
-                        setPage(1);
-                      }
-                      setShowFilter(false);
-                    }}
-                    className={`block w-full text-left px-3 py-1.5 rounded hover:bg-orange-100 ${
-                      province === p ? "bg-orange-200" : ""
-                    }`}
-                  >
-                    {p === "" ? t("hotelPage.allProvinces") : p}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* SORT */}
-          <div className="relative" ref={sortRef}>
-            <button
-              onClick={() => {
-                setShowSort(!showSort);
-                setShowFilter(false);
-              }}
-              className="bg-white border border-gray-300 rounded-lg w-10 h-10 flex justify-center items-center hover:bg-orange-50"
-            >
-              {sortOrder === "asc" ? (
-                <FaSortAmountUpAlt size={16} />
-              ) : (
-                <FaSortAmountDownAlt size={16} />
+              <FaFilter />
+              <span className="text-sm">{t("hotelPage.filterByProvince")}</span>
+              {province && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 text-[11px] rounded-full bg-orange-500 text-white grid place-items-center">
+                  1
+                </span>
               )}
             </button>
 
-            {showSort && (
-              <div className="absolute right-0 mt-2 w-52 bg-white border rounded-lg shadow-xl p-3 z-50 pointer-events-auto">
-                <p className="font-semibold mb-2">{t("hotelPage.sortBy")}</p>
+            <button
+              onClick={() => setMobilePanel("sort")}
+              className="bg-white border border-gray-300 rounded-xl py-2 flex items-center justify-center gap-2 relative"
+            >
+              {sortOrder === "asc" ? <FaSortAmountUpAlt /> : <FaSortAmountDownAlt />}
+              <span className="text-sm">{t("hotelPage.sortBy")}</span>
+              {sortOrder && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 text-[11px] rounded-full bg-orange-500 text-white grid place-items-center">
+                  1
+                </span>
+              )}
+            </button>
 
-                <button
-                  className={`block w-full text-left px-3 py-1.5 rounded hover:bg-orange-100 ${
-                    sortOrder === null ? "bg-orange-200" : ""
-                  }`}
-                  onClick={() => {
-                    if (sortOrder !== null) {
-                      setSortOrder(null);
-                      setPage(1);
-                    }
-                    setShowSort(false);
-                  }}
-                >
-                  {t("hotelPage.defaultSort")}
-                </button>
+            {(province || sortOrder) && (
+              <button
+                onClick={clearAll}
+                className="col-span-2 bg-orange-500 text-white rounded-xl py-2 font-semibold"
+              >
+                Clear all
+              </button>
+            )}
+          </div>
 
-                <button
-                  className={`block w-full text-left px-3 py-1.5 rounded hover:bg-orange-100 ${
-                    sortOrder === "asc" ? "bg-orange-200" : ""
-                  }`}
-                  onClick={() => {
-                    if (sortOrder !== "asc") {
-                      setSortOrder("asc");
-                      setPage(1);
-                    }
-                    setShowSort(false);
-                  }}
-                >
-                  {t("hotelPage.sortAsc")}
-                </button>
+          {/* DESKTOP: dropdown icons */}
+          <div className="hidden sm:flex items-center justify-end gap-2">
+            {/* FILTER */}
+            <div className="relative" ref={filterRef}>
+              <button
+                onClick={() => {
+                  setShowFilter(!showFilter);
+                  setShowSort(false);
+                }}
+                className="bg-white border border-gray-300 rounded-xl w-10 h-10 flex justify-center items-center hover:bg-orange-50 relative"
+              >
+                <FaFilter size={16} />
+                {province && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 text-[11px] rounded-full bg-orange-500 text-white grid place-items-center">
+                    1
+                  </span>
+                )}
+              </button>
 
-                <button
-                  className={`block w-full text-left px-3 py-1.5 rounded hover:bg-orange-100 ${
-                    sortOrder === "desc" ? "bg-orange-200" : ""
-                  }`}
-                  onClick={() => {
-                    if (sortOrder !== "desc") {
-                      setSortOrder("desc");
-                      setPage(1);
-                    }
-                    setShowSort(false);
-                  }}
-                >
-                  {t("hotelPage.sortDesc")}
-                </button>
-              </div>
+              {showFilter && (
+                <div className="absolute right-0 mt-2 w-72 bg-white border rounded-2xl shadow-xl p-4 z-50 max-h-72 overflow-y-auto">
+                  <p className="font-semibold mb-2">
+                    {t("hotelPage.filterByProvince")}
+                  </p>
+
+                  {["", ...provinces].map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => {
+                        if (province !== p) {
+                          setProvince(p);
+                          setPage(1);
+                        }
+                        setShowFilter(false);
+                      }}
+                      className={`block w-full text-left px-3 py-2 rounded-xl hover:bg-orange-100 ${
+                        province === p ? "bg-orange-200" : ""
+                      }`}
+                    >
+                      {p === "" ? t("hotelPage.allProvinces") : p}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* SORT */}
+            <div className="relative" ref={sortRef}>
+              <button
+                onClick={() => {
+                  setShowSort(!showSort);
+                  setShowFilter(false);
+                }}
+                className="bg-white border border-gray-300 rounded-xl w-10 h-10 flex justify-center items-center hover:bg-orange-50 relative"
+              >
+                {sortOrder === "asc" ? (
+                  <FaSortAmountUpAlt size={16} />
+                ) : (
+                  <FaSortAmountDownAlt size={16} />
+                )}
+                {sortOrder && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 text-[11px] rounded-full bg-orange-500 text-white grid place-items-center">
+                    1
+                  </span>
+                )}
+              </button>
+
+              {showSort && (
+                <div className="absolute right-0 mt-2 w-56 bg-white border rounded-2xl shadow-xl p-3 z-50">
+                  <p className="font-semibold mb-2">{t("hotelPage.sortBy")}</p>
+
+                  <button
+                    className={`block w-full text-left px-3 py-2 rounded-xl hover:bg-orange-100 ${
+                      sortOrder === null ? "bg-orange-200" : ""
+                    }`}
+                    onClick={() => {
+                      if (sortOrder !== null) {
+                        setSortOrder(null);
+                        setPage(1);
+                      }
+                      setShowSort(false);
+                    }}
+                  >
+                    {t("hotelPage.defaultSort")}
+                  </button>
+
+                  <button
+                    className={`block w-full text-left px-3 py-2 rounded-xl hover:bg-orange-100 ${
+                      sortOrder === "asc" ? "bg-orange-200" : ""
+                    }`}
+                    onClick={() => {
+                      if (sortOrder !== "asc") {
+                        setSortOrder("asc");
+                        setPage(1);
+                      }
+                      setShowSort(false);
+                    }}
+                  >
+                    {t("hotelPage.sortAsc")}
+                  </button>
+
+                  <button
+                    className={`block w-full text-left px-3 py-2 rounded-xl hover:bg-orange-100 ${
+                      sortOrder === "desc" ? "bg-orange-200" : ""
+                    }`}
+                    onClick={() => {
+                      if (sortOrder !== "desc") {
+                        setSortOrder("desc");
+                        setPage(1);
+                      }
+                      setShowSort(false);
+                    }}
+                  >
+                    {t("hotelPage.sortDesc")}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {(province || sortOrder) && (
+              <button
+                onClick={clearAll}
+                className="px-3 py-2 rounded-full bg-orange-100 text-orange-700 text-sm hover:bg-orange-200"
+              >
+                Clear ({activeCount})
+              </button>
             )}
           </div>
         </div>
 
         {/* CONTENT */}
         {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 items-stretch">
             {Array.from({ length: 8 }).map((_, i) => (
               <HotelSkeleton key={i} />
             ))}
           </div>
         ) : hotels.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 items-stretch">
             {hotels.map((hotel) => (
               <HotelCard
                 key={hotel.hotelId}
@@ -301,9 +393,7 @@ export default function HotelList() {
             ))}
           </div>
         ) : (
-          <p className="text-center text-gray-500 mt-10">
-            {t("hotelPage.noResult")}
-          </p>
+          <p className="text-center text-gray-500 mt-10">{t("hotelPage.noResult")}</p>
         )}
 
         <Pagination
@@ -313,6 +403,133 @@ export default function HotelList() {
           onPageChange={onPageChange}
         />
       </div>
+
+      {/* ✅ MOBILE FULLSCREEN PANEL */}
+      {mobilePanel && (
+        <div className="fixed inset-0 z-[80] sm:hidden">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setMobilePanel(null)}
+          />
+          <div className="absolute inset-x-0 bottom-0 top-16 bg-white rounded-t-3xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="px-4 py-3 border-b flex items-center justify-between">
+              <div className="font-semibold text-lg">
+                {mobilePanel === "filter"
+                  ? t("hotelPage.filterByProvince")
+                  : t("hotelPage.sortBy")}
+              </div>
+              <button
+                onClick={() => setMobilePanel(null)}
+                className="px-3 py-1.5 rounded-full bg-gray-100"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="p-4 overflow-auto flex-1">
+              {/* FILTER */}
+              {mobilePanel === "filter" && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    {["", ...provinces].map((p) => (
+                      <button
+                        key={p}
+                        onClick={() => {
+                          setProvince(p);
+                          setPage(1);
+                        }}
+                        className={`py-3 px-2 rounded-2xl border text-sm ${
+                          province === p
+                            ? "bg-orange-500 text-white border-orange-500"
+                            : "bg-white"
+                        }`}
+                      >
+                        {p === "" ? t("hotelPage.allProvinces") : p}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-2">
+                    <button
+                      onClick={() => setMobilePanel(null)}
+                      className="py-3 rounded-2xl bg-orange-500 text-white font-semibold"
+                    >
+                      Done
+                    </button>
+                    <button
+                      onClick={() => {
+                        setProvince("");
+                        setPage(1);
+                        setMobilePanel(null);
+                      }}
+                      className="py-3 rounded-2xl bg-gray-200 font-semibold"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* SORT */}
+              {mobilePanel === "sort" && (
+                <div className="space-y-2">
+                  <button
+                    onClick={() => {
+                      setSortOrder(null);
+                      setPage(1);
+                      setMobilePanel(null);
+                    }}
+                    className={`w-full text-left px-4 py-4 rounded-2xl border ${
+                      sortOrder === null
+                        ? "bg-orange-500 text-white border-orange-500"
+                        : "bg-white"
+                    }`}
+                  >
+                    {t("hotelPage.defaultSort")}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setSortOrder("asc");
+                      setPage(1);
+                      setMobilePanel(null);
+                    }}
+                    className={`w-full text-left px-4 py-4 rounded-2xl border ${
+                      sortOrder === "asc"
+                        ? "bg-orange-500 text-white border-orange-500"
+                        : "bg-white"
+                    }`}
+                  >
+                    {t("hotelPage.sortAsc")}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setSortOrder("desc");
+                      setPage(1);
+                      setMobilePanel(null);
+                    }}
+                    className={`w-full text-left px-4 py-4 rounded-2xl border ${
+                      sortOrder === "desc"
+                        ? "bg-orange-500 text-white border-orange-500"
+                        : "bg-white"
+                    }`}
+                  >
+                    {t("hotelPage.sortDesc")}
+                  </button>
+
+                  <button
+                    onClick={clearAll}
+                    className="w-full mt-2 py-3 rounded-2xl bg-gray-200 font-semibold"
+                  >
+                    Clear all
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

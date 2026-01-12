@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import BlogCard from "../components/pages/Blog/BlogCard";
 import BlogSidebar from "../components/pages/Blog/BlogSiderbar";
 
@@ -13,27 +13,22 @@ export default function Blog() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterDate, setFilterDate] = useState("");
 
-  const [selectedTag, setSelectedTag] = useState(""); // ✅ tag đang chọn
+  const [selectedTag, setSelectedTag] = useState(""); // tag đang chọn
   const [loading, setLoading] = useState(true);
 
   const blogsPerPage = 5;
-
   const BASE_URL = "http://localhost:8080";
 
-  // ✅ S3 base for blog images
   const S3_BLOG_BASE =
     "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/blog";
-
   const getBlogImage = (blogId) => `${S3_BLOG_BASE}/blog_${blogId}.jpg`;
 
-  // ✅ format desc
   const toDesc = (details) => {
     const text = details || "";
     if (!text) return "Không có mô tả.";
     return text.slice(0, 200) + (text.length > 200 ? "..." : "");
   };
 
-  // ✅ Map API blog -> UI blog card
   const mapBlog = (b, fallbackIndex = 0) => ({
     id: b.blogId ?? b.id ?? fallbackIndex,
     title: b.title ?? "",
@@ -43,9 +38,7 @@ export default function Blog() {
     createdAt: b.createdAt ?? null,
   });
 
-  /* ----------------------------------------------
-   *  DEBOUNCE SEARCH (0.7s)
-   * ---------------------------------------------- */
+  // DEBOUNCE SEARCH (0.7s)
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchTerm);
@@ -53,9 +46,7 @@ export default function Blog() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  /* ----------------------------------------------
-   *  FETCH BLOG DEFAULT (PAGED)
-   * ---------------------------------------------- */
+  // FETCH BLOG DEFAULT (PAGED)
   const fetchBlogs = async (page = 1) => {
     try {
       setLoading(true);
@@ -67,15 +58,10 @@ export default function Blog() {
 
       const data = await res.json();
       const items = data._embedded?.blogs || [];
-
       const formatted = items.map((b, index) => mapBlog(b, index));
 
-      // blogs: dùng cho sidebar recent/gallery
       setBlogs(formatted);
-
-      // nếu không có filter nào thì list hiển thị = default page
       setFilteredBlogs(formatted);
-
       setTotalPages(data.page?.totalPages || 1);
     } catch (err) {
       console.error("❌ Lỗi fetch blogs:", err);
@@ -94,13 +80,9 @@ export default function Blog() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, debouncedSearch, filterDate, selectedTag]);
 
-  /* ----------------------------------------------
-   *  SEARCH + FILTER DATE COMBO API
-   *  (chỉ chạy khi không chọn TAG)
-   * ---------------------------------------------- */
+  // SEARCH + FILTER DATE COMBO API (chỉ chạy khi không chọn TAG)
   useEffect(() => {
     const fetchFiltered = async () => {
-      // nếu đang lọc TAG thì không chạy search/date combo ở đây
       if (selectedTag) return;
 
       try {
@@ -121,7 +103,6 @@ export default function Blog() {
             filterDate
           )}`;
         } else {
-          // không filter gì => về default list page 1
           setCurrentPage(1);
           fetchBlogs(1);
           return;
@@ -132,13 +113,9 @@ export default function Blog() {
 
         const data = await res.json();
         const items = data._embedded?.blogs || [];
-
         const formatted = items.map((b, index) => mapBlog(b, index));
 
-        // với search/date: list bên trái thay đổi
         setFilteredBlogs(formatted);
-
-        // sidebar recent/gallery nên lấy theo data đang hiển thị cũng ok
         setBlogs(formatted);
 
         setTotalPages(1);
@@ -157,9 +134,7 @@ export default function Blog() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch, filterDate, selectedTag]);
 
-  /* ----------------------------------------------
-   *  FILTER BY TAG API
-   * ---------------------------------------------- */
+  // FILTER BY TAG API
   const fetchByTag = async (tag) => {
     try {
       setLoading(true);
@@ -173,22 +148,15 @@ export default function Blog() {
 
       const data = await res.json();
       const items = data._embedded?.blogs || [];
-
       const formatted = items.map((b, index) => mapBlog(b, index));
 
       setSelectedTag(tag);
-
-      // tag filter: update list bên trái
       setFilteredBlogs(formatted);
-
-      // sidebar recent/gallery theo list này cho hợp lý
       setBlogs(formatted);
 
-      // tag filter => không pagination
       setTotalPages(1);
       setCurrentPage(1);
 
-      // clear các filter khác để tránh “đánh nhau”
       setSearchTerm("");
       setDebouncedSearch("");
       setFilterDate("");
@@ -210,13 +178,10 @@ export default function Blog() {
   const clearTag = () => {
     setSelectedTag("");
     setCurrentPage(1);
-    // quay lại default list
     fetchBlogs(1);
   };
 
-  /* ----------------------------------------------
-   *  PAGINATION SLIDE (kiểu Tour)
-   * ---------------------------------------------- */
+  // PAGINATION
   const getVisiblePages = () => {
     let pages = [];
 
@@ -255,13 +220,33 @@ export default function Blog() {
   };
 
   const showPagination =
-    debouncedSearch === "" && filterDate === "" && selectedTag === "" && totalPages > 1;
+    debouncedSearch === "" &&
+    filterDate === "" &&
+    selectedTag === "" &&
+    totalPages > 1;
 
   return (
-    <div className="max-w-[1150px] mx-auto px-[70px] py-12 lg:flex gap-8">
-      {/* LEFT: LIST */}
-      <div className="lg:w-[68%] w-full">
-        {/* Tag label */}
+    <div
+      className="
+        max-w-[1150px] mx-auto
+        px-4 sm:px-6 lg:px-[70px]
+        py-12
+        flex flex-col lg:flex-row
+        gap-8
+      "
+    >
+      {/* ✅ SIDEBAR Ở TRÊN (mobile) & BÊN PHẢI (desktop) */}
+      <div className="w-full lg:w-[32%] lg:order-2">
+        <BlogSidebar
+          blogs={blogs}
+          onSearch={setSearchTerm}
+          onTagSelect={handleTagSelect}
+          onDateFilter={setFilterDate}
+        />
+      </div>
+
+      {/* ✅ LIST Ở DƯỚI (mobile) & BÊN TRÁI (desktop) */}
+      <div className="w-full lg:w-[68%] lg:order-1">
         {selectedTag && (
           <div className="mb-6 flex items-center gap-3">
             <div className="text-sm text-gray-600">
@@ -288,10 +273,8 @@ export default function Blog() {
           </p>
         )}
 
-        {/* PAGINATION only for default listing */}
         {showPagination && (
-          <div className="flex justify-center items-center gap-2 mt-10">
-            {/* Prev */}
+          <div className="flex justify-center items-center gap-2 mt-10 flex-wrap">
             <button
               onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
@@ -304,7 +287,6 @@ export default function Blog() {
               ‹ Prev
             </button>
 
-            {/* Page numbers */}
             {getVisiblePages().map((page) => (
               <button
                 key={page}
@@ -319,11 +301,8 @@ export default function Blog() {
               </button>
             ))}
 
-            {/* Next */}
             <button
-              onClick={() =>
-                setCurrentPage(Math.min(totalPages, currentPage + 1))
-              }
+              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
               disabled={currentPage === totalPages}
               className={`px-5 py-2 rounded-full text-sm font-semibold border ${
                 currentPage === totalPages
@@ -336,14 +315,6 @@ export default function Blog() {
           </div>
         )}
       </div>
-
-      {/* RIGHT: SIDEBAR */}
-      <BlogSidebar
-        blogs={blogs}
-        onSearch={setSearchTerm}
-        onTagSelect={handleTagSelect}      // ✅ TAG FILTER
-        onDateFilter={setFilterDate}
-      />
     </div>
   );
 }

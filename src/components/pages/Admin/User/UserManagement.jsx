@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import AdminUserCard from "@/components/pages/Admin/User/AdminUserCard";
 import Pagination from "@/utils/Pagination";
 import { getUsers } from "@/apis/User";
+import { adminDeleteUser } from "@/apis/User"; 
 
 const ROLES = [
   { label: "All roles", value: "ALL" },
@@ -63,7 +64,6 @@ export default function UserManagement() {
         role,
         status: "ALL",
       });
-
       setUsers(data._embedded?.users ?? []);
       setTotalPages(data.page?.totalPages ?? 1);
     } catch (e) {
@@ -99,6 +99,11 @@ export default function UserManagement() {
     setSearchParams(next);
   };
 
+  const handleRemove = async (userId) => {
+    await adminDeleteUser(userId);
+    loadUsers(currentPage, roleFilter);
+  };
+
   return (
     <div className="max-w-5xl mx-auto py-10">
       <div className="flex justify-between items-center mb-6">
@@ -117,9 +122,11 @@ export default function UserManagement() {
             ))}
           </select>
 
-          <button className="px-5 py-2 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition">
-            + Add User
-          </button>
+          <Link to="/admin/users/new">
+            <button className="px-5 py-2 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition">
+              + Add User
+            </button>
+          </Link>
         </div>
       </div>
 
@@ -133,8 +140,7 @@ export default function UserManagement() {
             <AdminUserCard
               key={user.userId}
               user={user}
-              onEdit={() => {}}
-              onRemove={() => {}}
+              onRemove={handleRemove}
             />
           ))}
         </div>

@@ -7,7 +7,6 @@ import { useNavigate } from "react-router-dom";
 
 const BASE_URL = "http://localhost:8080";
 
-// map blog api -> ui post
 const mapBlog = (b) => {
   const id = b.blogId ?? b.id;
   const dateISO = b.createdAt ?? b.time ?? b.date;
@@ -15,8 +14,6 @@ const mapBlog = (b) => {
   const title = b.title ?? "";
   const description = (b.details ?? b.description ?? "").slice(0, 180);
 
-  // ✅ ảnh: bạn chỉnh lại cho đúng nơi host ảnh
-  // Nếu thumbnail là file name và BE có endpoint serve ảnh kiểu /uploads/...
   const image =
     b.thumbnail?.startsWith("http")
       ? b.thumbnail
@@ -30,14 +27,13 @@ const mapBlog = (b) => {
 export default function BlogSidebar({
   blogs = [],
   onSearch,
-  onTagSelect, // (tag) => void
-  onDateFilter, // (yyyy-mm-dd) => void
+  onTagSelect,
+  onDateFilter,
 }) {
   const navigate = useNavigate();
   const [tags, setTags] = useState([]);
   const [selectedDate, setSelectedDate] = useState(null);
 
-  // Fetch TAGS from API
   useEffect(() => {
     fetch(`${BASE_URL}/blogs/tags`)
       .then((res) => res.json())
@@ -49,7 +45,6 @@ export default function BlogSidebar({
   const recentPosts = uiBlogs.slice(0, 3);
   const gallery = uiBlogs.slice(0, 6);
 
-  /** Chuyển Date → yyyy-mm-dd */
   const formatToYMD = (date) => {
     if (!date) return "";
     return date.toISOString().split("T")[0];
@@ -69,9 +64,9 @@ export default function BlogSidebar({
   };
 
   return (
-    <aside className="lg:w-[30%] w-full lg:pl-8 space-y-6 sticky top-20 self-start">
+    <aside className="w-full space-y-6 self-start">
       {/* 🔍 SEARCH BOX */}
-      <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition">
+      <div className="w-full bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition">
         <h3 className="font-semibold mb-3 text-gray-800">Search</h3>
         <div className="relative">
           <input
@@ -85,7 +80,7 @@ export default function BlogSidebar({
       </div>
 
       {/* 🗓 DATE FILTER BOX */}
-      <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition z-50">
+      <div className="w-full bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition">
         <h3 className="font-semibold mb-3 text-gray-800">Filter by Date</h3>
 
         <div className="relative flex items-center">
@@ -98,7 +93,7 @@ export default function BlogSidebar({
             dateFormat="yyyy-MM-dd"
             placeholderText="Select date"
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
-            popperClassName="z-[9999]"
+            popperClassName="z-[99999]"
             popperPlacement="bottom-start"
             showPopperArrow={false}
           />
@@ -119,7 +114,7 @@ export default function BlogSidebar({
       </div>
 
       {/* 🏷 TAG FILTER */}
-      <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition">
+      <div className="w-full bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition">
         <h3 className="font-semibold mb-3 text-gray-800">Tags</h3>
 
         <div className="flex flex-wrap gap-2">
@@ -140,7 +135,7 @@ export default function BlogSidebar({
       </div>
 
       {/* 📰 RECENT POSTS */}
-      <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition">
+      <div className="w-full bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition">
         <h3 className="font-semibold mb-3 text-gray-800">Recent Posts</h3>
         <ul className="space-y-3">
           {recentPosts.map((post) => (
@@ -155,12 +150,13 @@ export default function BlogSidebar({
                     src={post.image}
                     alt={post.title}
                     className="w-full h-full object-cover"
+                    loading="lazy"
                   />
                 ) : null}
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs text-gray-500">{post.date} • Admin</p>
-                <p className="text-sm font-medium text-gray-700 hover:text-orange-500 leading-tight">
+                <p className="text-sm font-medium text-gray-700 hover:text-orange-500 leading-tight line-clamp-2">
                   {post.title}
                 </p>
               </div>
@@ -170,7 +166,7 @@ export default function BlogSidebar({
       </div>
 
       {/* 🖼 GALLERY */}
-      <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition">
+      <div className="w-full bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition">
         <h3 className="font-semibold mb-3 text-gray-800">Gallery</h3>
         <div className="grid grid-cols-3 gap-2">
           {gallery.map((post, i) => (
@@ -185,6 +181,7 @@ export default function BlogSidebar({
                   src={post.image}
                   alt={`Gallery ${i + 1}`}
                   className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                  loading="lazy"
                 />
               ) : null}
             </button>

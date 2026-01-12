@@ -75,3 +75,74 @@ export const markNotificationRead = async (id) => {
     method: "PATCH",
   });
 };
+
+
+function getAuthHeaders() {
+  const token = localStorage.getItem("jwt");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+// Broadcast notification
+export async function adminBroadcastNotification(message) {
+  const res = await fetch(
+    `${BASE_URL}/admin/notif/broadcast?message=${encodeURIComponent(message)}`,
+    { method: "POST", headers: getAuthHeaders() }
+  );
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+// Update notification status
+export async function adminUpdateNotificationStatus(id, status) {
+  const res = await fetch(
+    `${BASE_URL}/admin/notif/${id}/status?status=${status}`,
+    { method: "PATCH", headers: getAuthHeaders() }
+  );
+  if (!res.ok) throw new Error(await res.text());
+  return res.text();
+}
+
+// Delete notification
+export async function adminDeleteNotification(id) {
+  const res = await fetch(
+    `${BASE_URL}/admin/notif/delete/${id}`,
+    { method: "DELETE", headers: getAuthHeaders() }
+  );
+  if (!res.ok) throw new Error(await res.text());
+  return true;
+}
+
+// Send notification to specific users
+export async function adminSendNotificationToUsers(message, userIds = []) {
+  const params = new URLSearchParams();
+  params.append("message", message);
+  userIds.forEach((id) => params.append("userIds", id));
+
+  const res = await fetch(
+    `${BASE_URL}/admin/notif/send-to-specific?${params.toString()}`,
+    { method: "POST", headers: getAuthHeaders() }
+  );
+  return res.text();
+}
+
+// Get all notifications (admin)
+export async function adminGetAllNotifications({
+  status,
+  isBroadcast,
+  search,
+  targetUser,
+} = {}) {
+  const params = new URLSearchParams();
+  if (status) params.append("status", status);
+  if (isBroadcast !== undefined) params.append("isBroadcast", isBroadcast);
+  if (search) params.append("search", search);
+  if (targetUser) params.append("targetUser", targetUser);
+
+  const res = await fetch(
+    `${BASE_URL}/admin/notif/all?${params.toString()}`,
+    { method: "GET", headers: getAuthHeaders() }
+  );
+
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}

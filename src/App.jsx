@@ -28,6 +28,7 @@ import TourScheduleDetail from "./pages/TourGuide/TourScheduleDetail";
 
 //  ADMIN
 import AdminUserManagementPage from "./pages/Admin/UserManagementPage";
+import AdminUserUpsertPage from "./pages/Admin/AdminUserUpsertPage";
 import AdminTourManagementPage from "./pages/Admin/TourManagementPage";
 import AdminTourUpsertPage from "./pages/Admin/AdminTourUpsertPage";
 import AdminHotelManagementPage from "./pages/Admin/HotelManagementPage";
@@ -35,6 +36,8 @@ import AddHotel from "./components/pages/Admin/Hotel/AddHotel";
 import UpdateHotel from "./components/pages/Admin/Hotel/UpdateHotel";
 import AdminBlogManagementPage from "./pages/Admin/BlogManagementPage";
 import AdminBlogUpsertPage from "./pages/Admin/AdminBlogUpsertPage";
+import AdminNotificationManagementPage from "./pages/Admin/NotificationManagementPage";
+import AdminNotificationCreatePage from "./pages/Admin/NotificationCreatePage";
 
 // ✅ HOTEL MANAGER
 import AddRoom from "./pages/HotelManager/AddRoom";
@@ -92,6 +95,7 @@ export default function App() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/profile/edit" element={<EditProfile />} />
+<<<<<<< HEAD
           <Route
             path="/booking-history/tours"
             element={<BookingHistoryTours />}
@@ -100,6 +104,12 @@ export default function App() {
             path="/booking-history/hotels"
             element={<BookingHistoryHotels />}
           />
+=======
+          <Route path="/booking-history/tours" element={<BookingHistoryTours />} />
+          <Route path="/booking-history/hotels" element={<BookingHistoryHotels />} />
+          
+
+>>>>>>> d51bc8deac8e81cab3c461e87205dcdacfbcef98
           <Route path="/403" element={<Forbidden403 />} />
 
           {/* TourGuide */}
@@ -276,6 +286,22 @@ export default function App() {
             }
           />
           <Route
+            path="/Admin/users/new"
+            element={
+              <RequireRole role="ADMIN">
+                <AdminUserUpsertPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/Admin/users/edit/:id"
+            element={
+              <RequireRole role="ADMIN">
+                <AdminUserUpsertPage />
+              </RequireRole>
+            }
+          />
+          <Route
             path="/Admin/blogs"
             element={
               <RequireRole role="ADMIN">
@@ -296,6 +322,22 @@ export default function App() {
             element={
               <RequireRole role="ADMIN">
                 <AdminBlogUpsertPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/admin/notifications"
+            element={
+              <RequireRole role="ADMIN">
+                <AdminNotificationManagementPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/admin/notifications/new"
+            element={
+              <RequireRole role="ADMIN">
+                <AdminNotificationCreatePage />
               </RequireRole>
             }
           />

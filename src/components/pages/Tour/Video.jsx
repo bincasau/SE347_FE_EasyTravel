@@ -2,22 +2,24 @@ import React from "react";
 
 export default function BookingVideo() {
   return (
-    <section className="w-full mt-20 flex flex-col items-center">
-      {/* Tiêu đề */}
-      <h2 className="text-4xl font-podcast text-center text-gray-900 mb-5 text-left w-[80%] max-w-6xl">
-        Beautiful Vietnam
-      </h2>
+    <section className="w-full mt-12 sm:mt-16 lg:mt-20">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6">
+        {/* Title */}
+        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-podcast text-gray-900 mb-5">
+          Beautiful Vietnam
+        </h2>
 
-      {/* Khung video */}
-      <div className="w-[80%] max-w-6xl aspect-video rounded-2xl overflow-hidden">
-        <iframe
-          className="w-full h-full rounded-2xl"
-          src="https://www.youtube.com/embed/Sxhfof7Y8Gw?si=vkJ8YTX042xsjzVn" // 👉 Thay link video bạn muốn
-          title="Beautiful Vietnam"
-          frameBorder="0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-        ></iframe>
+        {/* Video */}
+        <div className="w-full aspect-video rounded-2xl overflow-hidden bg-gray-100">
+          <iframe
+            className="w-full h-full"
+            src="https://www.youtube.com/embed/Sxhfof7Y8Gw?si=vkJ8YTX042xsjzVn"
+            title="Beautiful Vietnam"
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
       </div>
     </section>
   );
