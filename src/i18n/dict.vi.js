@@ -14,6 +14,7 @@ export const vi = {
     logout: "Đăng xuất",
     users: "Người dùng",
     dashboard: "Bảng điều khiển",
+    notifications: "Thông báo",
   },
 
   // ===== FOOTER =====

@@ -1,10 +1,29 @@
+// src/apis/UserAPI.js
 const API_BASE = "http://localhost:8080";
 
 function getAuthHeaders() {
   const token = localStorage.getItem("jwt");
-  return {
-    Authorization: `Bearer ${token}`,
-  };
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function readJsonOrText(res) {
+  const text = await res.text();
+  if (!res.ok) throw new Error(text || `${res.status} ${res.statusText}`);
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+function buildUserFormData(user, file) {
+  const fd = new FormData();
+  fd.append(
+    "user",
+    new Blob([JSON.stringify(user)], { type: "application/json" })
+  );
+  if (file) fd.append("file", file);
+  return fd;
 }
 
 export async function getAllUsers(page = 0, size = 20) {
@@ -12,20 +31,15 @@ export async function getAllUsers(page = 0, size = 20) {
     method: "GET",
     headers: getAuthHeaders(),
   });
-
-  if (!res.ok) {
-    throw new Error(await res.text());
-  }
-
-  return res.json();
+  return readJsonOrText(res);
 }
 
 /**
  * @param {Object} params
- * @param {number} params.page 
+ * @param {number} params.page
  * @param {number} params.size
- * @param {string} params.role  
- * @param {string} params.status 
+ * @param {string} params.role
+ * @param {string} params.status
  */
 export async function getUsers({
   page = 1,
@@ -63,9 +77,47 @@ export async function getUsers({
     method: "GET",
     headers: getAuthHeaders(),
   });
-  if (!res.ok) {
-    throw new Error(await res.text());
-  }
 
-  return res.json();
+  return readJsonOrText(res);
 }
+
+export async function adminCreateUser(user, file) {
+  console.log("api", user, file);
+  const res = await fetch(`${API_BASE}/admin/users/save`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: buildUserFormData(user, file),
+  });
+  return readJsonOrText(res);
+}
+
+export async function adminUpdateUser(id, user, file) {
+  const res = await fetch(`${API_BASE}/admin/users/update/${id}`, {
+    method: "PUT",
+    headers: getAuthHeaders(),
+    body: buildUserFormData(user, file),
+  });
+  return readJsonOrText(res);
+}
+
+export async function adminDeleteUser(id) {
+  const res = await fetch(`${API_BASE}/admin/users/delete/${id}`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+  const data = await readJsonOrText(res);
+  return data || true;
+}
+
+export async function getUserById(id) {
+  const res = await fetch(`${API_BASE}/users/${id}`, {
+    method: "GET",
+    headers: {
+      ...getAuthHeaders(),
+      Accept: "application/json",
+    },
+  });
+
+  return await readJsonOrText(res);
+}
+
