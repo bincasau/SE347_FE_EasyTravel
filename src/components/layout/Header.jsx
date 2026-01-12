@@ -69,6 +69,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
 
   const adminMenu = [
     { to: "/admin/dashboard", key: "dashboard" },
+    { to: "/admin/notifications", key: "notifications" },
     { to: "/admin/tours", key: "tours" },
     { to: "/admin/users", key: "users" },
     { to: "/admin/hotels", key: "hotel" },
@@ -667,3 +668,4 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     </header>
   );
 }
+ 

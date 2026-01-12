@@ -6,14 +6,15 @@ export const en = {
     home: "Home",
     about: "About Us",
     tours: "Tours",
-    hotel: "Hotel",
-    blog: "Blog",
+    hotel: "Hotels",
+    blog: "Blogs",
     contact: "Contact",
     login: "Login",
     signup: "Sign Up",
     logout: "Log out",
     users: "Users",
     dashboard: "Dashboard",
+    notifications: "Notifications",
   },
 
   // ===== FOOTER =====
