@@ -54,6 +54,8 @@ import SignupModal from "./pages/SignUp";
 import Forbidden403 from "./pages/Forbidden403";
 import NotFound404 from "./pages/NotFound404";
 
+import OAuth2Redirect from "./pages/OAuth2Redirect";
+
 export default function App() {
   const [openLogin, setOpenLogin] = useState(false);
   const [openSignup, setOpenSignup] = useState(false);
@@ -73,6 +75,7 @@ export default function App() {
         />
 
         <Routes>
+          <Route path="/oauth2-redirect" element={<OAuth2Redirect />} />
           <Route path="/" element={<Home />} />
           <Route path="/about-us" element={<AboutUs />} />
           <Route path="/contact-us" element={<ContactUs />} />
@@ -89,8 +92,14 @@ export default function App() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/profile/edit" element={<EditProfile />} />
-          <Route path="/booking-history/tours" element={<BookingHistoryTours />} />
-          <Route path="/booking-history/hotels" element={<BookingHistoryHotels />} />
+          <Route
+            path="/booking-history/tours"
+            element={<BookingHistoryTours />}
+          />
+          <Route
+            path="/booking-history/hotels"
+            element={<BookingHistoryHotels />}
+          />
           <Route path="/403" element={<Forbidden403 />} />
 
           {/* TourGuide */}

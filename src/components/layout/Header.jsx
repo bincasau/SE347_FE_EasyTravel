@@ -50,7 +50,9 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
       return (tb || 0) - (ta || 0);
     });
 
-  const unreadCount = notifications.filter((n) => !normalizeNoti(n).read).length;
+  const unreadCount = notifications.filter(
+    (n) => !normalizeNoti(n).read
+  ).length;
 
   const userMenu = [
     { to: "/", key: "home" },
@@ -130,8 +132,13 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
   };
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tokenFromUrl = params.get("token");
+    if (tokenFromUrl) {
+      localStorage.setItem("jwt", tokenFromUrl);
+      window.history.replaceState({}, document.title, "/");
+    }
     fetchUser();
-
     const handleJWT = () => fetchUser();
     window.addEventListener("jwt-changed", handleJWT);
 
@@ -283,8 +290,9 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     location.pathname.startsWith("/hotel-manager/rooms/edit") ||
     location.pathname.startsWith("/hotel-manager/rooms/view");
 
-  const isHotelManagerRevenueActive =
-    location.pathname.startsWith("/hotel-manager/revenue");
+  const isHotelManagerRevenueActive = location.pathname.startsWith(
+    "/hotel-manager/revenue"
+  );
 
   const renderNavClass = (it, isActive) => {
     if (it.to === "/tours" && isToursActive) return activeLink;
@@ -446,7 +454,10 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     <header className="sticky top-0 bg-white/90 backdrop-blur border-b border-gray-100 z-50">
       <div className="max-w-7xl mx-auto px-6">
         <div className="h-16 flex items-center justify-between">
-          <Link to={getHomeByRole()} className="flex items-center gap-2 shrink-0">
+          <Link
+            to={getHomeByRole()}
+            className="flex items-center gap-2 shrink-0"
+          >
             <img src={Logo} className="h-9" alt="logo" />
             <span className="text-2xl font-semibold text-orange-500">Easy</span>
             <span className="text-2xl font-semibold text-gray-900 -ml-2">
@@ -525,7 +536,9 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
 
                   <div className="max-h-[360px] overflow-auto">
                     {loadingNoti ? (
-                      <div className="p-6 text-gray-500 text-sm">Loading...</div>
+                      <div className="p-6 text-gray-500 text-sm">
+                        Loading...
+                      </div>
                     ) : notifications.length === 0 ? (
                       <div className="p-6 text-gray-500 text-sm">
                         No notifications.
