@@ -29,7 +29,7 @@ export default function AddHotel() {
   // popup success
   const [openSuccess, setOpenSuccess] = useState(false);
 
-  // Load danh sách user role HOTEL_MANAGER (HAL response)
+  // Load danh sách user role HOTEL_MANAGER 
   useEffect(() => {
     (async () => {
       try {

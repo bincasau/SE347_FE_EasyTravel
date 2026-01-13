@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getTourFullById, saveTourUpsert, deleteTour } from "@/apis/Tour";
+import { getUsers } from "@/apis/User";
 
 import TourCurrentInfoCard from "@/components/pages/admin/Tour/TourCurrentInfoCard";
 import TourItineraryEditor from "@/components/pages/admin/Tour/TourItineraryEditor";
@@ -18,7 +19,7 @@ function buildEmptyForm() {
     priceAdult: 0,
     priceChild: 0,
     percentDiscount: 0,
-    durationDays: 1,
+    durationDays: 0,
     startDate: "",
     endDate: "",
     departureLocation: "",
@@ -27,6 +28,8 @@ function buildEmptyForm() {
     limitSeats: 0,
     mainImage: "",
     status: "Pending",
+
+    tourGuideId: "",
   };
 }
 
@@ -54,6 +57,8 @@ function mapTourToForm(tour) {
     limitSeats: tour.limitSeats ?? 0,
     mainImage: tour.mainImage ?? "",
     status: tour.status ?? "Pending",
+
+    tourGuideId: tour.tourGuideId ?? "",
   };
 }
 
@@ -68,6 +73,19 @@ function isDateBefore(a, b) {
   return new Date(a) < new Date(b);
 }
 
+function calcDurationDays(start, end) {
+  if (!start || !end) return 1;
+  const s = new Date(start);
+  const e = new Date(end);
+  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return 1;
+
+  s.setHours(0, 0, 0, 0);
+  e.setHours(0, 0, 0, 0);
+
+  const diff = Math.round((e - s) / (1000 * 60 * 60 * 24));
+  return diff >= 0 ? diff + 1 : 1;
+}
+
 function validateForm(next) {
   const e = {};
 
@@ -76,6 +94,15 @@ function validateForm(next) {
   if (!next.departureLocation?.trim())
     e.departureLocation = "Vui lòng nhập nơi xuất phát.";
   if (!next.destination?.trim()) e.destination = "Vui lòng nhập điểm đến.";
+
+  // guide required
+  if (
+    next.tourGuideId === "" ||
+    next.tourGuideId === null ||
+    next.tourGuideId === undefined
+  ) {
+    e.tourGuideId = "Vui lòng chọn hướng dẫn viên.";
+  }
 
   const priceAdult = toNumberSafe(next.priceAdult, 0);
   const priceChild = toNumberSafe(next.priceChild, 0);
@@ -140,6 +167,10 @@ export default function AdminTourUpsert() {
   // modal success khi tạo mới
   const [openSuccess, setOpenSuccess] = useState(false);
 
+  // danh sách hướng dẫn viên
+  const [guides, setGuides] = useState([]);
+  const [loadingGuides, setLoadingGuides] = useState(false);
+
   const currentMainImageUrl = useMemo(() => {
     if (previewUrl) return previewUrl;
     if (!form.mainImage) return "";
@@ -171,12 +202,44 @@ export default function AdminTourUpsert() {
     setErr("");
   }
 
+  // cleanup preview
   useEffect(() => {
     return () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl]);
 
+  // load TOUR_GUIDE list
+  useEffect(() => {
+    (async () => {
+      try {
+        setLoadingGuides(true);
+
+        const data = await getUsers({
+          page: 1,
+          size: 9999,
+          role: "TOUR_GUIDE",
+          status: "Activated",
+        });
+
+        const embedded = data?._embedded;
+        let list = [];
+        if (embedded && typeof embedded === "object") {
+          const firstKey = Object.keys(embedded)[0];
+          list = embedded[firstKey] ?? [];
+        }
+
+        setGuides(Array.isArray(list) ? list : []);
+      } catch (e) {
+        console.error("Load tour guides failed:", e);
+        setGuides([]);
+      } finally {
+        setLoadingGuides(false);
+      }
+    })();
+  }, []);
+
+  // load tour when edit
   useEffect(() => {
     let alive = true;
 
@@ -192,7 +255,15 @@ export default function AdminTourUpsert() {
       .then((data) => {
         if (!alive || !data) return;
 
-        const mapped = mapTourToForm(data.tour);
+        // map tour -> form
+        const mapped0 = mapTourToForm(data.tour);
+
+        // NEW: luôn đồng bộ durationDays theo start/end
+        const mapped = {
+          ...mapped0,
+          durationDays: calcDurationDays(mapped0.startDate, mapped0.endDate),
+        };
+
         setForm(mapped);
         setFieldErrors(validateForm(mapped));
         setTouched({});
@@ -227,11 +298,11 @@ export default function AdminTourUpsert() {
     const { name, value, type } = e.target;
     setErr("");
 
+    // số
     if (type === "number") {
       const nextVal = value === "" ? "" : value;
       const next = { ...form, [name]: nextVal };
 
-      // limitSeats giảm xuống < availableSeats => kéo availableSeats xuống
       if (name === "limitSeats") {
         const lim = nextVal === "" ? 0 : Number(nextVal);
         const av = next.availableSeats === "" ? 0 : Number(next.availableSeats);
@@ -244,10 +315,10 @@ export default function AdminTourUpsert() {
       return;
     }
 
+    // ngày => auto-calc durationDays
     if (type === "date") {
       const next = { ...form, [name]: value };
 
-      // startDate đổi => endDate không được < startDate
       if (
         name === "startDate" &&
         next.endDate &&
@@ -256,7 +327,6 @@ export default function AdminTourUpsert() {
         next.endDate = value;
       }
 
-      // endDate đổi => không được < startDate
       if (
         name === "endDate" &&
         next.startDate &&
@@ -265,10 +335,14 @@ export default function AdminTourUpsert() {
         next.endDate = next.startDate;
       }
 
+      // NEW: tính durationDays
+      next.durationDays = calcDurationDays(next.startDate, next.endDate);
+
       applyForm(next);
       return;
     }
 
+    // bình thường (select/text)
     applyForm({ ...form, [name]: value });
   }
 
@@ -293,9 +367,13 @@ export default function AdminTourUpsert() {
     payload.priceAdult = toNumberSafe(payload.priceAdult, 0);
     payload.priceChild = toNumberSafe(payload.priceChild, 0);
     payload.percentDiscount = toNumberSafe(payload.percentDiscount, 0);
-    payload.durationDays = toNumberSafe(payload.durationDays, 1);
     payload.availableSeats = toNumberSafe(payload.availableSeats, 0);
     payload.limitSeats = toNumberSafe(payload.limitSeats, 0);
+
+    // NEW: guideId + durationDays auto-calc (chốt lại trước khi gửi)
+    const guideId = toNumberSafe(payload.tourGuideId, 0);
+    payload.tourGuideId = guideId;
+    payload.durationDays = calcDurationDays(payload.startDate, payload.endDate);
 
     if (!payload.status) payload.status = "Pending";
     if (!["Pending", "Passed", "Activated"].includes(payload.status)) {
@@ -315,6 +393,7 @@ export default function AdminTourUpsert() {
         linkVideo: true,
         departureLocation: true,
         destination: true,
+        tourGuideId: true,
         priceAdult: true,
         priceChild: true,
         percentDiscount: true,
@@ -331,7 +410,9 @@ export default function AdminTourUpsert() {
     setSaving(true);
 
     try {
-      const saved = await saveTourUpsert(payload, pickedFile);
+      // NEW: backend cần query param guideIds
+      const saved = await saveTourUpsert(payload, pickedFile, guideId);
+
       const savedId =
         saved?.tourId ?? saved?.id ?? (isEdit ? Number(id) : null);
 
@@ -341,7 +422,6 @@ export default function AdminTourUpsert() {
         return;
       }
 
-      // create: mở modal success
       setOpenSuccess(true);
     } catch (e2) {
       setErr(e2?.message || "Lưu thất bại.");
@@ -572,24 +652,23 @@ export default function AdminTourUpsert() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <div className="text-sm font-medium mb-1">Số ngày</div>
-                <input
-                  name="durationDays"
-                  type="number"
-                  value={form.durationDays}
-                  onChange={onChange}
-                  onBlur={onBlur}
-                  className="w-full border rounded-xl p-3"
-                  min={1}
-                />
-                <FieldError
-                  msg={fieldErrors.durationDays}
-                  show={submitted || touched.durationDays}
-                />
-              </div>
+            {/* NEW: duration auto-calc => readonly */}
+            <div>
+              <div className="text-sm font-medium mb-1">Số ngày</div>
+              <input
+                name="durationDays"
+                type="number"
+                value={form.durationDays}
+                readOnly
+                className="w-full border rounded-xl p-3 bg-gray-50"
+              />
+              <FieldError
+                msg={fieldErrors.durationDays}
+                show={submitted || touched.durationDays}
+              />
+            </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <div className="text-sm font-medium mb-1">Ngày bắt đầu</div>
                 <input
@@ -657,6 +736,45 @@ export default function AdminTourUpsert() {
                   show={submitted || touched.destination}
                 />
               </div>
+            </div>
+
+            {/* guide select */}
+            <div>
+              <div className="text-sm font-medium mb-1">
+                Hướng dẫn viên <span className="text-red-500">*</span>
+              </div>
+
+              <select
+                name="tourGuideId"
+                value={form.tourGuideId}
+                onChange={onChange}
+                onBlur={onBlur}
+                disabled={loadingGuides}
+                className="w-full border rounded-xl p-3 bg-white"
+              >
+                <option value="">
+                  {loadingGuides
+                    ? "Đang tải danh sách..."
+                    : "— Chọn hướng dẫn viên —"}
+                </option>
+
+                {guides.map((u) => {
+                  const gid = u.userId ?? u.id;
+                  const username = u.username ?? "";
+                  const name = u.name || u.fullName || "";
+                  return (
+                    <option key={gid} value={gid}>
+                      {gid} - {name}
+                      {username ? ` (${username})` : ""}
+                    </option>
+                  );
+                })}
+              </select>
+
+              <FieldError
+                msg={fieldErrors.tourGuideId}
+                show={submitted || touched.tourGuideId}
+              />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -743,7 +861,7 @@ export default function AdminTourUpsert() {
             </div>
           </form>
 
-          {/* RIGHT: 3 components */}
+          {/* RIGHT */}
           <div className="lg:col-span-1 space-y-6">
             <TourCurrentInfoCard
               title={form.title}

@@ -164,7 +164,7 @@ export async function getTourFullById(id) {
 }
 
 /* POST auth (upsert) */
-export async function saveTourUpsert(tour, file) {
+export async function saveTourUpsert(tour, file, guideIds) {
   const formData = new FormData();
 
   formData.append(
@@ -174,7 +174,7 @@ export async function saveTourUpsert(tour, file) {
 
   if (file) formData.append("file", file);
 
-  return fetchJsonAuth(`${API_BASE}/admin/tour/save`, {
+  return fetchJsonAuth(`${API_BASE}/admin/tour/save?guideIds=${guideIds}`, {
     method: "POST",
     body: formData,
   });
@@ -189,4 +189,37 @@ export async function deleteTour(tourId) {
 
   if (!res.ok) throw new Error(await res.text());
   return true;
+}
+
+export async function getTourParticipants(tourId) {
+  const res = await fetch(`${API_BASE}/tour/${tourId}/participants`, {
+    method: "GET",
+    headers: {
+      ...getAuthHeaders(),
+      Accept: "application/json",
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
+
+  return res.json(); 
+}
+
+export async function getMonthlyTourStats(month, year) {
+  const res = await fetch(
+    `${API_BASE}/admin/tour/monthly?month=${month}&year=${year}`,
+    {
+      method: "GET",
+      headers: {
+        ...getAuthHeaders(),
+        Accept: "application/json",
+      },
+    }
+  );
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
+  return res.json();
 }

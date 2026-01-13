@@ -68,7 +68,9 @@ export default function HotelDetail({ hotelId }) {
   return (
     <div className="py-10">
       <button
-        onClick={() => navigate(-1)}
+        onClick={() =>
+          from ? navigate(from, { replace: true }) : navigate("/hotels")
+        }
         className="mb-6 border border-orange-500 text-orange-500 px-4 py-1.5 rounded-md hover:bg-orange-500 hover:text-white transition"
       >
         Trở về

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useLang } from "@/contexts/LangContext";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { formatPrice } from "@/utils/formatPrice";
 import { buildTourSlug } from "@/utils/slug"; 
 // ✅ dùng chung helper buildTourSlug (slugify + `${slug}-${id}`)
@@ -9,18 +9,20 @@ import { buildTourSlug } from "@/utils/slug";
 const S3_HOTEL_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/hotel";
 
-const HotelCard = ({ hotel_id, name, price, hotline, address, description }) => {
+const HotelCard = ({
+  hotel_id,
+  name,
+  price,
+  hotline,
+  address,
+  description,
+}) => {
   const { t } = useLang();
-  const [searchParams] = useSearchParams();
+  const location = useLocation(); 
 
   const [imageUrl, setImageUrl] = useState(
     hotel_id != null ? `${S3_HOTEL_BASE}/hotel_${hotel_id}.jpg` : null
   );
-
-  const handleSavePage = () => {
-    const currentPage = searchParams.get("page") || 1;
-    sessionStorage.setItem("hotelPrevPage", currentPage);
-  };
 
   useEffect(() => {
     setImageUrl(

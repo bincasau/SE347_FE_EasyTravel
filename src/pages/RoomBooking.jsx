@@ -18,9 +18,6 @@ export default function RoomBooking() {
     [location.search]
   );
 
-  // ✅ hỗ trợ cả:
-  // ?hotel=12&room=5
-  // ?hotel=khach-san-da-lat-12&room=phong-doi-5
   const rawHotel = params.get("hotel") || "";
   const rawRoom = params.get("room") || "";
 
@@ -122,7 +119,7 @@ export default function RoomBooking() {
   const nextStep = () => setStep((s) => Math.min(3, s + 1));
   const prevStep = () => setStep((s) => Math.max(1, s - 1));
 
-  // ✅ Quay lại trang chi tiết khách sạn (đúng slug route)
+  //  Quay lại trang chi tiết khách sạn (đúng slug route)
   const backToHotel = () => {
     if (!hotelId) return;
 

@@ -183,3 +183,28 @@ export async function deleteHotel(id) {
     return text;
   }
 }
+
+// Lấy manager (user) của khách sạn theo hotelId (admin)
+export async function getHotelManagerByHotelId(hotelId) {
+  if (!hotelId) throw new Error("hotelId is required");
+
+  const token = localStorage.getItem("jwt");
+
+  const res = await fetch(
+    `${API_BASE}/admin/hotel/${hotelId}/manager`,
+    {
+      method: "GET",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        Accept: "application/json",
+      },
+    }
+  );
+
+  if (!res.ok) {
+    const msg = await res.text();
+    throw new Error(msg || "Failed to get hotel manager");
+  }
+
+  return res.json();
+}

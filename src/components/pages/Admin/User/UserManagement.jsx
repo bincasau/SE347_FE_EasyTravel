@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import AdminUserCard from "@/components/pages/Admin/User/AdminUserCard";
 import Pagination from "@/utils/Pagination";
-import { getUsers } from "@/apis/User";
-import { adminDeleteUser } from "@/apis/User"; 
+import { getUsers, adminDeleteUser } from "@/apis/User";
+
+import { exportUsersExcel } from "@/components/pages/Admin/User/UsersExportExcel";
+import { importUsersExcel } from "@/components/pages/Admin/User/UsersImportExcel";
 
 const ROLES = [
   { label: "All roles", value: "ALL" },
@@ -44,6 +46,10 @@ function buildVisiblePages(currentPage, totalPages, windowSize = 5) {
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+
   const [totalPages, setTotalPages] = useState(1);
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -55,6 +61,8 @@ export default function UserManagement() {
   const roleFromUrl = searchParams.get("role") || "ALL";
   const [roleFilter, setRoleFilter] = useState(roleFromUrl);
 
+  const fileInputId = "users-import-excel-input";
+
   async function loadUsers(pageUI, role) {
     setLoading(true);
     try {
@@ -64,8 +72,9 @@ export default function UserManagement() {
         role,
         status: "ALL",
       });
-      setUsers(data._embedded?.users ?? []);
-      setTotalPages(data.page?.totalPages ?? 1);
+
+      setUsers(data?._embedded?.users ?? []);
+      setTotalPages(data?.page?.totalPages ?? 1);
     } catch (e) {
       setUsers([]);
       setTotalPages(1);
@@ -76,6 +85,7 @@ export default function UserManagement() {
 
   useEffect(() => {
     loadUsers(currentPage, roleFilter);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, roleFilter]);
 
   const handlePageChange = (pageUI) => {
@@ -104,6 +114,62 @@ export default function UserManagement() {
     loadUsers(currentPage, roleFilter);
   };
 
+  // Export Excel (đã tách file)
+  const handleExportExcel = async () => {
+    setExporting(true);
+    try {
+      await exportUsersExcel({
+        role: roleFilter,
+        status: "ALL",
+        // fileName: "users.xlsx", // muốn đặt tên cứng thì mở
+      });
+    } catch (e) {
+      alert("Export failed: " + (e?.message || "Unknown error"));
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // Import Excel: click -> mở chọn file
+  const handlePickImport = () => {
+    const el = document.getElementById(fileInputId);
+    el?.click();
+  };
+
+  // Import Excel (đã tách file)
+  const handleImportExcel = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // chọn lại cùng file vẫn trigger
+    if (!file) return;
+
+    setImporting(true);
+    try {
+      const rs = await importUsersExcel(file, {
+        // nếu chọn role filter khác ALL thì có thể lấy role đó làm default
+        defaultRole: roleFilter === "ALL" ? "CUSTOMER" : roleFilter,
+        defaultStatus: "Activated",
+
+        // nếu file excel không có cột Password thì dùng default này
+        defaultPassword: "123456",
+      });
+
+      if (rs?.errors?.length) {
+        alert(
+          `Import xong: ${rs.ok} OK, ${rs.fail} FAIL\n\n` +
+            rs.errors.slice(0, 10).join("\n")
+        );
+      } else {
+        alert(`Import xong: ${rs.ok} OK, ${rs.fail} FAIL`);
+      }
+
+      loadUsers(currentPage, roleFilter);
+    } catch (err) {
+      alert(err?.message || "Import failed");
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto py-10">
       <div className="flex justify-between items-center mb-6">
@@ -121,6 +187,33 @@ export default function UserManagement() {
               </option>
             ))}
           </select>
+
+          {/* input hidden import */}
+          <input
+            id={fileInputId}
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={handleImportExcel}
+          />
+
+          {/* nút import */}
+          <button
+            onClick={handlePickImport}
+            disabled={importing}
+            className="px-5 py-2 bg-purple-600 text-white rounded-full hover:bg-purple-700 transition disabled:opacity-60"
+          >
+            {importing ? "Importing..." : "Import Excel"}
+          </button>
+
+          {/* nút export */}
+          <button
+            onClick={handleExportExcel}
+            disabled={exporting}
+            className="px-5 py-2 bg-green-600 text-white rounded-full hover:bg-green-700 transition disabled:opacity-60"
+          >
+            {exporting ? "Exporting..." : "Export Excel"}
+          </button>
 
           <Link to="/admin/users/new">
             <button className="px-5 py-2 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition">
