@@ -575,18 +575,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
   };
 
   return (
-<<<<<<< HEAD
-    <header className="sticky top-0 bg-white/90 backdrop-blur border-b border-gray-100 z-50">
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="h-16 flex items-center justify-between">
-          <Link
-            to={getHomeByRole()}
-            className="flex items-center gap-2 shrink-0"
-          >
-            <img src={Logo} className="h-9" alt="logo" />
-            <span className="text-2xl font-semibold text-orange-500">Easy</span>
-            <span className="text-2xl font-semibold text-gray-900 -ml-2">
-=======
+
     <header className="sticky top-0 z-[9998] bg-white border-b border-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="h-16 flex items-center justify-between gap-3">
@@ -596,7 +585,6 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
               Easy
             </span>
             <span className="text-xl sm:text-2xl font-semibold text-gray-900 -ml-2">
->>>>>>> d51bc8deac8e81cab3c461e87205dcdacfbcef98
               Travel
             </span>
           </Link>

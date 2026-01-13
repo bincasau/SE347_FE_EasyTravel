@@ -17,41 +17,33 @@ const CustomerReviews = () => {
         backgroundPosition: "top center",
       }}
     >
-      <div className="relative z-10 max-w-6xl mx-auto px-6 md:px-12 lg:px-20 py-20 text-center">
-        {/* Subtitle */}
-        <p className="text-[#eb662b] italic mb-2">
+      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 md:px-12 lg:px-20 py-12 md:py-20 text-center">
+        <p className="text-[#eb662b] italic mb-2 text-sm sm:text-base">
           {t("home.customerReviews.subtitle")}
         </p>
 
-        {/* Title */}
-        <h2 className="text-2xl md:text-4xl font-bold mb-12">
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-8 md:mb-12">
           {t("home.customerReviews.title")}
         </h2>
 
-        {/* Content */}
-        <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16 text-left">
-          {/* Customer image */}
+        <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-16 text-left">
           <img
             src={customerImg}
             alt="Customer"
-            className="w-[200px] md:w-[260px] rounded-lg object-cover"
+            className="w-[160px] sm:w-[200px] md:w-[260px] rounded-lg object-cover"
           />
 
-          {/* Text content */}
           <div className="max-w-lg">
-            {/* Rating */}
-            <div className="flex gap-1 mb-4 text-[#eb662b]">
+            <div className="flex gap-1 mb-3 md:mb-4 text-[#eb662b]">
               {[...Array(5)].map((_, i) => (
                 <FaStar key={i} />
               ))}
             </div>
 
-            {/* Review text */}
-            <p className="text-gray-700 leading-relaxed mb-6">
+            <p className="text-sm sm:text-base text-gray-700 leading-relaxed mb-5 md:mb-6">
               {t("home.customerReviews.review")}
             </p>
 
-            {/* Customer info */}
             <div>
               <p className="font-semibold text-gray-900">
                 {t("home.customerReviews.name")}

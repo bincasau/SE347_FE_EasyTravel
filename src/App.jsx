@@ -95,21 +95,8 @@ export default function App() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/profile/edit" element={<EditProfile />} />
-<<<<<<< HEAD
-          <Route
-            path="/booking-history/tours"
-            element={<BookingHistoryTours />}
-          />
-          <Route
-            path="/booking-history/hotels"
-            element={<BookingHistoryHotels />}
-          />
-=======
           <Route path="/booking-history/tours" element={<BookingHistoryTours />} />
           <Route path="/booking-history/hotels" element={<BookingHistoryHotels />} />
-          
-
->>>>>>> d51bc8deac8e81cab3c461e87205dcdacfbcef98
           <Route path="/403" element={<Forbidden403 />} />
 
           {/* TourGuide */}
