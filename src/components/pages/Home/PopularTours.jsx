@@ -15,7 +15,6 @@ const PopularTours = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const itemsPerPage = 4;
 
-  // Fetch Tours
   useEffect(() => {
     let isMounted = true;
 
@@ -25,15 +24,11 @@ const PopularTours = () => {
         setError(null);
 
         const res = await getPopularTours();
-
-        // Chuẩn hoá dữ liệu: ưu tiên mảng, nếu API bọc trong {data: []} thì lấy data
         const list = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
 
         if (!isMounted) return;
 
         setTours(list);
-
-        // reset index nếu data ít
         setCurrentIndex(0);
       } catch (err) {
         console.error("getPopularTours error:", err);
@@ -70,10 +65,8 @@ const PopularTours = () => {
     });
   };
 
-  // visibleTours: không ép đủ 4 nếu thiếu, và loại undefined
   const visibleTours = useMemo(() => {
     if (!Array.isArray(tours) || tours.length === 0) return [];
-
     return Array.from({ length: Math.min(itemsPerPage, tours.length) }, (_, i) => {
       const index = (currentIndex + i) % tours.length;
       return tours[index];
@@ -81,22 +74,18 @@ const PopularTours = () => {
   }, [tours, currentIndex]);
 
   if (loading) return <div className="text-center py-10">Đang tải tour...</div>;
-
   if (error) return <div className="text-center text-red-500 py-10">{error}</div>;
-
   if (!Array.isArray(tours) || tours.length === 0)
     return <div className="text-center py-10">Chưa có tour phổ biến.</div>;
 
   return (
-    <section className="py-20 px-6 md:px-12 lg:px-20 bg-white font-poppins">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-10">
+    <section className="py-12 md:py-20 px-4 sm:px-6 md:px-12 lg:px-20 bg-white font-poppins">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8 md:mb-10">
         <h2 className="text-2xl md:text-3xl font-semibold text-gray-800">
           {t("home.popularTours.title")}
         </h2>
 
-        {/* Navigation buttons */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 justify-center sm:justify-end">
           <button
             onClick={handlePrev}
             disabled={!canNavigate}
@@ -125,13 +114,9 @@ const PopularTours = () => {
         </div>
       </div>
 
-      {/* Tour list */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 justify-items-center">
         {visibleTours.map((tour, idx) => (
-          <TourCard
-            key={tour?.id ?? tour?.tour_id ?? `${currentIndex}-${idx}`}
-            tour={tour}
-          />
+          <TourCard key={tour?.id ?? tour?.tour_id ?? `${currentIndex}-${idx}`} tour={tour} />
         ))}
       </div>
     </section>

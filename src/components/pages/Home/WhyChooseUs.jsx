@@ -45,32 +45,27 @@ const WhyChooseUs = () => {
         backgroundPosition: "center",
       }}
     >
-      {/* Cô gái bên trái */}
       <img
         src={leftWoman}
         alt="Traveler Woman Left"
-        className="absolute bottom-0 left-0 w-[22vw] max-w-[340px] object-contain z-20"
+        className="hidden md:block absolute bottom-0 left-0 w-[22vw] max-w-[340px] object-contain z-20"
       />
 
-      {/* Cô gái bên phải */}
       <img
         src={rightWoman}
         alt="Traveler Woman Right"
-        className="absolute bottom-0 right-[2vw] w-[24vw] max-w-[380px] object-contain z-20"
+        className="hidden md:block absolute bottom-0 right-[2vw] w-[24vw] max-w-[380px] object-contain z-20"
       />
 
-      {/* Nội dung trung tâm */}
-      <div className="relative z-10 w-[88%] max-w-[900px] mx-auto py-[9vh] md:py-[14vh] text-left">
-        {/* Tiêu đề */}
-        <p className="text-[#eb662b] text-base md:text-lg font-medium mb-2 font-[cursive]">
+      <div className="relative z-10 w-[92%] md:w-[88%] max-w-[900px] mx-auto py-[6vh] md:py-[14vh] text-left">
+        <p className="text-[#eb662b] text-sm sm:text-base md:text-lg font-medium mb-2 font-[cursive]">
           {t("home.whyChooseUs.subtitle")}
         </p>
-        <h2 className="text-2xl md:text-4xl font-bold leading-snug mb-10 max-w-[650px]">
+        <h2 className="text-2xl md:text-4xl font-bold leading-snug mb-8 md:mb-10 max-w-[650px]">
           {t("home.whyChooseUs.title")}
         </h2>
 
-        {/* Grid feature */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6 sm:gap-y-8">
           {features.map((item, i) => (
             <div
               key={i}
@@ -81,7 +76,7 @@ const WhyChooseUs = () => {
                 <h4 className="font-semibold text-base md:text-lg mb-1">
                   {item.title}
                 </h4>
-                <p className="text-sm text-gray-300 leading-relaxed">
+                <p className="text-sm text-gray-200 leading-relaxed">
                   {item.desc}
                 </p>
               </div>

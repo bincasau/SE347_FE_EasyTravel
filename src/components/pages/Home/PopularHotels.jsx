@@ -1,10 +1,7 @@
 import React, { useEffect, useState } from "react";
 import HotelCard from "@/components/pages/Hotel/HotelCard";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faChevronLeft,
-  faChevronRight,
-} from "@fortawesome/free-solid-svg-icons";
+import { faChevronLeft, faChevronRight } from "@fortawesome/free-solid-svg-icons";
 import { getPopularHotels } from "@/apis/home";
 import { useLang } from "@/contexts/LangContext";
 
@@ -18,7 +15,6 @@ const PopularHotels = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const itemsPerPage = 4;
 
-  //  Fetch hotels from backend
   useEffect(() => {
     const fetchHotels = async () => {
       try {
@@ -53,19 +49,16 @@ const PopularHotels = () => {
   });
 
   if (loading) return <div className="text-center py-10">Đang tải...</div>;
-  if (error)
-    return <div className="text-center text-red-500 py-10">{error}</div>;
+  if (error) return <div className="text-center text-red-500 py-10">{error}</div>;
 
   return (
-    <section className="py-20 px-6 md:px-12 lg:px-20 bg-white font-poppins">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-10">
+    <section className="py-12 md:py-20 px-4 sm:px-6 md:px-12 lg:px-20 bg-white font-poppins">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8 md:mb-10">
         <h2 className="text-2xl md:text-3xl font-semibold text-gray-800">
           {t("home.popularHotels.title") || "The Most Popular Hotels"}
         </h2>
 
-        {/* Navigation buttons */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 justify-center sm:justify-end">
           <button
             onClick={handlePrev}
             className="p-2 rounded-full border bg-orange-100 text-orange-500 hover:bg-orange-200 transition"
@@ -84,7 +77,6 @@ const PopularHotels = () => {
         </div>
       </div>
 
-      {/* List */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 justify-items-center">
         {visibleHotels.map((h) => (
           <HotelCard
