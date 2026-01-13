@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   FaFacebookF,
@@ -9,16 +9,19 @@ import {
   FaLink,
   FaArrowLeft,
 } from "react-icons/fa";
-import BlogComments from "./BlogComments";
+
+import { extractIdFromSlug, buildTourSlug } from "@/utils/slug";
 
 export default function BlogDetailContent() {
-  const { id } = useParams();
+  const { slugId } = useParams();
   const navigate = useNavigate();
+
+  const id = useMemo(() => extractIdFromSlug(slugId), [slugId]);
+
   const [blog, setBlog] = useState(null);
   const [allBlogs, setAllBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ S3 paths đúng theo link bạn đưa
   const S3_BLOG_MAIN =
     "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/blog";
   const S3_BLOG_IMAGE =
@@ -28,10 +31,11 @@ export default function BlogDetailContent() {
   const blogExtraImg = (blogId, idx) =>
     `${S3_BLOG_IMAGE}/blog_${blogId}_img_${idx}.jpg`;
 
-  // ✅ Fetch blog detail + all blogs
   useEffect(() => {
     const fetchData = async () => {
       try {
+        if (!id) throw new Error("URL không hợp lệ (thiếu id blog).");
+
         const [detailRes, allRes] = await Promise.all([
           fetch(`http://localhost:8080/blogs/${id}`),
           fetch("http://localhost:8080/blogs?page=0&size=9999"),
@@ -57,15 +61,24 @@ export default function BlogDetailContent() {
 
         setBlog(current);
         setAllBlogs(blogs);
+
+        // ✅ redirect về slug đúng nếu gõ sai
+        const correctSlugId = buildTourSlug(current.id, current.title);
+        if (slugId !== correctSlugId) {
+          navigate(`/detailblog/${correctSlugId}`, { replace: true });
+        }
       } catch (err) {
         console.error("❌ Lỗi fetch blog:", err);
+        setBlog(null);
+        setAllBlogs([]);
       } finally {
         setLoading(false);
       }
     };
 
+    setLoading(true);
     fetchData();
-  }, [id]);
+  }, [id, slugId, navigate]);
 
   if (loading)
     return (
@@ -86,6 +99,12 @@ export default function BlogDetailContent() {
   const nextBlog =
     index >= 0 && index < allBlogs.length - 1 ? allBlogs[index + 1] : null;
 
+  const goToBlog = (b) => {
+    if (!b?.blogId) return;
+    const slug = buildTourSlug(b.blogId, b.title);
+    navigate(`/detailblog/${slug}`);
+  };
+
   const currentUrl = encodeURIComponent(window.location.href);
   const shareText = encodeURIComponent(blog.title);
   const shareLinks = {
@@ -98,7 +117,6 @@ export default function BlogDetailContent() {
 
   return (
     <div>
-      {/* ---------- BACK BUTTON ---------- */}
       <button
         onClick={() => navigate("/blog")}
         className="flex items-center gap-2 text-gray-700 hover:text-orange-500 font-medium mb-5 transition"
@@ -107,7 +125,6 @@ export default function BlogDetailContent() {
         <span>Back</span>
       </button>
 
-      {/* ---------- IMAGE + META ---------- */}
       <img
         src={blog.thumbnail}
         alt={blog.title}
@@ -120,15 +137,13 @@ export default function BlogDetailContent() {
       />
 
       <div className="mt-6 text-sm text-gray-500">
-        {blog.createdAt} •{" "}
-        <span className="text-gray-600 font-medium">Admin</span>
+        {blog.createdAt} • <span className="text-gray-600 font-medium">Admin</span>
       </div>
 
       <h1 className="text-3xl font-bold text-gray-900 mt-2 leading-snug">
         {blog.title}
       </h1>
 
-      {/* ---------- CONTENT ---------- */}
       <div className="mt-6 rounded-2xl border bg-white p-6 md:p-8 shadow-sm">
         <div
           className="prose prose-lg max-w-none text-gray-700 leading-relaxed prose-p:my-4"
@@ -138,7 +153,6 @@ export default function BlogDetailContent() {
         />
       </div>
 
-      {/* ---------- EXTRA IMAGES (FULL Ô, KHÔNG TÊN) ---------- */}
       <div className="mt-10">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {[1, 2].map((idx) => (
@@ -161,7 +175,6 @@ export default function BlogDetailContent() {
         </div>
       </div>
 
-      {/* ---------- TAGS + SHARE ---------- */}
       <div className="flex flex-wrap items-center justify-between mt-10 border-b border-gray-100 pb-6">
         <div className="flex gap-2 flex-wrap">
           {["Du lịch", "Trải nghiệm", "Khách sạn"].map((tag, i) => (
@@ -203,7 +216,6 @@ export default function BlogDetailContent() {
         </div>
       </div>
 
-      {/* ---------- AUTHOR ---------- */}
       <div className="mt-10 bg-gray-50 rounded-xl p-6 flex items-center gap-4">
         <img
           src="https://i.pravatar.cc/100?img=8"
@@ -220,18 +232,16 @@ export default function BlogDetailContent() {
         </div>
       </div>
 
-      {/* ---------- RELATED POSTS (PREV / NEXT 2 BÊN) ---------- */}
       <div className="mt-14 border-t border-gray-100 pt-8">
         <h3 className="text-xl font-semibold text-gray-800 mb-5">
           Bài viết liên quan
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
-          {/* PREV */}
           <div className={`${!prevBlog ? "opacity-50 pointer-events-none" : ""}`}>
             {prevBlog ? (
               <div
-                onClick={() => navigate(`/detailblog/${prevBlog.blogId}`)}
+                onClick={() => goToBlog(prevBlog)}
                 className="cursor-pointer group bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col h-full"
               >
                 <div className="w-full h-44 overflow-hidden">
@@ -269,11 +279,10 @@ export default function BlogDetailContent() {
             )}
           </div>
 
-          {/* NEXT */}
           <div className={`${!nextBlog ? "opacity-50 pointer-events-none" : ""}`}>
             {nextBlog ? (
               <div
-                onClick={() => navigate(`/detailblog/${nextBlog.blogId}`)}
+                onClick={() => goToBlog(nextBlog)}
                 className="cursor-pointer group bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col h-full"
               >
                 <div className="w-full h-44 overflow-hidden">
@@ -312,12 +321,11 @@ export default function BlogDetailContent() {
           </div>
         </div>
 
-        {/* ✅ PREV / NEXT BUTTONS (thêm lại) */}
         <div className="mt-10 border-t border-gray-100 pt-6">
           <div className="flex justify-between text-sm font-medium text-orange-600">
             <button
               disabled={!prevBlog}
-              onClick={() => prevBlog && navigate(`/detailblog/${prevBlog.blogId}`)}
+              onClick={() => prevBlog && goToBlog(prevBlog)}
               className={`flex items-center gap-2 transition ${
                 !prevBlog
                   ? "opacity-50 cursor-not-allowed"
@@ -329,7 +337,7 @@ export default function BlogDetailContent() {
 
             <button
               disabled={!nextBlog}
-              onClick={() => nextBlog && navigate(`/detailblog/${nextBlog.blogId}`)}
+              onClick={() => nextBlog && goToBlog(nextBlog)}
               className={`flex items-center gap-2 transition ${
                 !nextBlog
                   ? "opacity-50 cursor-not-allowed"
@@ -342,9 +350,7 @@ export default function BlogDetailContent() {
         </div>
       </div>
 
-      {/* ---------- COMMENTS ---------- */}
-      {/* Nếu muốn bật comment, dùng dòng dưới */}
-      {/* <div className="mt-12"><BlogComments blogId={blog.id} /></div> */}
+      {/* Comments: bạn đang render ở page BlogDetail rồi, nên ở đây không cần */}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { FaCalendarAlt } from "react-icons/fa";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { useNavigate } from "react-router-dom";
+import { buildTourSlug } from "@/utils/slug";
 
 const BASE_URL = "http://localhost:8080";
 
@@ -52,7 +53,8 @@ export default function BlogSidebar({
 
   const goDetail = (post) => {
     if (!post?.id) return;
-    navigate(`/detailblog/${post.id}`, {
+    const slugId = buildTourSlug(post.id, post.title);
+    navigate(`/detailblog/${slugId}`, {
       state: {
         id: post.id,
         image: post.image,

@@ -4,13 +4,13 @@ import {
   faSortAmountUp,
   faSortAmountDown,
 } from "@fortawesome/free-solid-svg-icons";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 
 import RoomCard from "./RoomCard";
 import Pagination from "@/utils/Pagination";
 import { getRoomsByHotel } from "@/apis/Room";
 
-const RoomList = ({ hotelId }) => {
+const RoomList = ({ hotelId, hotelName }) => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [rooms, setRooms] = useState([]);
@@ -44,7 +44,6 @@ const RoomList = ({ hotelId }) => {
       : rooms.filter(
           (room) => room.roomType?.toLowerCase() === roomType.toLowerCase()
         );
-
 
   // Sắp xếp theo giá
   const sortedRooms = [...filteredRooms].sort((a, b) =>
@@ -109,9 +108,17 @@ const RoomList = ({ hotelId }) => {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {currentRooms.map((room) => (
-          <RoomCard key={room.roomId} room={room} hotelId={hotelId} />
-        ))}
+        {currentRooms.map((room) => {
+          const roomKey = room.roomId ?? room.id; // ✅ fallback
+          return (
+            <RoomCard
+              key={roomKey}
+              room={room}
+              hotelId={hotelId}
+              hotelName={hotelName} // ✅ để RoomCard tạo slug hotel đẹp
+            />
+          );
+        })}
       </div>
 
       {totalPages > 1 && (

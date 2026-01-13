@@ -1,34 +1,47 @@
-import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import ShortInfor from "../components/pages/DetailTour/ShortInfor";
 import Detail from "../components/pages/DetailTour/Detail";
 import Gallery from "../components/pages/DetailTour/Gallery";
 import Itineraries from "../components/pages/DetailTour/Itineraries";
 import Reviews from "../components/pages/DetailTour/Reviews";
+import { buildTourSlug, extractIdFromSlug } from "@/utils/slug";
 
 export default function DetailTour() {
-  const { id } = useParams(); // ✅ id từ URL
+  const { slugId } = useParams(); // ✅ slug-id từ URL
+  const navigate = useNavigate();
+
+  const id = useMemo(() => extractIdFromSlug(slugId), [slugId]);
+
   const [tour, setTour] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchTour = async () => {
       try {
+        if (!id) throw new Error("URL không hợp lệ (thiếu id).");
+
         const res = await fetch(`http://localhost:8080/tours/${id}`);
-        if (!res.ok) {
-          throw new Error("Không thể tải dữ liệu tour.");
-        }
+        if (!res.ok) throw new Error("Không thể tải dữ liệu tour.");
         const data = await res.json();
         setTour(data);
+
+        // ✅ nếu user gõ sai slug, tự điều hướng về đúng slug (không reload)
+        const correct = buildTourSlug(id, data?.title);
+        if (slugId !== correct) {
+          navigate(`/detailtour/${correct}`, { replace: true });
+        }
       } catch (err) {
         console.error("❌ Lỗi khi fetch tour:", err);
+        setTour(null);
       } finally {
         setLoading(false);
       }
     };
 
+    setLoading(true);
     fetchTour();
-  }, [id]);
+  }, [id, slugId, navigate]);
 
   if (loading)
     return (
@@ -48,9 +61,13 @@ export default function DetailTour() {
     <div className="bg-gray-50 min-h-screen py-12">
       <ShortInfor tour={tour} />
       <Detail tour={tour} />
+
+      {/* ✅ dùng id thật để gọi API con */}
       <Itineraries tourId={id} />
       <Gallery tourId={id} />
-      <Reviews tourId={tour.tourId} tourTitle={tour.title} />
+
+      {/* ✅ fallback: nếu tour.tourId không có thì dùng id */}
+      <Reviews tourId={tour.tourId ?? id} tourTitle={tour.title} />
     </div>
   );
 }

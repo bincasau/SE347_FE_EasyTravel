@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams } from "react-router-dom";
 
 import BookingStepTour1 from "../components/pages/Booking/BookingStepTour1.jsx";
@@ -6,8 +6,22 @@ import BookingStepTour2 from "../components/pages/Booking/BookingStepTour2.jsx";
 import BookingStepTour3 from "../components/pages/Booking/BookingStepTour3.jsx";
 import BookingSummary from "../components/pages/Booking/BookingSummary.jsx";
 
+import { extractIdFromSlug } from "@/utils/slug";
+
 export default function BookingPage() {
-  const { tourId } = useParams();
+  // ✅ hỗ trợ cả /booking/:tourId hoặc /booking/:slugId
+  const params = useParams();
+  const rawParam = params.tourId || params.slugId; // linh hoạt
+
+  // ✅ tourId thật để fetch
+  const tourId = useMemo(() => {
+    // nếu rawParam là số => dùng luôn
+    const n = Number(rawParam);
+    if (Number.isFinite(n) && n > 0) return n;
+
+    // nếu là slug-id => extract
+    return extractIdFromSlug(rawParam);
+  }, [rawParam]);
 
   const [step, setStep] = useState(1);
   const [tour, setTour] = useState(null);
@@ -22,7 +36,6 @@ export default function BookingPage() {
     total: 0,
     tourInfo: null,
 
-    // UPDATED USER FIELDS
     user: {
       name: "",
       email: "",
@@ -34,12 +47,19 @@ export default function BookingPage() {
     limitSeats: 0,
   });
 
+  // ✅ keep bookingData.tourId sync khi tourId thay đổi
+  useEffect(() => {
+    setBookingData((prev) => ({ ...prev, tourId }));
+  }, [tourId]);
+
   /** ===============================
    *  1️⃣ LOAD TOUR DETAIL
    * =============================== */
   useEffect(() => {
     const loadTour = async () => {
       try {
+        if (!tourId) throw new Error("Invalid tourId");
+
         const res = await fetch(`http://localhost:8080/tours/${tourId}`);
         if (!res.ok) throw new Error("Failed to fetch tour");
 
@@ -57,11 +77,13 @@ export default function BookingPage() {
         }));
       } catch (err) {
         console.error("❌ Tour load error:", err);
+        setTour(null);
       } finally {
         setLoading(false);
       }
     };
 
+    setLoading(true);
     loadTour();
   }, [tourId]);
 
@@ -108,6 +130,14 @@ export default function BookingPage() {
    * =============================== */
   const nextStep = () => setStep((s) => Math.min(3, s + 1));
   const prevStep = () => setStep((s) => Math.max(1, s - 1));
+
+  // ✅ param sai
+  if (!tourId)
+    return (
+      <div className="text-center mt-20 text-red-500">
+        URL booking không hợp lệ (thiếu tourId).
+      </div>
+    );
 
   if (loading)
     return (

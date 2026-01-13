@@ -1,12 +1,25 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { useParams } from "react-router-dom";
+
 import RoomList from "@/components/pages/DetailHotel/Room/RoomList";
 import HotelDetail from "@/components/pages/DetailHotel/HotelDetail";
 import HotelReviews from "@/components/pages/DetailHotel/HotelReviews";
 
+import { extractIdFromSlug } from "@/utils/slug";
+
 export default function HotelDetailPage() {
-  const { id } = useParams();
-  const hotelId = parseInt(id, 10);
+  const { slugId } = useParams();
+
+  // ✅ lấy id từ "slug-id"
+  const hotelId = useMemo(() => extractIdFromSlug(slugId), [slugId]);
+
+  if (!hotelId) {
+    return (
+      <div className="max-w-7xl mx-auto px-6 md:px-12 py-10 text-center text-red-500">
+        URL không hợp lệ (thiếu id khách sạn).
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-6 md:px-12">
@@ -21,4 +34,4 @@ export default function HotelDetailPage() {
       </div>
     </div>
   );
-};
+}

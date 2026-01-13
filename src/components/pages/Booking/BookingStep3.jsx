@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { createHotelBooking } from "@/apis/Booking";
 
@@ -15,12 +15,32 @@ const getRoomImage = (imageBed) =>
 export default function BookingStep3({ bookingData, prevStep }) {
   const navigate = useNavigate();
 
-  const { room = {}, hotel = {} } = bookingData;
+  const { room = {}, hotel = {} } = bookingData || {};
+
+  // ✅ resolve id an toàn (room/hotel hay bị lệch key)
+  const realHotelId = useMemo(
+    () => hotel?.hotelId ?? hotel?.id ?? null,
+    [hotel]
+  );
+
+  const realRoomId = useMemo(
+    () => room?.roomId ?? room?.id ?? null,
+    [room]
+  );
+
+  const roomImageBed = room?.image_bed ?? room?.imageBed ?? "";
 
   const [method, setMethod] = useState("");
   const [showModal, setShowModal] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const nights = bookingData.nights || 1;
+  const nights = bookingData?.nights || 1;
+
+  const getToken = () =>
+    localStorage.getItem("jwt") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("accessToken") ||
+    "";
 
   const handleConfirm = async () => {
     if (!method) {
@@ -28,45 +48,73 @@ export default function BookingStep3({ bookingData, prevStep }) {
       return;
     }
 
-    const token =
-      localStorage.getItem("jwt") ||
-      localStorage.getItem("token") ||
-      localStorage.getItem("accessToken");
+    if (!realHotelId || !realRoomId) {
+      alert("Thiếu hotelId hoặc roomId (URL/bookingData đang sai).");
+      return;
+    }
+
+    const email =
+      bookingData?.user?.email ||
+      bookingData?.user?.gmail || // fallback nếu bạn lưu gmail
+      "";
+
+    if (!email) {
+      alert("Thiếu email người đặt (cần đăng nhập / điền email).");
+      return;
+    }
+
+    if (submitting) return;
+
+    const token = getToken();
 
     try {
+      setSubmitting(true);
+
       const payload = {
         checkInDate: bookingData.checkInDate,
         checkOutDate: bookingData.checkOutDate,
         totalPrice: bookingData.total,
-        hotelId: bookingData.hotel.id,
-        roomID: bookingData.room.id,
-        gmail: bookingData.user.email,
+
+        // ✅ luôn dùng id thật
+        hotelId: realHotelId,
+
+        // ✅ khuyến nghị dùng roomId (nếu BE bạn bắt buộc roomID thì đổi key này lại)
+        roomId: realRoomId,
+
+        // ✅ email
+        email,
       };
 
+      // ✅ tạo booking
       const bookingRes = await createHotelBooking(payload);
-      console.log("bookingRes =", bookingRes);
-      console.log("bookingRes.data =", typeof bookingRes);
 
-
+      // bookingRes có thể là axios response hoặc object thuần
       const bookingId =
-        bookingRes?.bookingId || bookingRes?.id || bookingRes?.data?.bookingId;
+        bookingRes?.bookingId ||
+        bookingRes?.id ||
+        bookingRes?.data?.bookingId ||
+        bookingRes?.data?.id;
 
       if (!bookingId) {
-        alert("Không lấy được bookingId");
+        console.log("bookingRes =", bookingRes);
+        alert("Không lấy được bookingId (check response BE)");
         return;
       }
 
+      // ✅ CASH
       if (method === "cash") {
         setShowModal(true);
         return;
       }
 
+      // ✅ VNPAY
       if (method === "vnpay") {
         const params = new URLSearchParams();
         params.append("amount", bookingData.total);
-        params.append("bankCode", "NCB");
         params.append("bookingId", bookingId);
         params.append("bookingType", "HOTEL");
+        // bankCode optional
+        params.append("bankCode", "NCB");
 
         const payRes = await fetch(
           `http://localhost:8080/payment/vn-pay?${params.toString()}`,
@@ -79,7 +127,8 @@ export default function BookingStep3({ bookingData, prevStep }) {
         );
 
         if (!payRes.ok) {
-          alert("VNPay request failed");
+          const msg = await payRes.text().catch(() => "");
+          alert(`VNPay request failed: ${payRes.status} ${msg}`);
           return;
         }
 
@@ -94,7 +143,10 @@ export default function BookingStep3({ bookingData, prevStep }) {
         window.location.href = paymentUrl;
       }
     } catch (err) {
+      console.error("❌ Hotel booking error:", err);
       alert("Lỗi khi đặt phòng");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -143,6 +195,7 @@ export default function BookingStep3({ bookingData, prevStep }) {
           <button
             onClick={prevStep}
             className="rounded-full border mt-3 border-gray-300 text-gray-600 px-6 py-2 hover:bg-gray-50"
+            disabled={submitting}
           >
             Back
           </button>
@@ -156,14 +209,16 @@ export default function BookingStep3({ bookingData, prevStep }) {
 
             <div className="flex gap-3 mb-4">
               <img
-                src={getRoomImage(room.image_bed)}
-                alt={room.type}
+                src={getRoomImage(roomImageBed)}
+                alt={room.type || room.roomType || "room"}
                 className="w-20 h-16 rounded-md object-cover"
               />
 
               <div className="text-sm leading-snug">
                 <div className="font-medium text-gray-800">
-                  {hotel.name} – {room.type} ({room.guests} khách)
+                  {hotel.name} –{" "}
+                  {room.type || room.roomType} (
+                  {room.guests || room.numberOfGuest} khách)
                 </div>
                 <div className="text-xs text-gray-500">{hotel.address}</div>
               </div>
@@ -174,10 +229,10 @@ export default function BookingStep3({ bookingData, prevStep }) {
             <div className="text-sm space-y-2 text-gray-700">
               <div className="flex justify-between">
                 <span>
-                  {nights} đêm · {room.type}
+                  {nights} đêm · {room.type || room.roomType}
                 </span>
                 <span className="font-medium">
-                  {formatVND(room.price * nights)}
+                  {formatVND((room.price || 0) * nights)}
                 </span>
               </div>
             </div>
@@ -193,9 +248,10 @@ export default function BookingStep3({ bookingData, prevStep }) {
 
             <button
               onClick={handleConfirm}
-              className="w-full rounded-full bg-orange-500 hover:bg-orange-600 text-white py-3 font-medium"
+              disabled={submitting}
+              className="w-full rounded-full bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white py-3 font-medium"
             >
-              Xác nhận & Thanh toán
+              {submitting ? "Đang xử lý..." : "Xác nhận & Thanh toán"}
             </button>
           </div>
         </aside>
@@ -205,9 +261,7 @@ export default function BookingStep3({ bookingData, prevStep }) {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-2xl shadow-xl max-w-sm w-full text-center">
             <h2 className="text-xl font-semibold mb-2">Đặt phòng thành công</h2>
-            <p className="text-gray-600 mb-4">
-              Cảm ơn bạn đã sử dụng EasyTravel
-            </p>
+            <p className="text-gray-600 mb-4">Cảm ơn bạn đã sử dụng EasyTravel</p>
 
             <button
               onClick={() => navigate("/hotels")}

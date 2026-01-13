@@ -10,29 +10,39 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
   const { user, tickets, total, tourInfo, date } = bookingData;
 
   const [payment, setPayment] = useState("cash");
-  const [bankCode, setBankCode] = useState(""); // ✅ cho chọn ngân hàng
-  const [loading, setLoading] = useState(false); // ✅ tránh bấm spam
+  const [bankCode, setBankCode] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const getToken = () =>
+    localStorage.getItem("jwt") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("accessToken") ||
+    "";
 
   const handleConfirm = async () => {
     if (loading) return;
 
-    const token =
-      localStorage.getItem("jwt") ||
-      localStorage.getItem("token") ||
-      localStorage.getItem("accessToken");
+    const token = getToken();
+
+    // ✅ resolve tourId an toàn
+    const realTourId = tourInfo?.tourId ?? tourInfo?.id ?? null;
+
+    if (!realTourId) {
+      alert("Thiếu tourId (tourInfo bị sai dữ liệu).");
+      return;
+    }
 
     const payload = {
-      tourId: tourInfo.tourId,
-      adults: tickets.adult,
-      children: tickets.child,
-      totalPrice: total,
-      email: user.email,
+      tourId: realTourId,
+      adults: tickets?.adult || 0,
+      children: tickets?.child || 0,
+      totalPrice: total || 0,
+      email: user?.email || "",
     };
 
     try {
       setLoading(true);
 
-      // 1️⃣ Booking
       const bookingRes = await fetch("http://localhost:8080/booking/tour", {
         method: "POST",
         headers: {
@@ -44,29 +54,27 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
 
       if (!bookingRes.ok) throw new Error(await bookingRes.text());
 
-      const bookingData = await bookingRes.json();
+      const bookingDataRes = await bookingRes.json();
       const bookingId =
-        bookingData.bookingId || bookingData.id || bookingData?.data?.bookingId;
+        bookingDataRes.bookingId ||
+        bookingDataRes.id ||
+        bookingDataRes?.data?.bookingId;
 
       if (!bookingId) {
         alert("❌ Booking failed: missing bookingId!");
         return;
       }
 
-      // 2️⃣ CASH
       if (payment === "cash") {
         alert("🎉 Booking successfully! Please pay at departure.");
         return;
       }
 
-      // 3️⃣ VNPAY
       if (payment === "vnpay") {
         const params = new URLSearchParams();
-        params.append("amount", total);
+        params.append("amount", total || 0);
         params.append("bookingId", bookingId);
         params.append("bookingType", "TOUR");
-
-        // ✅ chỉ gửi bankCode nếu user chọn (để BE tự default hoặc hiển thị chọn bank trên VNPay)
         if (bankCode) params.append("bankCode", bankCode);
 
         const vnpApi = `http://localhost:8080/payment/vn-pay?${params.toString()}`;
@@ -92,7 +100,6 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
           return;
         }
 
-        // ✅ Redirect thẳng — không popup
         window.location.assign(paymentUrl);
         return;
       }
@@ -110,18 +117,24 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
         Payment & Confirmation
       </h2>
 
-      {/* SUMMARY */}
       <div className="border rounded-lg p-4 space-y-2">
-        <p><strong>Tour:</strong> {tourInfo.title}</p>
-        <p><strong>Date:</strong> {date}</p>
-        <p><strong>Adult:</strong> {tickets.adult}</p>
-        <p><strong>Child:</strong> {tickets.child}</p>
+        <p>
+          <strong>Tour:</strong> {tourInfo?.title}
+        </p>
+        <p>
+          <strong>Date:</strong> {date}
+        </p>
+        <p>
+          <strong>Adult:</strong> {tickets?.adult}
+        </p>
+        <p>
+          <strong>Child:</strong> {tickets?.child}
+        </p>
         <p className="text-orange-500 font-semibold text-lg">
           Total: {formatVND(total)}
         </p>
       </div>
 
-      {/* PAYMENT */}
       <div className="border rounded-lg p-4 space-y-3">
         <h3 className="font-semibold text-gray-800 mb-2">Payment Method</h3>
 
@@ -145,7 +158,6 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
           VNPay
         </label>
 
-        {/* ✅ Chọn ngân hàng chỉ khi VNPay */}
         {payment === "vnpay" && (
           <div className="pt-2">
             <label className="block text-sm text-gray-700 mb-1">

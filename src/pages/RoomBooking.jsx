@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import BookingStep1 from "@/components/pages/Booking/BookingStep1";
 import BookingStep2 from "@/components/pages/Booking/BookingStep2";
 import BookingStep3 from "@/components/pages/Booking/BookingStep3";
+
+import { extractIdFromSlug, buildTourSlug } from "@/utils/slug";
 
 export default function RoomBooking() {
   const [step, setStep] = useState(1);
@@ -11,9 +13,28 @@ export default function RoomBooking() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const params = new URLSearchParams(location.search);
-  const hotelId = parseInt(params.get("hotel"), 10);
-  const roomId = parseInt(params.get("room"), 10);
+  const params = useMemo(
+    () => new URLSearchParams(location.search),
+    [location.search]
+  );
+
+  // ✅ hỗ trợ cả:
+  // ?hotel=12&room=5
+  // ?hotel=khach-san-da-lat-12&room=phong-doi-5
+  const rawHotel = params.get("hotel") || "";
+  const rawRoom = params.get("room") || "";
+
+  const hotelId = useMemo(() => {
+    const n = Number(rawHotel);
+    if (Number.isFinite(n) && n > 0) return n;
+    return extractIdFromSlug(rawHotel);
+  }, [rawHotel]);
+
+  const roomId = useMemo(() => {
+    const n = Number(rawRoom);
+    if (Number.isFinite(n) && n > 0) return n;
+    return extractIdFromSlug(rawRoom);
+  }, [rawRoom]);
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -48,7 +69,7 @@ export default function RoomBooking() {
   // Fetch thông tin khách sạn và phòng
   useEffect(() => {
     if (!hotelId || !roomId) {
-      setError("Thiếu thông tin phòng hoặc khách sạn.");
+      setError("Thiếu thông tin phòng hoặc khách sạn (URL/query không hợp lệ).");
       setIsLoading(false);
       return;
     }
@@ -71,20 +92,20 @@ export default function RoomBooking() {
         setBookingData((prev) => ({
           ...prev,
           hotel: {
-            id: hotel.hotelId,
-            name: hotel.name,
-            address: hotel.address,
-            main_image: hotel.mainImage,
+            id: hotel.hotelId ?? hotel.id ?? hotelId,
+            name: hotel.name || "",
+            address: hotel.address || "",
+            main_image: hotel.mainImage || "",
           },
           room: {
-            id: room.roomId,
-            type: room.roomType,
-            price: room.price,
-            desc: room.desc,
-            guests: room.numberOfGuest,
-            image_bed: room.imageBed,
+            id: room.roomId ?? room.id ?? roomId,
+            type: room.roomType || "",
+            price: room.price || 0,
+            desc: room.desc || "",
+            guests: room.numberOfGuest || 0,
+            image_bed: room.imageBed || "",
           },
-          total: room.price,
+          total: room.price || 0,
         }));
       } catch (err) {
         console.error(err);
@@ -101,11 +122,20 @@ export default function RoomBooking() {
   const nextStep = () => setStep((s) => Math.min(3, s + 1));
   const prevStep = () => setStep((s) => Math.max(1, s - 1));
 
-  // Quay lại trang chi tiết khách sạn
+  // ✅ Quay lại trang chi tiết khách sạn (đúng slug route)
   const backToHotel = () => {
-    if (hotelId) {
-      navigate(`/hotel/${hotelId}`);
+    if (!hotelId) return;
+
+    // nếu rawHotel là slug-id thì quay về slug đó luôn
+    if (rawHotel && isNaN(Number(rawHotel))) {
+      navigate(`/detailhotel/${rawHotel}`);
+      return;
     }
+
+    // nếu rawHotel là số thì tạo slug từ tên (nếu có)
+    const hotelTitle = bookingData.hotel?.name || "hotel";
+    const slugId = buildTourSlug(hotelId, hotelTitle);
+    navigate(`/detailhotel/${slugId}`);
   };
 
   // Thanh step

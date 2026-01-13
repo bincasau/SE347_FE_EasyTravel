@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { getHotelById, fetchHotelImages } from "@/apis/hotel";
+import { buildTourSlug } from "@/utils/slug";
 
 const HOTEL_IMAGE_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/hotel";
@@ -8,17 +9,21 @@ const HOTEL_IMAGE_BASE =
 const IMAGE_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/image";
 
-const HotelDetail = ({ hotelId }) => {
+export default function HotelDetail({ hotelId }) {
+  const navigate = useNavigate();
+  const { slugId } = useParams(); // để redirect slug đúng
+
   const [hotel, setHotel] = useState(null);
   const [thumbnails, setThumbnails] = useState([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  const navigate = useNavigate();
-
-  // Lấy dữ liệu khách sạn và ảnh
   useEffect(() => {
-    if (!hotelId) return;
+    if (!hotelId) {
+      setLoading(false);
+      setHotel(null);
+      return;
+    }
 
     const fetchData = async () => {
       try {
@@ -27,12 +32,16 @@ const HotelDetail = ({ hotelId }) => {
 
         setHotel(hotelData);
 
-        // Gộp ảnh chính + 3 ảnh phụ vào chung 1 mảng
+        // ✅ nếu slug trên URL không đúng -> replace về slug đúng
+        if (slugId) {
+          const correctSlugId = buildTourSlug(hotelId, hotelData?.name);
+          if (slugId !== correctSlugId) {
+            navigate(`/detailhotel/${correctSlugId}`, { replace: true });
+          }
+        }
+
         const mergedImages = [
-          {
-            id: "main",
-            url: `${HOTEL_IMAGE_BASE}/${hotelData.mainImage}`,
-          },
+          { id: "main", url: `${HOTEL_IMAGE_BASE}/${hotelData.mainImage}` },
           ...imageList.map((img) => ({
             id: img.imageId,
             url: `${IMAGE_BASE}/${img.url}`,
@@ -43,21 +52,18 @@ const HotelDetail = ({ hotelId }) => {
         setActiveIndex(0);
       } catch (error) {
         console.error("Lỗi khi tải dữ liệu khách sạn:", error);
+        setHotel(null);
       } finally {
         setLoading(false);
       }
     };
 
+    setLoading(true);
     fetchData();
-  }, [hotelId]);
+  }, [hotelId, slugId, navigate]);
 
-  if (loading) {
-    return <div className="py-10 text-center">Đang tải dữ liệu...</div>;
-  }
-
-  if (!hotel) {
-    return <div className="py-10 text-center">Không tìm thấy khách sạn</div>;
-  }
+  if (loading) return <div className="py-10 text-center">Đang tải dữ liệu...</div>;
+  if (!hotel) return <div className="py-10 text-center">Không tìm thấy khách sạn</div>;
 
   return (
     <div className="py-10">
@@ -74,9 +80,7 @@ const HotelDetail = ({ hotelId }) => {
           <div className="relative overflow-hidden rounded-2xl h-80 mb-4">
             <div
               className="flex h-full transition-transform duration-500 ease-in-out"
-              style={{
-                transform: `translateX(-${activeIndex * 100}%)`,
-              }}
+              style={{ transform: `translateX(-${activeIndex * 100}%)` }}
             >
               {thumbnails.map((img) => (
                 <img
@@ -98,11 +102,7 @@ const HotelDetail = ({ hotelId }) => {
                 alt="thumbnail"
                 onClick={() => setActiveIndex(index)}
                 className={`h-24 w-full object-cover rounded-xl cursor-pointer transition
-                  ${
-                    index === activeIndex
-                      ? "ring-2 ring-orange-500"
-                      : "hover:scale-105"
-                  }`}
+                  ${index === activeIndex ? "ring-2 ring-orange-500" : "hover:scale-105"}`}
               />
             ))}
           </div>
@@ -128,6 +128,4 @@ const HotelDetail = ({ hotelId }) => {
       </div>
     </div>
   );
-};
-
-export default HotelDetail;
+}

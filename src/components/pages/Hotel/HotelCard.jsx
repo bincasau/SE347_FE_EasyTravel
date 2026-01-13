@@ -2,6 +2,9 @@ import React, { useEffect, useState } from "react";
 import { useLang } from "@/contexts/LangContext";
 import { Link, useSearchParams } from "react-router-dom";
 import { formatPrice } from "@/utils/formatPrice";
+import { buildTourSlug } from "@/utils/slug"; 
+// ✅ dùng chung helper buildTourSlug (slugify + `${slug}-${id}`)
+// bạn có thể rename sau thành buildHotelSlug nếu muốn
 
 const S3_HOTEL_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/hotel";
@@ -25,9 +28,12 @@ const HotelCard = ({ hotel_id, name, price, hotline, address, description }) => 
     );
   }, [hotel_id]);
 
+  // ✅ slug-id
+  const slugId = buildTourSlug(hotel_id, name);
+
   return (
     <Link
-      to={`/detailhotel/${hotel_id}`}
+      to={`/detailhotel/${slugId}`}
       onClick={handleSavePage}
       className="block w-full"
     >

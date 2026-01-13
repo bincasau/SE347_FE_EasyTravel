@@ -1,6 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { FaMapMarkerAlt } from "react-icons/fa";
+import { buildTourSlug } from "@/utils/slug";
 
 export default function TourCard({ tour }) {
   const navigate = useNavigate();
@@ -27,9 +28,15 @@ export default function TourCard({ tour }) {
       ? Number(price) - (Number(price) * Number(percentDiscount)) / 100
       : null;
 
+  const handleClick = () => {
+    if (id == null) return;
+    const slugId = buildTourSlug(id, title);
+    navigate(`/detailtour/${slugId}`);
+  };
+
   return (
     <div
-      onClick={() => navigate(`/detailtour/${id}`)}
+      onClick={handleClick}
       className="bg-white rounded-2xl overflow-hidden w-full hover:shadow-lg transition cursor-pointer group"
     >
       {/* Image */}

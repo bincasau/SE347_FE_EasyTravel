@@ -82,21 +82,24 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/about-us" element={<AboutUs />} />
           <Route path="/contact-us" element={<ContactUs />} />
-          <Route path="/detailtour/:id" element={<DetailTour />} />
+          <Route path="/detailtour/:slugId" element={<DetailTour />} />
           <Route path="/tours" element={<Tour />} />
           <Route path="/booking/:tourId" element={<Booking />} />
           <Route path="/hotels" element={<Hotel />} />
-          <Route path="/detailhotel/:id" element={<HotelDetailPage />} />
+          <Route path="/detailhotel/:slugId" element={<HotelDetailPage />} />
           <Route path="/booking-room" element={<RoomBooking />} />
           <Route path="/blog" element={<Blog />} />
-          <Route path="/detailblog/:id" element={<BlogDetail />} />
+          <Route path="/detailblog/:slugId" element={<BlogDetail />} />
           <Route path="/home" element={<Navigate to="/" replace />} />
           <Route path="/verify" element={<Verify />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/profile/edit" element={<EditProfile />} />
           <Route path="/booking-history/tours" element={<BookingHistoryTours />} />
-          <Route path="/booking-history/hotels" element={<BookingHistoryHotels />} />
+          <Route
+            path="/booking-history/hotels"
+            element={<BookingHistoryHotels />}
+          />
           <Route path="/403" element={<Forbidden403 />} />
 
           {/* TourGuide */}

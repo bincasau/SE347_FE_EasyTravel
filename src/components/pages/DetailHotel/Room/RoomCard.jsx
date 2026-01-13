@@ -6,18 +6,20 @@ import {
   faChevronRight,
 } from "@fortawesome/free-solid-svg-icons";
 
+import { buildTourSlug } from "@/utils/slug";
+
 const S3_ROOM_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/room";
 
 const FALLBACK_IMAGE = `${S3_ROOM_BASE}/standard_bed.jpg`;
 
-const RoomCard = ({ room, hotelId }) => {
+// ✅ thêm hotelName (optional) để làm slug đẹp hơn
+const RoomCard = ({ room, hotelId, hotelName }) => {
   // ===== BUILD IMAGE LIST (SAFE) =====
   const images = useMemo(() => {
     const list = [];
 
     if (room?.imageBed) list.push(`${S3_ROOM_BASE}/${room.imageBed}`);
-
     if (room?.imageWC) list.push(`${S3_ROOM_BASE}/${room.imageWC}`);
 
     return list.length > 0 ? list : [FALLBACK_IMAGE];
@@ -40,6 +42,15 @@ const RoomCard = ({ room, hotelId }) => {
     if (total <= 1) return;
     setIndex((prev) => (prev - 1 + total) % total);
   };
+
+  // ✅ resolve ids an toàn
+  const roomId = room?.roomId ?? room?.id ?? null;
+  const roomTitle = room?.roomType || "room";
+  const safeHotelTitle = hotelName || "hotel";
+
+  // ✅ slug-id cho query
+  const hotelSlugId = hotelId ? buildTourSlug(hotelId, safeHotelTitle) : "";
+  const roomSlugId = roomId ? buildTourSlug(roomId, roomTitle) : "";
 
   return (
     <div className="bg-white rounded-2xl shadow-md overflow-hidden flex flex-col hover:shadow-lg transition-all duration-300">
@@ -102,24 +113,25 @@ const RoomCard = ({ room, hotelId }) => {
 
       {/* CONTENT */}
       <div className="p-4 flex flex-col flex-grow">
-        <h3 className="text-lg font-semibold capitalize mb-1">
-          {room.roomType}
-        </h3>
+        <h3 className="text-lg font-semibold capitalize mb-1">{roomTitle}</h3>
 
         <p className="text-gray-600 text-sm line-clamp-2 mb-3">
-          {room.desc || "Hiện chưa có mô tả phòng."}
+          {room?.desc || "Hiện chưa có mô tả phòng."}
         </p>
 
         <div className="flex justify-between items-center text-sm text-gray-500 mb-4">
-          <span>{room.numberOfGuest} khách</span>
+          <span>{room?.numberOfGuest || 0} khách</span>
           <span className="text-orange-500 font-semibold">
-            {room.price?.toLocaleString("vi-VN")}₫ / đêm
+            {room?.price?.toLocaleString("vi-VN")}₫ / đêm
           </span>
         </div>
 
-        {hotelId ? (
+        {hotelId && roomId ? (
           <Link
-            to={`/booking-room?hotel=${hotelId}&room=${room.roomId}`}
+            // ✅ dùng slug-id cho query (RoomBooking đã support)
+            to={`/booking-room?hotel=${encodeURIComponent(
+              hotelSlugId
+            )}&room=${encodeURIComponent(roomSlugId)}`}
             className="mt-auto text-center text-sm font-semibold text-white 
             bg-orange-500 hover:bg-orange-600 rounded-full py-2 transition"
           >

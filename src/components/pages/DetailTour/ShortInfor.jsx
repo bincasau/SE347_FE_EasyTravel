@@ -21,9 +21,16 @@ import travel4 from "../../../assets/images/Tour/travel4.jpg";
 // ✅ dùng chung với Header (project bạn đã có)
 import { getUserFromToken } from "@/utils/auth";
 
+// ✅ slug helpers
+import { extractIdFromSlug, buildTourSlug } from "@/utils/slug";
+
 export default function TourDetail() {
-  const { id } = useParams();
+  // ✅ route bây giờ là /detailtour/:slugId
+  const { slugId } = useParams();
   const navigate = useNavigate();
+
+  // ✅ tách id từ slug-id
+  const id = useMemo(() => extractIdFromSlug(slugId), [slugId]);
 
   const [tour, setTour] = useState(null);
   const [images, setImages] = useState([]);
@@ -38,10 +45,20 @@ export default function TourDetail() {
   useEffect(() => {
     const fetchTour = async () => {
       try {
+        // ✅ nếu id null => URL sai
+        if (!id) throw new Error("URL không hợp lệ (thiếu id).");
+
         const res = await fetch(`http://localhost:8080/tours/${id}`);
         if (!res.ok) throw new Error("Không thể tải dữ liệu tour");
         const data = await res.json();
         setTour(data);
+
+        // ✅ nếu người dùng gõ sai slug -> redirect về slug đúng
+        const correctSlugId = buildTourSlug(id, data?.title);
+        if (slugId !== correctSlugId) {
+          navigate(`/detailtour/${correctSlugId}`, { replace: true });
+          // không return; vẫn ok vì setTour xong rồi
+        }
 
         const s3Images = Array.from({ length: 5 }, (_, idx) => {
           const n = idx + 1;
@@ -52,6 +69,7 @@ export default function TourDetail() {
         setSelectedImg(s3Images[0]);
       } catch (err) {
         console.error("❌ Lỗi khi fetch tour:", err);
+        setTour(null);
       } finally {
         setLoading(false);
       }
@@ -59,7 +77,7 @@ export default function TourDetail() {
 
     setLoading(true);
     fetchTour();
-  }, [id]);
+  }, [id, slugId, navigate]);
 
   useEffect(() => {
     if (images?.length) setSelectedImg(images[0]);
@@ -190,14 +208,12 @@ export default function TourDetail() {
   const handleBuyNow = () => {
     const token = getToken();
     if (!token) {
-      // chưa đăng nhập
       alert("Please log in to book this tour.");
-      // optional: mở popup login nếu bạn đang dùng event
       window.dispatchEvent(new Event("open-login"));
       return;
     }
 
-    const jwtUser = getUserFromToken(); // { role, ... } hoặc null
+    const jwtUser = getUserFromToken();
     const role = String(jwtUser?.role || "").toUpperCase();
 
     if (role === "TOUR_GUIDE") {
@@ -205,10 +221,8 @@ export default function TourDetail() {
       return;
     }
 
-    // ✅ USER (hoặc role khác bạn muốn cho booking)
-    navigate(`/booking/${id}`, {
-      state: { tour, images },
-    });
+    // ✅ IMPORTANT: dùng id thật (đã extract), không dùng slugId
+    navigate(`/booking/${buildTourSlug(id, title)}`)
   };
 
   return (
