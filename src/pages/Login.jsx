@@ -1,13 +1,19 @@
 import { useState } from "react";
-import { loginApi } from "@/apis/AccountAPI";
+import { loginApi, resetPasswordApi } from "@/apis/AccountAPI";
 import { getUserFromToken } from "@/utils/auth";
 import { useNavigate } from "react-router-dom";
 
 export default function LoginModal({ onClose, onOpenSignup }) {
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   const navigate = useNavigate();
+
+  // ✅ Google login: redirect sang backend OAuth2 endpoint
+  function handleGoogleLogin() {
+    window.location.href = "http://localhost:8080/oauth2/authorization/google";
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -31,13 +37,13 @@ export default function LoginModal({ onClose, onOpenSignup }) {
 
       // ⭐ Điều hướng theo role
       if (user?.role === "HOTEL_MANAGER") {
-        navigate("/hotel-manager/hotels/addroom"); // ✅ dẫn vào Add Room
+        navigate("/hotel-manager/hotels/addroom");
       } else if (user?.role === "TOUR_GUIDE") {
-        navigate("/guide/schedule"); // ✅ dẫn vào trang lịch trình
+        navigate("/guide/schedule");
       } else if (user?.role === "ADMIN") {
-        navigate("/admin/dashboard"); // ✅ (optional) admin
+        navigate("/admin/dashboard");
       } else {
-        navigate("/"); // ✅ user thường
+        navigate("/");
       }
 
       // ⭐ Báo cho app biết JWT đã thay đổi
@@ -46,6 +52,26 @@ export default function LoginModal({ onClose, onOpenSignup }) {
       setErr(error?.message || "Đăng nhập thất bại!");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleForgotPassword() {
+    setErr("");
+    setResetting(true);
+    try {
+      // ⚠️ Backend hiện tại yêu cầu Principal => phải có JWT mới reset được
+      const msg = await resetPasswordApi();
+      alert(msg || "Reset password thành công!");
+    } catch (e) {
+      if (e?.code === "NO_TOKEN") {
+        setErr(
+          "Chức năng reset password hiện tại yêu cầu bạn đăng nhập trước (backend đang dùng Principal)."
+        );
+      } else {
+        setErr(e?.message || "Reset password thất bại!");
+      }
+    } finally {
+      setResetting(false);
     }
   }
 
@@ -71,6 +97,23 @@ export default function LoginModal({ onClose, onOpenSignup }) {
 
       {err && <p className="text-sm text-red-600 mb-3">{err}</p>}
 
+      {/* ✅ Button Google */}
+      <button
+        type="button"
+        onClick={handleGoogleLogin}
+        className="w-full rounded-full border border-gray-300 bg-white text-gray-900 font-semibold py-3 hover:bg-gray-50 transition flex items-center justify-center gap-2 mb-4"
+      >
+        <span>G</span>
+        Continue with Google
+      </button>
+
+      {/* Divider */}
+      <div className="flex items-center gap-3 mb-4">
+        <div className="h-px flex-1 bg-gray-200" />
+        <span className="text-xs text-gray-400">OR</span>
+        <div className="h-px flex-1 bg-gray-200" />
+      </div>
+
       <form className="space-y-5" onSubmit={handleSubmit}>
         <div className="space-y-1">
           <label className="text-sm font-medium text-gray-800">Username</label>
@@ -92,6 +135,18 @@ export default function LoginModal({ onClose, onOpenSignup }) {
             placeholder="Enter your password"
             className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:ring-2 focus:ring-orange-400"
           />
+        </div>
+
+        {/* ✅ Forgot password */}
+        <div className="text-right">
+          <button
+            type="button"
+            onClick={handleForgotPassword}
+            disabled={resetting}
+            className="text-sm font-semibold text-orange-500 hover:underline disabled:opacity-60"
+          >
+            {resetting ? "Resetting..." : "Forgot password?"}
+          </button>
         </div>
 
         <button

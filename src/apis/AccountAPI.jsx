@@ -77,13 +77,50 @@ export async function getAccountDetail() {
   });
 
   if (!res.ok) {
-    const txt = await res.text();
-    const err = new Error(txt || "UNAOTHORIZED");
+    const txt = await res.text().catch(() => "");
+    const err = new Error(txt || "UNAUTHORIZED");
     err.status = res.status;
     throw err;
   }
 
   return res.json();
+}
+
+/** ---------------- CHANGE PASSWORD ---------------- **/
+export async function changePasswordApi({ oldPassword, newPassword }) {
+  const token = localStorage.getItem("jwt");
+  if (!token) {
+    const err = new Error("NO_TOKEN");
+    err.code = "NO_TOKEN";
+    throw err;
+  }
+
+  const res = await fetch(`${API_BASE}/account/change-password`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ oldPassword, newPassword }),
+  });
+
+  if (!res.ok) {
+    let msg = "Đổi mật khẩu thất bại!";
+    try {
+      const ct = res.headers.get("content-type") || "";
+      if (ct.includes("application/json")) {
+        const data = await res.json();
+        msg = data.message || data.error || msg;
+      } else {
+        msg = await res.text();
+      }
+    } catch {}
+    throw new Error(msg);
+  }
+
+  // backend của bạn có thể trả text hoặc json
+  const ct = res.headers.get("content-type") || "";
+  return ct.includes("application/json") ? res.json() : res.text();
 }
 
 /** ---------------- ACTIVATE ACCOUNT ---------------- **/
@@ -97,6 +134,30 @@ export async function activateAccount(email, code) {
   const msg = await res.text();
   return { ok: res.ok, message: msg };
 }
+
+/** ---------------- RESET PASSWORD (require login) ---------------- **/
+export async function resetPasswordApi() {
+  const token = localStorage.getItem("jwt");
+  if (!token) {
+    const err = new Error("NO_TOKEN");
+    err.code = "NO_TOKEN";
+    throw err;
+  }
+
+  const res = await fetch(`${API_BASE}/account/reset-password`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  const text = await res.text().catch(() => "");
+
+  if (!res.ok) {
+    throw new Error(text || "Reset password failed!");
+  }
+
+  return text || "Reset password success!";
+}
+
 
 /** ---------------- LOGOUT ---------------- **/
 export function logout() {

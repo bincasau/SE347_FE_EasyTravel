@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getAccountDetail } from "@/apis/AccountAPI";
+import { getAccountDetail, changePasswordApi } from "@/apis/AccountAPI";
 import { updateMyProfileApi, deleteMineApi } from "@/apis/ProfileAPI";
 import { logout } from "@/apis/AccountAPI";
 
@@ -11,6 +11,9 @@ export default function EditProfile() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // ✅ thêm modal change password
+  const [openChangePw, setOpenChangePw] = useState(false);
 
   // ✅ form dùng đúng field entity
   const [form, setForm] = useState({
@@ -133,7 +136,9 @@ export default function EditProfile() {
               alt="avatar"
             />
             <div>
-              <div className="font-medium text-gray-900 mb-2">Change Avatar</div>
+              <div className="font-medium text-gray-900 mb-2">
+                Change Avatar
+              </div>
               <input
                 type="file"
                 accept="image/*"
@@ -231,7 +236,27 @@ export default function EditProfile() {
           </div>
         </form>
 
+        {/* ✅ Security: Change password */}
         <div className="mt-10 pt-6 border-t">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="font-semibold text-gray-900">Security</div>
+              <div className="text-sm text-gray-500">
+                Đổi mật khẩu tài khoản của bạn.
+              </div>
+            </div>
+
+            <button
+              onClick={() => setOpenChangePw(true)}
+              className="px-5 py-2.5 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-50"
+            >
+              Change Password
+            </button>
+          </div>
+        </div>
+
+        {/* Danger Zone */}
+        <div className="mt-6 pt-6 border-t">
           <div className="flex items-center justify-between gap-4">
             <div>
               <div className="font-semibold text-gray-900">Danger Zone</div>
@@ -249,6 +274,11 @@ export default function EditProfile() {
           </div>
         </div>
       </div>
+
+      {/* ✅ Modal Change Password */}
+      {openChangePw && (
+        <ChangePasswordModal onClose={() => setOpenChangePw(false)} />
+      )}
     </div>
   );
 }
@@ -258,6 +288,122 @@ function Field({ label, children }) {
     <div className="space-y-2">
       <div className="text-sm text-gray-500">{label}</div>
       {children}
+    </div>
+  );
+}
+
+function ChangePasswordModal({ onClose }) {
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setErr("");
+
+    if (newPassword.length < 6) {
+      setErr("Mật khẩu mới phải từ 6 ký tự trở lên!");
+      return;
+    }
+    if (newPassword !== confirm) {
+      setErr("Xác nhận mật khẩu không khớp!");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await changePasswordApi({ oldPassword, newPassword });
+      alert("Đổi mật khẩu thành công!");
+      onClose?.();
+    } catch (e) {
+      console.error(e);
+      setErr(e?.message || "Đổi mật khẩu thất bại!");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl relative">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+          aria-label="Close"
+          type="button"
+        >
+          ✕
+        </button>
+
+        <h3 className="text-xl font-semibold text-gray-900 mb-4 text-center">
+          Change Password
+        </h3>
+
+        {err && <p className="text-sm text-red-600 mb-3">{err}</p>}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-gray-800">
+              Current Password
+            </label>
+            <input
+              type="password"
+              value={oldPassword}
+              onChange={(e) => setOldPassword(e.target.value)}
+              required
+              className="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:ring-2 focus:ring-orange-400"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-gray-800">
+              New Password
+            </label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              required
+              className="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:ring-2 focus:ring-orange-400"
+            />
+            <p className="text-xs text-gray-500">Tối thiểu 6 ký tự.</p>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-gray-800">
+              Confirm New Password
+            </label>
+            <input
+              type="password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              required
+              className="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:ring-2 focus:ring-orange-400"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-5 py-2.5 rounded-full border hover:bg-gray-50"
+              disabled={loading}
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              className="px-5 py-2.5 rounded-full bg-orange-500 text-white hover:bg-orange-400 disabled:opacity-60"
+              disabled={loading}
+            >
+              {loading ? "Saving..." : "Update"}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
