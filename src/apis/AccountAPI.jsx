@@ -1,6 +1,22 @@
 // src/apis/AccountAPI.js
 const API_BASE = "http://localhost:8080";
 
+/** ---------------- HELPERS ---------------- **/
+async function readErrorMessage(res, fallbackMsg) {
+  let msg = fallbackMsg;
+  try {
+    const ct = res.headers.get("content-type") || "";
+    if (ct.includes("application/json")) {
+      const data = await res.json();
+      msg = data.message || data.error || msg;
+    } else {
+      const text = await res.text();
+      msg = text || msg;
+    }
+  } catch {}
+  return msg;
+}
+
 /** ---------------- LOGIN ---------------- **/
 export async function loginApi(payload) {
   const res = await fetch(`${API_BASE}/account/login`, {
@@ -10,14 +26,7 @@ export async function loginApi(payload) {
   });
 
   if (!res.ok) {
-    let msg = "Đăng nhập thất bại!";
-    try {
-      const ct = res.headers.get("content-type") || "";
-      if (ct.includes("application/json")) {
-        const data = await res.json();
-        msg = data.message || data.error || msg;
-      } else msg = await res.text();
-    } catch {}
+    const msg = await readErrorMessage(res, "Đăng nhập thất bại!");
     throw new Error(msg);
   }
 
@@ -48,14 +57,7 @@ export async function signupApi(payload) {
   });
 
   if (!res.ok) {
-    let msg = "Sign up failed!";
-    try {
-      const ct = res.headers.get("content-type") || "";
-      if (ct.includes("application/json")) {
-        const data = await res.json();
-        msg = data.message || data.error || msg;
-      } else msg = await res.text();
-    } catch {}
+    const msg = await readErrorMessage(res, "Sign up failed!");
     throw new Error(msg);
   }
 
@@ -105,20 +107,10 @@ export async function changePasswordApi({ oldPassword, newPassword }) {
   });
 
   if (!res.ok) {
-    let msg = "Đổi mật khẩu thất bại!";
-    try {
-      const ct = res.headers.get("content-type") || "";
-      if (ct.includes("application/json")) {
-        const data = await res.json();
-        msg = data.message || data.error || msg;
-      } else {
-        msg = await res.text();
-      }
-    } catch {}
+    const msg = await readErrorMessage(res, "Đổi mật khẩu thất bại!");
     throw new Error(msg);
   }
 
-  // backend của bạn có thể trả text hoặc json
   const ct = res.headers.get("content-type") || "";
   return ct.includes("application/json") ? res.json() : res.text();
 }
@@ -131,33 +123,54 @@ export async function activateAccount(email, code) {
     )}&code=${encodeURIComponent(code)}`
   );
 
-  const msg = await res.text();
+  const msg = await res.text().catch(() => "");
   return { ok: res.ok, message: msg };
 }
 
-/** ---------------- RESET PASSWORD (require login) ---------------- **/
-export async function resetPasswordApi() {
-  const token = localStorage.getItem("jwt");
-  if (!token) {
-    const err = new Error("NO_TOKEN");
-    err.code = "NO_TOKEN";
-    throw err;
-  }
-
-  const res = await fetch(`${API_BASE}/account/reset-password`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-  });
-
-  const text = await res.text().catch(() => "");
+/** ---------------- FORGOT PASSWORD (NO JWT) ---------------- **/
+// Step 1: Request reset code to email
+export async function forgotPasswordRequestApi(email) {
+  const res = await fetch(
+    `${API_BASE}/account/forgot-password/request?email=${encodeURIComponent(email)}`,
+    { method: "POST" }
+  );
 
   if (!res.ok) {
-    throw new Error(text || "Reset password failed!");
+    const msg = await readErrorMessage(res, "Gửi mã reset thất bại!");
+    throw new Error(msg);
   }
 
-  return text || "Reset password success!";
+  // backend có thể trả text hoặc json
+  const ct = res.headers.get("content-type") || "";
+  if (ct.includes("application/json")) {
+    const data = await res.json();
+    return data.message || data.result || "Đã gửi mã xác nhận về email!";
+  }
+  return (await res.text().catch(() => "")) || "Đã gửi mã xác nhận về email!";
 }
 
+// Step 2: Confirm code + set new password
+export async function forgotPasswordConfirmApi({ email, code, newPassword }) {
+  const url =
+    `${API_BASE}/account/forgot-password/confirm` +
+    `?email=${encodeURIComponent(email)}` +
+    `&code=${encodeURIComponent(code)}` +
+    `&newPassword=${encodeURIComponent(newPassword)}`;
+
+  const res = await fetch(url, { method: "POST" });
+
+  if (!res.ok) {
+    const msg = await readErrorMessage(res, "Xác nhận reset thất bại!");
+    throw new Error(msg);
+  }
+
+  const ct = res.headers.get("content-type") || "";
+  if (ct.includes("application/json")) {
+    const data = await res.json();
+    return data.message || data.result || "Đổi mật khẩu thành công!";
+  }
+  return (await res.text().catch(() => "")) || "Đổi mật khẩu thành công!";
+}
 
 /** ---------------- LOGOUT ---------------- **/
 export function logout() {

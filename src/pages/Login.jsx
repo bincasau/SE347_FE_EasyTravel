@@ -1,16 +1,49 @@
-import { useState } from "react";
-import { loginApi, resetPasswordApi } from "@/apis/AccountAPI";
+import { useState, useMemo } from "react";
+import {
+  loginApi,
+  forgotPasswordRequestApi,
+  forgotPasswordConfirmApi,
+} from "@/apis/AccountAPI";
 import { getUserFromToken } from "@/utils/auth";
 import { useNavigate } from "react-router-dom";
+
+/** ===== Password Rules =====
+ * - >= 8 chars
+ * - at least 1 uppercase, 1 lowercase, 1 number, 1 special char
+ */
+function validatePassword(password) {
+  if (!password || password.length < 8) {
+    return "Mật khẩu phải có ít nhất 8 ký tự.";
+  }
+  if (!/[A-Z]/.test(password)) {
+    return "Mật khẩu phải chứa ít nhất 1 chữ hoa (A-Z).";
+  }
+  if (!/[a-z]/.test(password)) {
+    return "Mật khẩu phải chứa ít nhất 1 chữ thường (a-z).";
+  }
+  if (!/[0-9]/.test(password)) {
+    return "Mật khẩu phải chứa ít nhất 1 số (0-9).";
+  }
+  if (!/[!@#$%^&*(),.?\":{}|<>_\-+=/\\[\]~`;'@]/.test(password)) {
+    return "Mật khẩu phải chứa ít nhất 1 ký tự đặc biệt (ví dụ: !@#$%^&*).";
+  }
+  return "";
+}
 
 export default function LoginModal({ onClose, onOpenSignup }) {
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // forgot password state
+  const [showForgot, setShowForgot] = useState(false);
+  const [fpEmail, setFpEmail] = useState("");
+  const [fpCode, setFpCode] = useState("");
+  const [fpNewPass, setFpNewPass] = useState("");
+  const [fpStep, setFpStep] = useState(1); // 1=request, 2=confirm
   const [resetting, setResetting] = useState(false);
 
   const navigate = useNavigate();
 
-  // ✅ Google login: redirect sang backend OAuth2 endpoint
   function handleGoogleLogin() {
     window.location.href = "http://localhost:8080/oauth2/authorization/google";
   }
@@ -23,30 +56,17 @@ export default function LoginModal({ onClose, onOpenSignup }) {
     const payload = Object.fromEntries(fd.entries());
 
     setLoading(true);
-
     try {
-      // ⭐ Gọi API để đăng nhập → backend trả JWT → FE tự lưu vào localStorage
       await loginApi(payload);
 
-      // ⭐ Giải mã JWT lấy role
       const user = getUserFromToken();
-      console.log("Decoded user:", user);
-
-      // ⭐ Đóng modal
       onClose?.();
 
-      // ⭐ Điều hướng theo role
-      if (user?.role === "HOTEL_MANAGER") {
-        navigate("/hotel-manager/hotels/addroom");
-      } else if (user?.role === "TOUR_GUIDE") {
-        navigate("/guide/schedule");
-      } else if (user?.role === "ADMIN") {
-        navigate("/admin/dashboard");
-      } else {
-        navigate("/");
-      }
+      if (user?.role === "HOTEL_MANAGER") navigate("/hotel-manager/hotels/addroom");
+      else if (user?.role === "TOUR_GUIDE") navigate("/guide/schedule");
+      else if (user?.role === "ADMIN") navigate("/admin/dashboard");
+      else navigate("/");
 
-      // ⭐ Báo cho app biết JWT đã thay đổi
       window.dispatchEvent(new Event("jwt-changed"));
     } catch (error) {
       setErr(error?.message || "Đăng nhập thất bại!");
@@ -55,21 +75,52 @@ export default function LoginModal({ onClose, onOpenSignup }) {
     }
   }
 
-  async function handleForgotPassword() {
+  async function handleForgotRequest() {
     setErr("");
     setResetting(true);
     try {
-      // ⚠️ Backend hiện tại yêu cầu Principal => phải có JWT mới reset được
-      const msg = await resetPasswordApi();
-      alert(msg || "Reset password thành công!");
+      const msg = await forgotPasswordRequestApi(fpEmail);
+      alert(msg || "Đã gửi mã xác nhận về email!");
+      setFpStep(2);
     } catch (e) {
-      if (e?.code === "NO_TOKEN") {
-        setErr(
-          "Chức năng reset password hiện tại yêu cầu bạn đăng nhập trước (backend đang dùng Principal)."
-        );
-      } else {
-        setErr(e?.message || "Reset password thất bại!");
-      }
+      setErr(e?.message || "Gửi mã reset thất bại!");
+    } finally {
+      setResetting(false);
+    }
+  }
+
+  const pwdError = useMemo(() => {
+    if (!showForgot || fpStep !== 2) return "";
+    return validatePassword(fpNewPass);
+  }, [showForgot, fpStep, fpNewPass]);
+
+  async function handleForgotConfirm() {
+    setErr("");
+
+    // ✅ validate password trước khi gọi API
+    const msgErr = validatePassword(fpNewPass);
+    if (msgErr) {
+      setErr(msgErr);
+      return;
+    }
+
+    setResetting(true);
+    try {
+      const msg = await forgotPasswordConfirmApi({
+        email: fpEmail,
+        code: fpCode,
+        newPassword: fpNewPass,
+      });
+      alert(msg || "Đổi mật khẩu thành công!");
+
+      // xong thì quay về login
+      setShowForgot(false);
+      setFpStep(1);
+      setFpEmail("");
+      setFpCode("");
+      setFpNewPass("");
+    } catch (e) {
+      setErr(e?.message || "Xác nhận reset thất bại!");
     } finally {
       setResetting(false);
     }
@@ -92,82 +143,174 @@ export default function LoginModal({ onClose, onOpenSignup }) {
       </button>
 
       <h3 className="text-2xl font-semibold text-gray-900 mb-6 text-center">
-        Sign In to EasyTravel
+        {showForgot ? "Reset Password" : "Sign In to EasyTravel"}
       </h3>
 
       {err && <p className="text-sm text-red-600 mb-3">{err}</p>}
 
-      {/* ✅ Button Google */}
-      <button
-        type="button"
-        onClick={handleGoogleLogin}
-        className="w-full rounded-full border border-gray-300 bg-white text-gray-900 font-semibold py-3 hover:bg-gray-50 transition flex items-center justify-center gap-2 mb-4"
-      >
-        <span>G</span>
-        Continue with Google
-      </button>
-
-      {/* Divider */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="h-px flex-1 bg-gray-200" />
-        <span className="text-xs text-gray-400">OR</span>
-        <div className="h-px flex-1 bg-gray-200" />
-      </div>
-
-      <form className="space-y-5" onSubmit={handleSubmit}>
-        <div className="space-y-1">
-          <label className="text-sm font-medium text-gray-800">Username</label>
-          <input
-            name="username"
-            type="text"
-            required
-            placeholder="Enter your username"
-            className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:ring-2 focus:ring-orange-400"
-          />
-        </div>
-
-        <div className="space-y-1">
-          <label className="text-sm font-medium text-gray-800">Password</label>
-          <input
-            name="password"
-            type="password"
-            required
-            placeholder="Enter your password"
-            className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:ring-2 focus:ring-orange-400"
-          />
-        </div>
-
-        {/* ✅ Forgot password */}
-        <div className="text-right">
+      {!showForgot ? (
+        <>
           <button
             type="button"
-            onClick={handleForgotPassword}
-            disabled={resetting}
-            className="text-sm font-semibold text-orange-500 hover:underline disabled:opacity-60"
+            onClick={handleGoogleLogin}
+            className="w-full rounded-full border border-gray-300 bg-white text-gray-900 font-semibold py-3 hover:bg-gray-50 transition flex items-center justify-center gap-2 mb-4"
           >
-            {resetting ? "Resetting..." : "Forgot password?"}
+            <span>G</span>
+            Continue with Google
           </button>
-        </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-full bg-orange-500 text-white font-semibold py-3 hover:bg-orange-400 transition disabled:opacity-60"
-        >
-          {loading ? "Signing in..." : "Sign In"}
-        </button>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-px flex-1 bg-gray-200" />
+            <span className="text-xs text-gray-400">OR</span>
+            <div className="h-px flex-1 bg-gray-200" />
+          </div>
 
-        <p className="text-center text-sm text-gray-600">
-          Don't have an account?
+          <form className="space-y-5" onSubmit={handleSubmit}>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-800">Username</label>
+              <input
+                name="username"
+                type="text"
+                required
+                placeholder="Enter your username"
+                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:ring-2 focus:ring-orange-400"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-800">Password</label>
+              <input
+                name="password"
+                type="password"
+                required
+                placeholder="Enter your password"
+                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:ring-2 focus:ring-orange-400"
+              />
+            </div>
+
+            <div className="text-right">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowForgot(true);
+                  setFpStep(1);
+                  setErr("");
+                }}
+                className="text-sm font-semibold text-orange-500 hover:underline"
+              >
+                Forgot password?
+              </button>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-full bg-orange-500 text-white font-semibold py-3 hover:bg-orange-400 transition disabled:opacity-60"
+            >
+              {loading ? "Signing in..." : "Sign In"}
+            </button>
+
+            <p className="text-center text-sm text-gray-600">
+              Don't have an account?
+              <button
+                type="button"
+                onClick={handleGoSignup}
+                className="font-semibold text-orange-500 hover:underline ml-1"
+              >
+                Sign Up
+              </button>
+            </p>
+          </form>
+        </>
+      ) : (
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-gray-800">Email</label>
+            <input
+              value={fpEmail}
+              onChange={(e) => setFpEmail(e.target.value)}
+              type="email"
+              required
+              placeholder="Enter your email"
+              className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:ring-2 focus:ring-orange-400"
+            />
+          </div>
+
+          {fpStep === 2 && (
+            <>
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-800">Code</label>
+                <input
+                  value={fpCode}
+                  onChange={(e) => setFpCode(e.target.value)}
+                  type="text"
+                  required
+                  placeholder="Enter code from email"
+                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:ring-2 focus:ring-orange-400"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-800">New password</label>
+                <input
+                  value={fpNewPass}
+                  onChange={(e) => setFpNewPass(e.target.value)}
+                  type="password"
+                  required
+                  placeholder="Enter new password"
+                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:ring-2 focus:ring-orange-400"
+                />
+              </div>
+
+              {/* ✅ Password rules + realtime hint */}
+              <div className="text-xs text-gray-500 space-y-1 mt-1">
+                <p className="font-medium text-gray-600">Yêu cầu mật khẩu:</p>
+                <ul className="list-disc ml-5">
+                  <li>Ít nhất 8 ký tự</li>
+                  <li>Có chữ hoa (A-Z)</li>
+                  <li>Có chữ thường (a-z)</li>
+                  <li>Có số (0-9)</li>
+                  <li>Có ký tự đặc biệt (ví dụ: !@#$%^&*)</li>
+                </ul>
+                {fpNewPass && pwdError && (
+                  <p className="text-red-600 mt-1">{pwdError}</p>
+                )}
+              </div>
+            </>
+          )}
+
           <button
             type="button"
-            onClick={handleGoSignup}
-            className="font-semibold text-orange-500 hover:underline ml-1"
+            disabled={
+              resetting ||
+              !fpEmail ||
+              (fpStep === 2 && (!fpCode || !fpNewPass || !!pwdError))
+            }
+            onClick={fpStep === 1 ? handleForgotRequest : handleForgotConfirm}
+            className="w-full rounded-full bg-orange-500 text-white font-semibold py-3 hover:bg-orange-400 transition disabled:opacity-60"
           >
-            Sign Up
+            {resetting
+              ? "Processing..."
+              : fpStep === 1
+              ? "Send reset code"
+              : "Confirm & change password"}
           </button>
-        </p>
-      </form>
+
+          <button
+            type="button"
+            className="w-full text-sm font-semibold text-gray-500 hover:underline"
+            onClick={() => {
+              setShowForgot(false);
+              setFpStep(1);
+              setErr("");
+              setFpCode("");
+              setFpNewPass("");
+            }}
+          >
+            Back to sign in
+          </button>
+        </div>
+      )}
     </div>
   );
 }

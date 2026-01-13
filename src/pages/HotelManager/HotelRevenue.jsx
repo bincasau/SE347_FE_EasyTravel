@@ -1,4 +1,7 @@
-import { useMemo, useEffect, useState, useCallback } from "react";
+import { useMemo, useEffect, useState, useCallback, useRef } from "react";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
+
 import SummaryCards from "@/components/pages/HotelManager/HotelRevenue/SummaryCards";
 import RevenueTable from "@/components/pages/HotelManager/HotelRevenue/RevenueTable";
 
@@ -22,6 +25,10 @@ export default function HotelRevenue() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // ✅ PDF mode + ref export
+  const exportRef = useRef(null);
+  const [pdfMode, setPdfMode] = useState(false);
+
   const token =
     localStorage.getItem("jwt") ||
     localStorage.getItem("token") ||
@@ -36,6 +43,14 @@ export default function HotelRevenue() {
       monthNum: Math.trunc(safeNumber(m, new Date().getMonth() + 1)),
     };
   }, [monthValue]);
+
+  const monthLabel = useMemo(() => {
+    // monthNum: 1-12
+    return new Date(yearNum, monthNum - 1).toLocaleString("en-US", {
+      month: "long",
+      year: "numeric",
+    });
+  }, [monthNum, yearNum]);
 
   /** ✅ fetch bookings by month/year (JWT required) */
   const fetchBookingsByMonth = useCallback(
@@ -122,50 +137,152 @@ export default function HotelRevenue() {
     }
   }, [data, sortBy]);
 
+  /** helpers tổng quan (để in lên PDF header) */
+  const totalBookings = useMemo(() => sortedData.length, [sortedData]);
+
+  const totalRevenue = useMemo(() => {
+    const sum = sortedData.reduce((acc, b) => {
+      const r = safeNumber(b?.payment?.totalPrice ?? b?.totalPrice ?? 0, 0);
+      return acc + r;
+    }, 0);
+    return sum;
+  }, [sortedData]);
+
+  const totalRevenueText = useMemo(() => {
+    return `${Math.round(totalRevenue).toLocaleString("vi-VN")}₫`;
+  }, [totalRevenue]);
+
+  /** ✅ Export PDF */
+  const exportPDF = async () => {
+    try {
+      if (!exportRef.current) throw new Error("Không tìm thấy vùng để export!");
+      if (loading) throw new Error("Đang tải dữ liệu, thử lại sau nhé!");
+      if (!token) throw new Error("Bạn chưa đăng nhập!");
+
+      // bật layout PDF (title giữa + ẩn filter)
+      setPdfMode(true);
+
+      // đợi render ổn định
+      await new Promise((r) => setTimeout(r, 350));
+
+      const el = exportRef.current;
+
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        scrollX: 0,
+        scrollY: -window.scrollY,
+      });
+
+      const imgData = canvas.toDataURL("image/png", 1.0);
+
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      const imgWidth = pageWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(`Hotel_Revenue_${monthLabel}.pdf`);
+    } catch (e) {
+      console.error(e);
+      alert(e?.message || "Export PDF failed!");
+    } finally {
+      setPdfMode(false);
+    }
+  };
+
   return (
     <div className="min-h-[calc(100vh-64px)] bg-gray-50">
-      {/* HEADER */}
-      <div className="bg-white border-b">
-        <div className="max-w-6xl mx-auto px-6 py-6">
-          <h1 className="text-2xl font-semibold text-gray-900 text-center">
-            Hotel Revenue
-          </h1>
-          <p className="text-sm text-gray-500 text-center mt-1">
-            Booking revenue by month
-          </p>
-
-          {/* Filters */}
-          <div className="mt-6 flex justify-center gap-4">
-            <input
-              type="month"
-              value={monthValue}
-              onChange={(e) => setMonthValue(e.target.value)}
-              className="border rounded-md px-3 py-2 text-sm"
-            />
-
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="border rounded-md px-3 py-2 text-sm bg-white"
-            >
-              <option value="revenue_desc">Revenue: High → Low</option>
-              <option value="revenue_asc">Revenue: Low → High</option>
-              <option value="checkin_desc">Check-in: New → Old</option>
-              <option value="checkin_asc">Check-in: Old → New</option>
-            </select>
+      {/* ✅ VÙNG EXPORT PDF */}
+      <div ref={exportRef} className="bg-white">
+        {/* ✅ Header PDF (title giữa) */}
+        {pdfMode && (
+          <div className="px-6 pt-8 pb-4 text-center">
+            <h1 className="text-2xl font-semibold text-gray-900">HOTEL REVENUE</h1>
+            <div className="text-sm text-gray-600 mt-1">{monthLabel}</div>
+            <div className="text-xs text-gray-500 mt-1">
+              Total bookings: {totalBookings} · Total revenue: {totalRevenueText}
+            </div>
+            <div className="mt-4 h-px bg-gray-200" />
           </div>
+        )}
 
-          <div className="mt-3 text-center text-xs text-gray-500">
-            {loading ? "Đang tải dữ liệu..." : error ? `Lỗi: ${error}` : ""}
+        {/* HEADER UI (ẩn khi pdfMode) */}
+        {!pdfMode && (
+          <div className="bg-white border-b">
+            <div className="max-w-6xl mx-auto px-6 py-6">
+              <h1 className="text-2xl font-semibold text-gray-900 text-center">
+                Hotel Revenue
+              </h1>
+              <p className="text-sm text-gray-500 text-center mt-1">
+                Booking revenue by month
+              </p>
+
+              {/* Filters */}
+              <div className="mt-6 flex flex-wrap justify-center items-center gap-4">
+                <input
+                  type="month"
+                  value={monthValue}
+                  onChange={(e) => setMonthValue(e.target.value)}
+                  className="border rounded-md px-3 py-2 text-sm"
+                />
+
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="border rounded-md px-3 py-2 text-sm bg-white"
+                >
+                  <option value="revenue_desc">Revenue: High → Low</option>
+                  <option value="revenue_asc">Revenue: Low → High</option>
+                  <option value="checkin_desc">Check-in: New → Old</option>
+                  <option value="checkin_asc">Check-in: Old → New</option>
+                </select>
+
+                <button
+                  onClick={exportPDF}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md text-sm disabled:opacity-60"
+                  disabled={loading}
+                >
+                  Export PDF
+                </button>
+              </div>
+
+              <div className="mt-3 text-center text-xs text-gray-500">
+                {loading ? "Đang tải dữ liệu..." : error ? `Lỗi: ${error}` : ""}
+              </div>
+            </div>
           </div>
+        )}
+
+        {/* CONTENT */}
+        <div className="max-w-6xl mx-auto px-6 py-8 space-y-8">
+          <SummaryCards data={sortedData} />
+          <RevenueTable data={sortedData} />
         </div>
-      </div>
 
-      {/* CONTENT */}
-      <div className="max-w-6xl mx-auto px-6 py-8 space-y-8">
-        <SummaryCards data={sortedData} />
-        <RevenueTable data={sortedData} />
+        {/* Footer PDF */}
+        {pdfMode && (
+          <div className="px-6 pb-6 text-center text-xs text-gray-400">
+            Generated by EasyTravel · {new Date().toLocaleString("vi-VN")}
+          </div>
+        )}
       </div>
+      {/* ✅ END EXPORT */}
     </div>
   );
 }

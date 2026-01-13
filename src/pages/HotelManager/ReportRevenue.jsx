@@ -1,4 +1,7 @@
-import { useMemo, useEffect, useState, useCallback } from "react";
+import { useMemo, useEffect, useState, useCallback, useRef } from "react";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
+
 import RoomTypePie from "@/components/pages/HotelManager/RevenueReports/RoomTypePie.jsx";
 import ComparisonText from "@/components/pages/HotelManager/RevenueReports/ComparisonText.jsx";
 
@@ -29,11 +32,17 @@ export default function RevenueReport() {
   const [month, setMonth] = useState(12);
   const [year, setYear] = useState(2025);
 
-  const [stats, setStats] = useState(null);      // raw stats object
+  const [stats, setStats] = useState(null);
   const [prevStats, setPrevStats] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // ✅ vùng để chụp PDF
+  const exportRef = useRef(null);
+
+  // ✅ bật layout riêng cho PDF (title giữa + 1 cột)
+  const [pdfMode, setPdfMode] = useState(false);
 
   const token =
     localStorage.getItem("jwt") ||
@@ -150,6 +159,8 @@ export default function RevenueReport() {
   }, [stats, prevStats]);
 
   const exportCSV = () => {
+    if (!stats) return;
+
     const curRevenue = safeNumber(stats?.allTypeRevenue, 0);
     const curBookings = safeNumber(stats?.allTypeBookings, 0);
 
@@ -174,115 +185,208 @@ export default function RevenueReport() {
     a.click();
   };
 
+  /** ✅ Export PDF: title giữa + pie trên + text dưới */
+  const exportPDF = async () => {
+    try {
+      if (!stats) return;
+      if (!exportRef.current) throw new Error("Không tìm thấy vùng để export!");
+
+      // bật mode layout cho PDF
+      setPdfMode(true);
+
+      // đợi UI render + chart ổn định
+      await new Promise((r) => setTimeout(r, 350));
+
+      const el = exportRef.current;
+
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        scrollX: 0,
+        scrollY: -window.scrollY,
+      });
+
+      const imgData = canvas.toDataURL("image/png", 1.0);
+
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      const imgWidth = pageWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(`Revenue_Report_${monthLabel}.pdf`);
+    } catch (e) {
+      console.error(e);
+      alert(e?.message || "Export PDF failed!");
+    } finally {
+      setPdfMode(false);
+    }
+  };
+
   return (
     <div className="min-h-[calc(100vh-64px)] bg-gray-50">
-      <div className="bg-white border-b">
-        <div className="max-w-6xl mx-auto px-6 py-6">
-          <h1 className="text-2xl font-semibold text-gray-900 text-center">Revenue Report</h1>
-          <p className="text-sm text-gray-500 text-center mt-1">
-            Room distribution & monthly comparison
-          </p>
-
-          <div className="mt-6 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => {
-                  setMonth((m) => {
-                    const mm = clampInt(m, 1, 12, 1);
-                    if (mm === 1) {
-                      setYear((y) => clampInt(y, 1970, 2100, 2025) - 1);
-                      return 12;
-                    }
-                    return mm - 1;
-                  });
-                }}
-                className="px-3 py-1 border rounded"
-              >
-                ← Prev
-              </button>
-
-              <span className="font-medium">{monthLabel}</span>
-
-              <button
-                onClick={() => {
-                  setMonth((m) => {
-                    const mm = clampInt(m, 1, 12, 1);
-                    if (mm === 12) {
-                      setYear((y) => clampInt(y, 1970, 2100, 2025) + 1);
-                      return 1;
-                    }
-                    return mm + 1;
-                  });
-                }}
-                className="px-3 py-1 border rounded"
-              >
-                Next →
-              </button>
+      {/* ✅ VÙNG EXPORT PDF */}
+      <div ref={exportRef} className="bg-white">
+        {/* ✅ HEADER cho PDF (giữa trên cùng) */}
+        {pdfMode && (
+          <div className="px-6 pt-8 pb-4 text-center">
+            <h1 className="text-2xl font-semibold text-gray-900">REVENUE REPORT</h1>
+            <div className="text-sm text-gray-600 mt-1">{monthLabel}</div>
+            <div className="text-xs text-gray-500 mt-1">
+              Total Revenue: {revenueText} · Bookings: {bookings} · Avg/Booking: {avgRevenueText}
             </div>
+            <div className="mt-4 h-px bg-gray-200" />
+          </div>
+        )}
 
-            <div className="flex items-center gap-3">
-              <select
-                className="border rounded px-2 py-1"
-                value={safeMonth}
-                onChange={(e) => setMonth(Number(e.target.value))}
-              >
-                {Array.from({ length: 12 }).map((_, i) => {
-                  const m = i + 1;
-                  return (
-                    <option key={m} value={m}>
-                      Month {m}
-                    </option>
-                  );
-                })}
-              </select>
+        {/* ✅ UI header bình thường (ẩn khi pdfMode) */}
+        {!pdfMode && (
+          <div className="bg-white border-b">
+            <div className="max-w-6xl mx-auto px-6 py-6">
+              <h1 className="text-2xl font-semibold text-gray-900 text-center">Revenue Report</h1>
+              <p className="text-sm text-gray-500 text-center mt-1">
+                Room distribution & monthly comparison
+              </p>
 
-              <input
-                className="border rounded px-2 py-1 w-28"
-                type="number"
-                value={safeYear}
-                onChange={(e) => setYear(Number(e.target.value))}
-              />
+              <div className="mt-6 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => {
+                      setMonth((m) => {
+                        const mm = clampInt(m, 1, 12, 1);
+                        if (mm === 1) {
+                          setYear((y) => clampInt(y, 1970, 2100, 2025) - 1);
+                          return 12;
+                        }
+                        return mm - 1;
+                      });
+                    }}
+                    className="px-3 py-1 border rounded"
+                  >
+                    ← Prev
+                  </button>
 
-              <button
-                onClick={exportCSV}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm"
-                disabled={!stats}
-              >
-                Export Report
-              </button>
+                  <span className="font-medium">{monthLabel}</span>
+
+                  <button
+                    onClick={() => {
+                      setMonth((m) => {
+                        const mm = clampInt(m, 1, 12, 1);
+                        if (mm === 12) {
+                          setYear((y) => clampInt(y, 1970, 2100, 2025) + 1);
+                          return 1;
+                        }
+                        return mm + 1;
+                      });
+                    }}
+                    className="px-3 py-1 border rounded"
+                  >
+                    Next →
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <select
+                    className="border rounded px-2 py-1"
+                    value={safeMonth}
+                    onChange={(e) => setMonth(Number(e.target.value))}
+                  >
+                    {Array.from({ length: 12 }).map((_, i) => {
+                      const m = i + 1;
+                      return (
+                        <option key={m} value={m}>
+                          Month {m}
+                        </option>
+                      );
+                    })}
+                  </select>
+
+                  <input
+                    className="border rounded px-2 py-1 w-28"
+                    type="number"
+                    value={safeYear}
+                    onChange={(e) => setYear(Number(e.target.value))}
+                  />
+
+                  <button
+                    onClick={exportCSV}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm"
+                    disabled={!stats}
+                  >
+                    Export CSV
+                  </button>
+
+                  <button
+                    onClick={exportPDF}
+                    className="px-4 py-2 bg-green-600 text-white rounded-md text-sm"
+                    disabled={!stats}
+                  >
+                    Export PDF
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
+        )}
+
+        {/* ✅ BODY: pdfMode => 1 cột (pie trên, text dưới). Normal => 2 cột */}
+        <div
+          className={[
+            "max-w-6xl mx-auto px-6",
+            pdfMode ? "py-6" : "py-10",
+            pdfMode ? "grid grid-cols-1 gap-6" : "grid grid-cols-1 md:grid-cols-2 gap-8",
+          ].join(" ")}
+        >
+          {loading ? (
+            <div className="bg-white border rounded-2xl p-6 shadow-sm">
+              <div className="text-gray-600">Đang tải biểu đồ...</div>
+            </div>
+          ) : (
+            <RoomTypePie stats={stats} />
+          )}
+
+          {loading ? (
+            <div className="bg-white border rounded-2xl p-6 shadow-sm">
+              <div className="text-gray-600">Đang tải thống kê...</div>
+            </div>
+          ) : error ? (
+            <div className="bg-white border rounded-2xl p-6 shadow-sm">
+              <div className="text-lg font-semibold text-gray-900">Lỗi</div>
+              <div className="text-sm text-gray-600 mt-2 break-words">{error}</div>
+            </div>
+          ) : (
+            <ComparisonText
+              revenueText={revenueText}
+              bookings={bookings}
+              avgRevenueText={avgRevenueText}
+              changePercent={changePercent}
+            />
+          )}
         </div>
-      </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-10 grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* ✅ Pie từ stats thật */}
-        {loading ? (
-          <div className="bg-white border rounded-2xl p-6 shadow-sm">
-            <div className="text-gray-600">Đang tải biểu đồ...</div>
+        {/* ✅ FOOTER nhỏ cho PDF */}
+        {pdfMode && (
+          <div className="px-6 pb-6 text-center text-xs text-gray-400">
+            Generated by EasyTravel · {new Date().toLocaleString("vi-VN")}
           </div>
-        ) : (
-          <RoomTypePie stats={stats} />
-        )}
-
-        {loading ? (
-          <div className="bg-white border rounded-2xl p-6 shadow-sm">
-            <div className="text-gray-600">Đang tải thống kê...</div>
-          </div>
-        ) : error ? (
-          <div className="bg-white border rounded-2xl p-6 shadow-sm">
-            <div className="text-lg font-semibold text-gray-900">Lỗi</div>
-            <div className="text-sm text-gray-600 mt-2 break-words">{error}</div>
-          </div>
-        ) : (
-          <ComparisonText
-            revenueText={revenueText}
-            bookings={bookings}
-            avgRevenueText={avgRevenueText}
-            changePercent={changePercent}
-          />
         )}
       </div>
+      {/* ✅ END EXPORT */}
     </div>
   );
 }

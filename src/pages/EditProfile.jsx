@@ -7,6 +7,29 @@ import { logout } from "@/apis/AccountAPI";
 const S3_USER_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/user";
 
+/** ===== Password Rules =====
+ * - >= 8 chars
+ * - at least 1 uppercase, 1 lowercase, 1 number, 1 special char
+ */
+function validatePassword(password) {
+  if (!password || password.length < 8) {
+    return "Mật khẩu mới phải có ít nhất 8 ký tự.";
+  }
+  if (!/[A-Z]/.test(password)) {
+    return "Mật khẩu mới phải chứa ít nhất 1 chữ hoa (A-Z).";
+  }
+  if (!/[a-z]/.test(password)) {
+    return "Mật khẩu mới phải chứa ít nhất 1 chữ thường (a-z).";
+  }
+  if (!/[0-9]/.test(password)) {
+    return "Mật khẩu mới phải chứa ít nhất 1 số (0-9).";
+  }
+  if (!/[!@#$%^&*(),.?\":{}|<>_\-+=/\\[\]~`;'@]/.test(password)) {
+    return "Mật khẩu mới phải chứa ít nhất 1 ký tự đặc biệt (ví dụ: !@#$%^&*).";
+  }
+  return "";
+}
+
 export default function EditProfile() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -295,19 +318,23 @@ function Field({ label, children }) {
 function ChangePasswordModal({ onClose }) {
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const pwdError = useMemo(() => validatePassword(newPassword), [newPassword]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErr("");
 
-    if (newPassword.length < 6) {
-      setErr("Mật khẩu mới phải từ 6 ký tự trở lên!");
+    // ✅ rule mật khẩu mạnh
+    if (pwdError) {
+      setErr(pwdError);
       return;
     }
-    if (newPassword !== confirm) {
+
+    if (newPassword !== confirmPw) {
       setErr("Xác nhận mật khẩu không khớp!");
       return;
     }
@@ -368,7 +395,22 @@ function ChangePasswordModal({ onClose }) {
               required
               className="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:ring-2 focus:ring-orange-400"
             />
-            <p className="text-xs text-gray-500">Tối thiểu 6 ký tự.</p>
+
+            {/* ✅ Rules + realtime error */}
+            <div className="text-xs text-gray-500 space-y-1 mt-2">
+              <p className="font-medium text-gray-600">Yêu cầu mật khẩu:</p>
+              <ul className="list-disc ml-5">
+                <li>Ít nhất 8 ký tự</li>
+                <li>Có chữ hoa (A-Z)</li>
+                <li>Có chữ thường (a-z)</li>
+                <li>Có số (0-9)</li>
+                <li>Có ký tự đặc biệt (ví dụ: !@#$%^&*)</li>
+              </ul>
+
+              {newPassword && pwdError && (
+                <p className="text-red-600 mt-1">{pwdError}</p>
+              )}
+            </div>
           </div>
 
           <div className="space-y-1">
@@ -377,8 +419,8 @@ function ChangePasswordModal({ onClose }) {
             </label>
             <input
               type="password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
+              value={confirmPw}
+              onChange={(e) => setConfirmPw(e.target.value)}
               required
               className="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:ring-2 focus:ring-orange-400"
             />
@@ -397,7 +439,7 @@ function ChangePasswordModal({ onClose }) {
             <button
               type="submit"
               className="px-5 py-2.5 rounded-full bg-orange-500 text-white hover:bg-orange-400 disabled:opacity-60"
-              disabled={loading}
+              disabled={loading || !!pwdError || newPassword !== confirmPw}
             >
               {loading ? "Saving..." : "Update"}
             </button>

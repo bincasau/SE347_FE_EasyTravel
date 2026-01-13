@@ -18,6 +18,8 @@
     "@heroicons/react": "^2.2.0",
     "date-fns": "^4.1.0",
     "file-saver": "^2.0.5",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.0.0",
     "lucide-react": "^0.548.0",
     "react": "^19.1.1",
     "react-datepicker": "^8.8.0",

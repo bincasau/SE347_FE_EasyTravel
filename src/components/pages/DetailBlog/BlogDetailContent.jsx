@@ -216,21 +216,7 @@ export default function BlogDetailContent() {
         </div>
       </div>
 
-      <div className="mt-10 bg-gray-50 rounded-xl p-6 flex items-center gap-4">
-        <img
-          src="https://i.pravatar.cc/100?img=8"
-          alt="Admin"
-          className="w-16 h-16 rounded-full object-cover border"
-        />
-        <div>
-          <h4 className="font-semibold text-gray-800">Admin</h4>
-          <p className="text-sm text-gray-500">Tác giả</p>
-          <p className="text-gray-600 text-sm mt-1">
-            Chia sẻ những trải nghiệm du lịch và đánh giá khách sạn chân thật,
-            giúp bạn chọn điểm đến lý tưởng.
-          </p>
-        </div>
-      </div>
+      
 
       <div className="mt-14 border-t border-gray-100 pt-8">
         <h3 className="text-xl font-semibold text-gray-800 mb-5">
