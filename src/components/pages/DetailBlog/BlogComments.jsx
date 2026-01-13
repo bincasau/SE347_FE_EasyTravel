@@ -6,6 +6,24 @@ import {
   updateComment,
 } from "@/apis/CommentAPI";
 
+const API_BASE = "http://localhost:8080";
+
+// fetch có JWT (nếu user endpoint cần auth)
+async function fetchWithJwt(url, options = {}) {
+  const token = localStorage.getItem("jwt");
+  const finalUrl = url.startsWith("http") ? url : `${API_BASE}${url}`;
+
+  return fetch(finalUrl, {
+    cache: "no-store",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+}
+
 function AvatarLetter({ name }) {
   const initial = (name || "A").trim().charAt(0).toUpperCase();
   return (
@@ -36,26 +54,62 @@ export default function BlogComments({ blogId }) {
   const [editingContent, setEditingContent] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
+  // ✅ map cache user: { [userHref]: userObj }
+  const [userMap, setUserMap] = useState({});
+
   const visibleComments = useMemo(
     () => comments.slice(0, visibleCount),
     [comments, visibleCount]
   );
 
   const getId = (c, i) => c?.commentId ?? c?.comment_id ?? c?.id ?? i;
-  const getName = (c) =>
-    c?.user?.name || c?.user?.username || c?.name || "Anonymous";
   const getTime = (c) => c?.createdAt || c?.created_at;
   const getContent = (c) => c?.content || "";
 
-  // ✅ LOAD COMMENTS
+  // ✅ HAL: lấy user href từ _links.user.href
+  const getUserHref = (c) => c?._links?.user?.href || "";
+
+  // ✅ name ưu tiên userMap[href], fallback "Anonymous"
+  const getName = (c) => {
+    const href = getUserHref(c);
+    const u = href ? userMap[href] : null;
+
+    return (
+      u?.name ||
+      u?.username ||
+      u?.fullName ||
+      u?.email ||
+      c?.user?.name ||
+      c?.name ||
+      "Anonymous"
+    );
+  };
+
+  // =========================
+  // 1) LOAD COMMENTS (parse đúng HAL)
+  // =========================
   useEffect(() => {
     const load = async () => {
       if (!blogId) return;
       setLoading(true);
       try {
-        const list = await getCommentsByBlogId(blogId);
-        // list là array comment
-        setComments(Array.isArray(list) ? list : []);
+        const data = await getCommentsByBlogId(blogId);
+
+        // ✅ nếu API trả HAL object: { _embedded: { comments: [...] } }
+        const list = Array.isArray(data)
+          ? data
+          : data?._embedded?.comments
+          ? data._embedded.comments
+          : [];
+
+        // ✅ sort mới nhất lên đầu (optional)
+        const sorted = [...list].sort((a, b) => {
+          const ta = new Date(getTime(a) || 0).getTime();
+          const tb = new Date(getTime(b) || 0).getTime();
+          return tb - ta;
+        });
+
+        setComments(sorted);
       } catch (e) {
         console.error("Load comments failed:", e);
         setComments([]);
@@ -64,17 +118,83 @@ export default function BlogComments({ blogId }) {
       }
     };
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blogId]);
 
-  // ✅ ADD
+  // =========================
+  // 2) FETCH USERS theo link comment/_links/user
+  // =========================
+  const userHrefs = useMemo(() => {
+    const s = new Set();
+    for (const c of comments) {
+      const href = getUserHref(c);
+      if (href) s.add(href);
+    }
+    return [...s];
+  }, [comments]);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const need = userHrefs.filter((h) => !userMap[h]);
+        if (!need.length) return;
+
+        const results = await Promise.all(
+          need.map(async (href) => {
+            try {
+              const res = await fetchWithJwt(href, { method: "GET" });
+              if (!res.ok) return [href, null];
+              const u = await res.json();
+              return [href, u];
+            } catch {
+              return [href, null];
+            }
+          })
+        );
+
+        setUserMap((prev) => {
+          const next = { ...prev };
+          results.forEach(([href, u]) => {
+            if (u) next[href] = u;
+          });
+          return next;
+        });
+      } catch (e) {
+        console.error("fetchUsers failed:", e);
+      }
+    };
+
+    if (userHrefs.length) fetchUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userHrefs]);
+
+  // =========================
+  // ✅ ADD (xong thì reload lại để có _links user đầy đủ)
+  // =========================
   const onSubmit = async (e) => {
     e.preventDefault();
     if (!content.trim()) return;
 
     setSubmitting(true);
     try {
-      const created = await addComment(blogId, content.trim());
-      setComments((prev) => [created, ...prev]);
+      await addComment(blogId, content.trim());
+
+      // ✅ reload lại list (đảm bảo đúng HAL + có link user)
+      const data = await getCommentsByBlogId(blogId);
+      const list = Array.isArray(data)
+        ? data
+        : data?._embedded?.comments
+        ? data._embedded.comments
+        : [];
+
+      const sorted = [...list].sort((a, b) => {
+        const ta = new Date(getTime(a) || 0).getTime();
+        const tb = new Date(getTime(b) || 0).getTime();
+        return tb - ta;
+      });
+
+      setComments(sorted);
+
       setVisibleCount(4);
       setContent("");
     } catch (e) {
@@ -103,10 +223,17 @@ export default function BlogComments({ blogId }) {
 
     setSavingEdit(true);
     try {
-      const updated = await updateComment(editingId, editingContent.trim());
-      setComments((prev) =>
-        prev.map((c) => (getId(c) === editingId ? updated : c))
-      );
+      await updateComment(editingId, editingContent.trim());
+
+      // reload lại để đồng bộ
+      const data = await getCommentsByBlogId(blogId);
+      const list = Array.isArray(data)
+        ? data
+        : data?._embedded?.comments
+        ? data._embedded.comments
+        : [];
+      setComments(list);
+
       cancelEdit();
     } catch (e) {
       console.error(e);
@@ -168,6 +295,7 @@ export default function BlogComments({ blogId }) {
                     </div>
                   </div>
 
+                  {/* ⚠️ tạm vẫn cho hiện Sửa/Xoá (muốn owner-only thì mình chỉnh tiếp) */}
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => startEdit(c)}

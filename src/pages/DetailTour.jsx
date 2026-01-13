@@ -50,7 +50,7 @@ export default function DetailTour() {
       <Detail tour={tour} />
       <Itineraries tourId={id} />
       <Gallery tourId={id} />
-      <Reviews tourId={id} />
+      <Reviews tourId={tour.tourId} tourTitle={tour.title} />
     </div>
   );
 }
