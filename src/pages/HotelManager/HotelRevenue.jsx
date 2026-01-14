@@ -4,6 +4,7 @@ import jsPDF from "jspdf";
 
 import SummaryCards from "@/components/pages/HotelManager/HotelRevenue/SummaryCards";
 import RevenueTable from "@/components/pages/HotelManager/HotelRevenue/RevenueTable";
+import { popup } from "@/utils/popup"; // ✅ ADD
 
 const API_BASE = "http://localhost:8080";
 
@@ -155,9 +156,15 @@ export default function HotelRevenue() {
   /** ✅ Export PDF */
   const exportPDF = async () => {
     try {
-      if (!exportRef.current) throw new Error("Không tìm thấy vùng để export!");
-      if (loading) throw new Error("Đang tải dữ liệu, thử lại sau nhé!");
-      if (!token) throw new Error("Bạn chưa đăng nhập!");
+      if (!exportRef.current) return popup.error("Không tìm thấy vùng để export!");
+      if (loading) return popup.error("Đang tải dữ liệu, thử lại sau nhé!");
+      if (!token) return popup.error("Bạn chưa đăng nhập!");
+
+      const ok = await popup.confirm(
+        `Xuất báo cáo doanh thu tháng ${monthLabel} ra PDF?`,
+        "Xác nhận"
+      );
+      if (!ok) return;
 
       // bật layout PDF (title giữa + ẩn filter)
       setPdfMode(true);
@@ -198,9 +205,10 @@ export default function HotelRevenue() {
       }
 
       pdf.save(`Hotel_Revenue_${monthLabel}.pdf`);
+      popup.success("Export PDF thành công!");
     } catch (e) {
       console.error(e);
-      alert(e?.message || "Export PDF failed!");
+      popup.error(e?.message || "Export PDF failed!");
     } finally {
       setPdfMode(false);
     }

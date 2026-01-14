@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { popup } from "@/utils/popup";
 import RoomCard from "@/components/pages/HotelManager/MyRoom/Card.jsx";
 
 import * as XLSX from "xlsx";
@@ -161,21 +162,30 @@ export default function MyRooms() {
   }, [filteredRooms, sortBy]);
 
   // ---------- EXPORT EXCEL ----------
-  const formatVND = (v) => {
-    const n = Number(v);
-    if (!Number.isFinite(n)) return "";
-    return `${n.toLocaleString("vi-VN")}₫`;
-  };
+  // ---------- EXPORT EXCEL ----------
+const formatVND = (v) => {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "";
+  return `${n.toLocaleString("vi-VN")}₫`;
+};
 
-  const handleExportExcel = useCallback(() => {
-    // Export đúng những gì đang hiển thị (đã search + sort)
-    const dataToExport = sortedRooms;
+const handleExportExcel = useCallback(async () => {
+  // Export đúng những gì đang hiển thị (đã search + sort)
+  const dataToExport = sortedRooms;
 
-    if (!dataToExport || dataToExport.length === 0) {
-      alert("Không có phòng nào để export.");
-      return;
-    }
+  if (loading) return popup.error("Đang tải dữ liệu, thử lại sau nhé!");
+  if (!dataToExport || dataToExport.length === 0) {
+    return popup.error("Không có phòng nào để export.");
+  }
 
+  // ✅ confirm
+  const ok = await popup.confirm(
+    `Xuất ${dataToExport.length} phòng (đang hiển thị) ra Excel?`,
+    "Xác nhận export"
+  );
+  if (!ok) return;
+
+  try {
     const rows = dataToExport.map((r, idx) => ({
       "No.": idx + 1,
       "Room ID": r.room_id ?? "",
@@ -202,12 +212,12 @@ export default function MyRooms() {
 
     // optional: width cột cho đẹp
     ws["!cols"] = [
-      { wch: 6 }, // No.
+      { wch: 6 },  // No.
       { wch: 10 }, // Room ID
       { wch: 14 }, // Room Number
       { wch: 16 }, // Type
-      { wch: 8 }, // Guests
-      { wch: 8 }, // Floor
+      { wch: 8 },  // Guests
+      { wch: 8 },  // Floor
       { wch: 12 }, // Status
       { wch: 12 }, // Price
       { wch: 16 }, // Price formatted
@@ -217,14 +227,18 @@ export default function MyRooms() {
       { wch: 22 }, // Created at
     ];
 
-    const fileName = `rooms_export_${new Date()
-      .toISOString()
-      .slice(0, 10)}.xlsx`;
-
+    const fileName = `rooms_export_${new Date().toISOString().slice(0, 10)}.xlsx`;
     const out = XLSX.write(wb, { bookType: "xlsx", type: "array" });
     saveAs(new Blob([out], { type: "application/octet-stream" }), fileName);
-  }, [sortedRooms]);
-  // ---------- END EXPORT EXCEL ----------
+
+    popup.success("Export Excel thành công!");
+  } catch (e) {
+    console.error(e);
+    popup.error(e?.message || "Export Excel failed!");
+  }
+}, [sortedRooms, loading]);
+// ---------- END EXPORT EXCEL ----------
+
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-gray-50">

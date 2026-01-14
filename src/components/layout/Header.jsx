@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { NavLink, Link, useLocation, useNavigate } from "react-router-dom";
 import { useLang } from "@/contexts/LangContext";
 import Logo from "@/assets/images/logo.png";
+import { popup } from "@/utils/popup";
 import { getAccountDetail, logout } from "@/apis/AccountAPI";
 import { getUserFromToken } from "@/utils/auth";
 import { Bell, X } from "lucide-react";
@@ -244,16 +245,19 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     };
   }, [openMobile]);
 
-  const handleLogout = () => {
-    if (!confirm("Bạn có chắc muốn đăng xuất?")) return;
-    logout();
-    setUser(null);
-    didRedirectRef.current = false;
-    setOpenUserMenu(false);
-    setOpenNoti(false);
-    setOpenMobile(false);
-    navigate("/");
-  };
+  const handleLogout = async () => {
+  const ok = await popup.confirm("Bạn có chắc muốn đăng xuất?", "Đăng xuất");
+  if (!ok) return;
+
+  logout();
+  setUser(null);
+  didRedirectRef.current = false;
+  setOpenUserMenu(false);
+  setOpenNoti(false);
+  setOpenMobile(false);
+  navigate("/");
+};
+
 
   const Flag = ({ code }) => (
     <div className="flex items-center gap-2 text-sm">

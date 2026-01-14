@@ -49,6 +49,8 @@ import RoomView from "@/pages/HotelManager/RoomView";
 import ListBooking from "@/pages/HotelManager/ListBooking";
 import MyHotel from "@/pages/HotelManager/MyHotel";
 
+import PaymentResult from "@/pages/PaymentResult";
+
 import ScrollToTop from "./utils/ScrollToTop";
 import LoginModal from "./pages/Login";
 import { useEffect, useState } from "react";
@@ -331,6 +333,8 @@ export default function App() {
               </RequireRole>
             }
           />
+
+          <Route path="/payment-result" element={<PaymentResult />} />
 
           <Route path="*" element={<NotFound404 />} />
         </Routes>

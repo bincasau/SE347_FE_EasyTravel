@@ -24,6 +24,9 @@ import { getUserFromToken } from "@/utils/auth";
 // ✅ slug helpers
 import { extractIdFromSlug, buildTourSlug } from "@/utils/slug";
 
+// ✅ popup sweetalert2 helper
+import { popup } from "@/utils/popup";
+
 export default function TourDetail() {
   // ✅ route bây giờ là /detailtour/:slugId
   const { slugId } = useParams();
@@ -46,10 +49,15 @@ export default function TourDetail() {
     const fetchTour = async () => {
       try {
         // ✅ nếu id null => URL sai
-        if (!id) throw new Error("URL không hợp lệ (thiếu id).");
+        if (!id) {
+          await popup.error("URL không hợp lệ (thiếu id).");
+          setTour(null);
+          return;
+        }
 
         const res = await fetch(`http://localhost:8080/tours/${id}`);
         if (!res.ok) throw new Error("Không thể tải dữ liệu tour");
+
         const data = await res.json();
         setTour(data);
 
@@ -57,7 +65,6 @@ export default function TourDetail() {
         const correctSlugId = buildTourSlug(id, data?.title);
         if (slugId !== correctSlugId) {
           navigate(`/detailtour/${correctSlugId}`, { replace: true });
-          // không return; vẫn ok vì setTour xong rồi
         }
 
         const s3Images = Array.from({ length: 5 }, (_, idx) => {
@@ -70,6 +77,7 @@ export default function TourDetail() {
       } catch (err) {
         console.error("❌ Lỗi khi fetch tour:", err);
         setTour(null);
+        await popup.error(err?.message || "Không thể tải dữ liệu tour.");
       } finally {
         setLoading(false);
       }
@@ -205,11 +213,16 @@ export default function TourDetail() {
     localStorage.getItem("accessToken") ||
     "";
 
-  const handleBuyNow = () => {
+  const handleBuyNow = async () => {
     const token = getToken();
+
+    // ✅ chưa login -> popup confirm mở login
     if (!token) {
-      alert("Please log in to book this tour.");
-      window.dispatchEvent(new Event("open-login"));
+      const ok = await popup.confirm(
+        "Bạn cần đăng nhập để đặt tour. Mở trang đăng nhập ngay?",
+        "Yêu cầu đăng nhập"
+      );
+      if (ok) window.dispatchEvent(new Event("open-login"));
       return;
     }
 
@@ -217,12 +230,12 @@ export default function TourDetail() {
     const role = String(jwtUser?.role || "").toUpperCase();
 
     if (role === "TOUR_GUIDE") {
-      alert("Please log in with a USER account to book this tour.");
+      await popup.error("Vui lòng đăng nhập bằng tài khoản USER để đặt tour.");
       return;
     }
 
     // ✅ IMPORTANT: dùng id thật (đã extract), không dùng slugId
-    navigate(`/booking/${buildTourSlug(id, title)}`)
+    navigate(`/booking/${buildTourSlug(id, title)}`);
   };
 
   return (

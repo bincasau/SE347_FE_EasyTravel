@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { createHotelBooking } from "@/apis/Booking";
+import { popup } from "@/utils/popup";
 
 const AWS_ROOM_IMAGE_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/room";
@@ -23,10 +24,7 @@ export default function BookingStep3({ bookingData, prevStep }) {
     [hotel]
   );
 
-  const realRoomId = useMemo(
-    () => room?.roomId ?? room?.id ?? null,
-    [room]
-  );
+  const realRoomId = useMemo(() => room?.roomId ?? room?.id ?? null, [room]);
 
   const roomImageBed = room?.image_bed ?? room?.imageBed ?? "";
 
@@ -44,12 +42,12 @@ export default function BookingStep3({ bookingData, prevStep }) {
 
   const handleConfirm = async () => {
     if (!method) {
-      alert("Vui lòng chọn phương thức thanh toán");
+      popup.error("Vui lòng chọn phương thức thanh toán");
       return;
     }
 
     if (!realHotelId || !realRoomId) {
-      alert("Thiếu hotelId hoặc roomId (URL/bookingData đang sai).");
+      popup.error("Thiếu hotelId hoặc roomId (URL/bookingData đang sai).");
       return;
     }
 
@@ -59,7 +57,7 @@ export default function BookingStep3({ bookingData, prevStep }) {
       "";
 
     if (!email) {
-      alert("Thiếu email người đặt (cần đăng nhập / điền email).");
+      popup.error("Thiếu email người đặt (cần đăng nhập / điền email).");
       return;
     }
 
@@ -74,21 +72,13 @@ export default function BookingStep3({ bookingData, prevStep }) {
         checkInDate: bookingData.checkInDate,
         checkOutDate: bookingData.checkOutDate,
         totalPrice: bookingData.total,
-
-        // ✅ luôn dùng id thật
         hotelId: realHotelId,
-
-        // ✅ khuyến nghị dùng roomId (nếu BE bạn bắt buộc roomID thì đổi key này lại)
         roomId: realRoomId,
-
-        // ✅ email
         email,
       };
 
-      // ✅ tạo booking
       const bookingRes = await createHotelBooking(payload);
 
-      // bookingRes có thể là axios response hoặc object thuần
       const bookingId =
         bookingRes?.bookingId ||
         bookingRes?.id ||
@@ -97,12 +87,14 @@ export default function BookingStep3({ bookingData, prevStep }) {
 
       if (!bookingId) {
         console.log("bookingRes =", bookingRes);
-        alert("Không lấy được bookingId (check response BE)");
+        popup.error("Không lấy được bookingId (check response BE)");
         return;
       }
 
       // ✅ CASH
       if (method === "cash") {
+        // optional: show success popup rồi mở modal
+        await popup.success("Đặt phòng thành công!");
         setShowModal(true);
         return;
       }
@@ -113,7 +105,6 @@ export default function BookingStep3({ bookingData, prevStep }) {
         params.append("amount", bookingData.total);
         params.append("bookingId", bookingId);
         params.append("bookingType", "HOTEL");
-        // bankCode optional
         params.append("bankCode", "NCB");
 
         const payRes = await fetch(
@@ -128,7 +119,7 @@ export default function BookingStep3({ bookingData, prevStep }) {
 
         if (!payRes.ok) {
           const msg = await payRes.text().catch(() => "");
-          alert(`VNPay request failed: ${payRes.status} ${msg}`);
+          popup.error(`VNPay request failed: ${payRes.status} ${msg}`);
           return;
         }
 
@@ -136,15 +127,17 @@ export default function BookingStep3({ bookingData, prevStep }) {
         const paymentUrl = payData?.data?.paymentUrl;
 
         if (!paymentUrl) {
-          alert("Không lấy được link VNPay");
+          popup.error("Không lấy được link VNPay");
           return;
         }
 
+        // optional: thông báo đang chuyển hướng
+        await popup.success("Đang chuyển sang VNPay...");
         window.location.href = paymentUrl;
       }
     } catch (err) {
       console.error("❌ Hotel booking error:", err);
-      alert("Lỗi khi đặt phòng");
+      popup.error(err?.message || "Lỗi khi đặt phòng");
     } finally {
       setSubmitting(false);
     }
@@ -216,8 +209,7 @@ export default function BookingStep3({ bookingData, prevStep }) {
 
               <div className="text-sm leading-snug">
                 <div className="font-medium text-gray-800">
-                  {hotel.name} –{" "}
-                  {room.type || room.roomType} (
+                  {hotel.name} – {room.type || room.roomType} (
                   {room.guests || room.numberOfGuest} khách)
                 </div>
                 <div className="text-xs text-gray-500">{hotel.address}</div>
@@ -261,7 +253,9 @@ export default function BookingStep3({ bookingData, prevStep }) {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-2xl shadow-xl max-w-sm w-full text-center">
             <h2 className="text-xl font-semibold mb-2">Đặt phòng thành công</h2>
-            <p className="text-gray-600 mb-4">Cảm ơn bạn đã sử dụng EasyTravel</p>
+            <p className="text-gray-600 mb-4">
+              Cảm ơn bạn đã sử dụng EasyTravel
+            </p>
 
             <button
               onClick={() => navigate("/hotels")}

@@ -6,6 +6,7 @@ import {
 } from "@/apis/AccountAPI";
 import { getUserFromToken } from "@/utils/auth";
 import { useNavigate } from "react-router-dom";
+import { popup } from "@/utils/popup";
 
 /** ===== Password Rules =====
  * - >= 8 chars
@@ -39,6 +40,7 @@ export default function LoginModal({ onClose, onOpenSignup }) {
   const [fpEmail, setFpEmail] = useState("");
   const [fpCode, setFpCode] = useState("");
   const [fpNewPass, setFpNewPass] = useState("");
+  const [fpConfirmPass, setFpConfirmPass] = useState(""); // ✅ NEW
   const [fpStep, setFpStep] = useState(1); // 1=request, 2=confirm
   const [resetting, setResetting] = useState(false);
 
@@ -62,7 +64,8 @@ export default function LoginModal({ onClose, onOpenSignup }) {
       const user = getUserFromToken();
       onClose?.();
 
-      if (user?.role === "HOTEL_MANAGER") navigate("/hotel-manager/hotels/addroom");
+      if (user?.role === "HOTEL_MANAGER")
+        navigate("/hotel-manager/hotels/addroom");
       else if (user?.role === "TOUR_GUIDE") navigate("/guide/schedule");
       else if (user?.role === "ADMIN") navigate("/admin/dashboard");
       else navigate("/");
@@ -78,10 +81,17 @@ export default function LoginModal({ onClose, onOpenSignup }) {
   async function handleForgotRequest() {
     setErr("");
     setResetting(true);
+
     try {
       const msg = await forgotPasswordRequestApi(fpEmail);
-      alert(msg || "Đã gửi mã xác nhận về email!");
+
+      await popup.success(msg || "Đã gửi mã xác nhận về email!", "Thành công");
+
+      // ✅ sang step 2 và clear code/newPass/confirm cho sạch
       setFpStep(2);
+      setFpCode("");
+      setFpNewPass("");
+      setFpConfirmPass("");
     } catch (e) {
       setErr(e?.message || "Gửi mã reset thất bại!");
     } finally {
@@ -89,18 +99,30 @@ export default function LoginModal({ onClose, onOpenSignup }) {
     }
   }
 
+  // ✅ validate new password realtime
   const pwdError = useMemo(() => {
     if (!showForgot || fpStep !== 2) return "";
     return validatePassword(fpNewPass);
   }, [showForgot, fpStep, fpNewPass]);
 
+  // ✅ validate confirm password realtime
+  const confirmError = useMemo(() => {
+    if (!showForgot || fpStep !== 2) return "";
+    if (!fpConfirmPass) return "";
+    return fpNewPass === fpConfirmPass ? "" : "Mật khẩu xác nhận không khớp.";
+  }, [showForgot, fpStep, fpNewPass, fpConfirmPass]);
+
   async function handleForgotConfirm() {
     setErr("");
 
-    // ✅ validate password trước khi gọi API
     const msgErr = validatePassword(fpNewPass);
     if (msgErr) {
       setErr(msgErr);
+      return;
+    }
+
+    if (!fpConfirmPass || fpNewPass !== fpConfirmPass) {
+      setErr("Mật khẩu xác nhận không khớp.");
       return;
     }
 
@@ -111,14 +133,17 @@ export default function LoginModal({ onClose, onOpenSignup }) {
         code: fpCode,
         newPassword: fpNewPass,
       });
-      alert(msg || "Đổi mật khẩu thành công!");
 
-      // xong thì quay về login
+      await popup.success(msg || "Đổi mật khẩu thành công!", "Thành công");
+
+      // ✅ xong thì quay về login
       setShowForgot(false);
       setFpStep(1);
       setFpEmail("");
       setFpCode("");
       setFpNewPass("");
+      setFpConfirmPass("");
+      setErr("");
     } catch (e) {
       setErr(e?.message || "Xác nhận reset thất bại!");
     } finally {
@@ -130,6 +155,16 @@ export default function LoginModal({ onClose, onOpenSignup }) {
     onClose?.();
     onOpenSignup?.();
   }
+
+  const disableResetBtn =
+    resetting ||
+    !fpEmail ||
+    (fpStep === 2 &&
+      (!fpCode ||
+        !fpNewPass ||
+        !fpConfirmPass ||
+        !!pwdError ||
+        fpNewPass !== fpConfirmPass));
 
   return (
     <div className="w-[92%] max-w-md rounded-2xl bg-white p-6 shadow-2xl relative animate-fadeIn">
@@ -150,24 +185,12 @@ export default function LoginModal({ onClose, onOpenSignup }) {
 
       {!showForgot ? (
         <>
-          <button
-            type="button"
-            onClick={handleGoogleLogin}
-            className="w-full rounded-full border border-gray-300 bg-white text-gray-900 font-semibold py-3 hover:bg-gray-50 transition flex items-center justify-center gap-2 mb-4"
-          >
-            <span>G</span>
-            Continue with Google
-          </button>
-
-          <div className="flex items-center gap-3 mb-4">
-            <div className="h-px flex-1 bg-gray-200" />
-            <span className="text-xs text-gray-400">OR</span>
-            <div className="h-px flex-1 bg-gray-200" />
-          </div>
-
+          {/* ✅ LOGIN FORM */}
           <form className="space-y-5" onSubmit={handleSubmit}>
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-800">Username</label>
+              <label className="text-sm font-medium text-gray-800">
+                Username
+              </label>
               <input
                 name="username"
                 type="text"
@@ -178,7 +201,9 @@ export default function LoginModal({ onClose, onOpenSignup }) {
             </div>
 
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-800">Password</label>
+              <label className="text-sm font-medium text-gray-800">
+                Password
+              </label>
               <input
                 name="password"
                 type="password"
@@ -195,6 +220,10 @@ export default function LoginModal({ onClose, onOpenSignup }) {
                   setShowForgot(true);
                   setFpStep(1);
                   setErr("");
+                  setFpEmail("");
+                  setFpCode("");
+                  setFpNewPass("");
+                  setFpConfirmPass("");
                 }}
                 className="text-sm font-semibold text-orange-500 hover:underline"
               >
@@ -221,9 +250,26 @@ export default function LoginModal({ onClose, onOpenSignup }) {
               </button>
             </p>
           </form>
+
+          {/* ✅ GOOGLE LOGIN Ở DƯỚI CÙNG */}
+          <div className="flex items-center gap-3 my-4">
+            <div className="h-px flex-1 bg-gray-200" />
+            <span className="text-xs text-gray-400">OR</span>
+            <div className="h-px flex-1 bg-gray-200" />
+          </div>
+
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            className="w-full rounded-full border border-gray-300 bg-white text-gray-900 font-semibold py-3 hover:bg-gray-50 transition flex items-center justify-center gap-2"
+          >
+            <span>G</span>
+            Continue with Google
+          </button>
         </>
       ) : (
         <div className="space-y-4">
+          {/* EMAIL */}
           <div className="space-y-1">
             <label className="text-sm font-medium text-gray-800">Email</label>
             <input
@@ -231,13 +277,32 @@ export default function LoginModal({ onClose, onOpenSignup }) {
               onChange={(e) => setFpEmail(e.target.value)}
               type="email"
               required
+              disabled={fpStep === 2} // ✅ khóa email ở step 2
               placeholder="Enter your email"
-              className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:ring-2 focus:ring-orange-400"
+              className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:ring-2 focus:ring-orange-400 disabled:bg-gray-100 disabled:text-gray-500"
             />
+
+            {/* ✅ Change email button ở step 2 */}
+            {fpStep === 2 && (
+              <button
+                type="button"
+                className="text-xs font-semibold text-gray-500 hover:underline mt-2"
+                onClick={() => {
+                  setFpStep(1);
+                  setFpCode("");
+                  setFpNewPass("");
+                  setFpConfirmPass("");
+                  setErr("");
+                }}
+              >
+                Change email
+              </button>
+            )}
           </div>
 
           {fpStep === 2 && (
             <>
+              {/* CODE */}
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-800">Code</label>
                 <input
@@ -250,8 +315,11 @@ export default function LoginModal({ onClose, onOpenSignup }) {
                 />
               </div>
 
+              {/* NEW PASS */}
               <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-800">New password</label>
+                <label className="text-sm font-medium text-gray-800">
+                  New password
+                </label>
                 <input
                   value={fpNewPass}
                   onChange={(e) => setFpNewPass(e.target.value)}
@@ -262,7 +330,25 @@ export default function LoginModal({ onClose, onOpenSignup }) {
                 />
               </div>
 
-              {/* ✅ Password rules + realtime hint */}
+              {/* ✅ CONFIRM PASS */}
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-800">
+                  Confirm password
+                </label>
+                <input
+                  value={fpConfirmPass}
+                  onChange={(e) => setFpConfirmPass(e.target.value)}
+                  type="password"
+                  required
+                  placeholder="Re-enter new password"
+                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:ring-2 focus:ring-orange-400"
+                />
+                {fpConfirmPass && confirmError && (
+                  <p className="text-xs text-red-600 mt-1">{confirmError}</p>
+                )}
+              </div>
+
+              {/* PASSWORD RULES */}
               <div className="text-xs text-gray-500 space-y-1 mt-1">
                 <p className="font-medium text-gray-600">Yêu cầu mật khẩu:</p>
                 <ul className="list-disc ml-5">
@@ -279,13 +365,10 @@ export default function LoginModal({ onClose, onOpenSignup }) {
             </>
           )}
 
+          {/* ACTION BUTTON */}
           <button
             type="button"
-            disabled={
-              resetting ||
-              !fpEmail ||
-              (fpStep === 2 && (!fpCode || !fpNewPass || !!pwdError))
-            }
+            disabled={disableResetBtn}
             onClick={fpStep === 1 ? handleForgotRequest : handleForgotConfirm}
             className="w-full rounded-full bg-orange-500 text-white font-semibold py-3 hover:bg-orange-400 transition disabled:opacity-60"
           >
@@ -303,8 +386,10 @@ export default function LoginModal({ onClose, onOpenSignup }) {
               setShowForgot(false);
               setFpStep(1);
               setErr("");
+              setFpEmail("");
               setFpCode("");
               setFpNewPass("");
+              setFpConfirmPass("");
             }}
           >
             Back to sign in

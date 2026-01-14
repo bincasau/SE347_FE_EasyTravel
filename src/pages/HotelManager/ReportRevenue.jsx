@@ -4,6 +4,7 @@ import jsPDF from "jspdf";
 
 import RoomTypePie from "@/components/pages/HotelManager/RevenueReports/RoomTypePie.jsx";
 import ComparisonText from "@/components/pages/HotelManager/RevenueReports/ComparisonText.jsx";
+import { popup } from "@/utils/popup"; // ✅ ADD
 
 const API_BASE = "http://localhost:8080";
 
@@ -114,7 +115,10 @@ export default function RevenueReport() {
         if (alive) setStats(cur);
 
         try {
-          const prev = await fetchStatsByMonth({ month: prevParams.pm, year: prevParams.py });
+          const prev = await fetchStatsByMonth({
+            month: prevParams.pm,
+            year: prevParams.py,
+          });
           if (alive) setPrevStats(prev);
         } catch {
           if (alive) setPrevStats(null);
@@ -158,8 +162,17 @@ export default function RevenueReport() {
     return Number.isFinite(pct) ? Number(pct.toFixed(1)) : null;
   }, [stats, prevStats]);
 
-  const exportCSV = () => {
-    if (!stats) return;
+  // ✅ Export CSV (đổi alert -> popup + confirm)
+  const exportCSV = async () => {
+    if (!token) return popup.error("Bạn chưa đăng nhập!");
+    if (loading) return popup.error("Đang tải dữ liệu, thử lại sau nhé!");
+    if (!stats) return popup.error("Không có dữ liệu để export.");
+
+    const ok = await popup.confirm(
+      `Xuất báo cáo tháng ${monthLabel} ra CSV?`,
+      "Xác nhận"
+    );
+    if (!ok) return;
 
     const curRevenue = safeNumber(stats?.allTypeRevenue, 0);
     const curBookings = safeNumber(stats?.allTypeBookings, 0);
@@ -183,13 +196,24 @@ export default function RevenueReport() {
     a.href = url;
     a.download = `Revenue_Report_${monthLabel}.csv`;
     a.click();
+
+    URL.revokeObjectURL(url);
+    popup.success("Export CSV thành công!");
   };
 
-  /** ✅ Export PDF: title giữa + pie trên + text dưới */
+  /** ✅ Export PDF: title giữa + pie trên + text dưới (đổi alert -> popup + confirm) */
   const exportPDF = async () => {
     try {
-      if (!stats) return;
-      if (!exportRef.current) throw new Error("Không tìm thấy vùng để export!");
+      if (!token) return popup.error("Bạn chưa đăng nhập!");
+      if (loading) return popup.error("Đang tải dữ liệu, thử lại sau nhé!");
+      if (!stats) return popup.error("Không có dữ liệu để export.");
+      if (!exportRef.current) return popup.error("Không tìm thấy vùng để export!");
+
+      const ok = await popup.confirm(
+        `Xuất báo cáo tháng ${monthLabel} ra PDF?`,
+        "Xác nhận"
+      );
+      if (!ok) return;
 
       // bật mode layout cho PDF
       setPdfMode(true);
@@ -230,9 +254,10 @@ export default function RevenueReport() {
       }
 
       pdf.save(`Revenue_Report_${monthLabel}.pdf`);
+      popup.success("Export PDF thành công!");
     } catch (e) {
       console.error(e);
-      alert(e?.message || "Export PDF failed!");
+      popup.error(e?.message || "Export PDF failed!");
     } finally {
       setPdfMode(false);
     }
@@ -258,7 +283,9 @@ export default function RevenueReport() {
         {!pdfMode && (
           <div className="bg-white border-b">
             <div className="max-w-6xl mx-auto px-6 py-6">
-              <h1 className="text-2xl font-semibold text-gray-900 text-center">Revenue Report</h1>
+              <h1 className="text-2xl font-semibold text-gray-900 text-center">
+                Revenue Report
+              </h1>
               <p className="text-sm text-gray-500 text-center mt-1">
                 Room distribution & monthly comparison
               </p>
@@ -325,16 +352,16 @@ export default function RevenueReport() {
 
                   <button
                     onClick={exportCSV}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm"
-                    disabled={!stats}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm disabled:opacity-60"
+                    disabled={!stats || loading}
                   >
                     Export CSV
                   </button>
 
                   <button
                     onClick={exportPDF}
-                    className="px-4 py-2 bg-green-600 text-white rounded-md text-sm"
-                    disabled={!stats}
+                    className="px-4 py-2 bg-green-600 text-white rounded-md text-sm disabled:opacity-60"
+                    disabled={!stats || loading}
                   >
                     Export PDF
                   </button>

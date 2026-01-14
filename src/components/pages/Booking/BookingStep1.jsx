@@ -3,6 +3,7 @@ import { FaCalendarAlt } from "react-icons/fa";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { getRoomBookedDates } from "@/apis/booking";
+import { popup } from "@/utils/popup";
 
 // ===== AWS IMAGE BASE =====
 const AWS_ROOM_IMAGE_BASE =
@@ -11,17 +12,13 @@ const AWS_ROOM_IMAGE_BASE =
 // format VND
 const formatVND = (n) => `${Number(n || 0).toLocaleString("vi-VN")}₫`;
 
-export default function BookingStep1({
-  bookingData,
-  setBookingData,
-  nextStep,
-}) {
+export default function BookingStep1({ bookingData, setBookingData, nextStep }) {
   const { room = {}, hotel = {} } = bookingData;
 
   const realHotelId = hotel.hotelId || hotel.id;
   const realRoomId = room.roomId || room.id;
   const imageBed = room.image_bed;
-  
+
   // === STATE ===
   const [checkInLocal, setCheckInLocal] = useState(
     bookingData.checkInDate ? new Date(bookingData.checkInDate) : null
@@ -73,7 +70,7 @@ export default function BookingStep1({
     if (!d) return;
 
     if (isRangeBlocked(checkInLocal, d)) {
-      alert("Khoảng ngày bạn chọn nằm trong thời gian đã có người đặt.");
+      popup.error("Khoảng ngày bạn chọn nằm trong thời gian đã có người đặt.");
       return;
     }
 
@@ -87,7 +84,7 @@ export default function BookingStep1({
 
   const handleNext = () => {
     if (!checkInLocal || !checkOutLocal) {
-      alert("❌ Vui lòng chọn ngày nhận phòng và ngày trả phòng!");
+      popup.error("Vui lòng chọn ngày nhận phòng và ngày trả phòng!");
       return;
     }
 
@@ -222,9 +219,7 @@ export default function BookingStep1({
                 <span>
                   {it.qty} đêm · {it.label}
                 </span>
-                <span className="font-medium">
-                  {formatVND(it.qty * it.price)}
-                </span>
+                <span className="font-medium">{formatVND(it.qty * it.price)}</span>
               </div>
             ))}
           </div>

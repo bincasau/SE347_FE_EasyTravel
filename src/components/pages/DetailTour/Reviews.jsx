@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { FaStar, FaRegStar } from "react-icons/fa";
+import { popup } from "@/utils/popup";
 
 const API_BASE = "http://localhost:8080";
 const S3_AVATAR_BASE =
@@ -100,7 +101,15 @@ export default function Reviews({ tourId }) {
   useEffect(() => {
     const onStorage = () => setIsLoggedIn(!!localStorage.getItem("jwt"));
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+
+    // (optional) nếu bạn có dispatch event "jwt-changed" như login modal:
+    const onJwtChanged = () => setIsLoggedIn(!!localStorage.getItem("jwt"));
+    window.addEventListener("jwt-changed", onJwtChanged);
+
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("jwt-changed", onJwtChanged);
+    };
   }, []);
 
   const [actionErr, setActionErr] = useState("");
@@ -124,16 +133,22 @@ export default function Reviews({ tourId }) {
       setActionErr("");
       if (!tourId) return;
 
-      const res = await fetchWithJwt(`/tours/${tourId}/reviews`, { method: "GET" });
+      const res = await fetchWithJwt(`/tours/${tourId}/reviews`, {
+        method: "GET",
+      });
       if (!res.ok) throw new Error(await readText(res));
 
       const data = await res.json();
       const items = data?._embedded?.reviews || data || [];
-      const sorted = [...items].sort((a, b) => (b.rating || 0) - (a.rating || 0));
+      const sorted = [...items].sort(
+        (a, b) => (b.rating || 0) - (a.rating || 0)
+      );
       setReviews(sorted);
     } catch (err) {
       console.error("❌ fetchReviews error:", err);
-      setActionErr(err?.message || "Fetch reviews lỗi.");
+      const msg = err?.message || "Fetch reviews lỗi.";
+      setActionErr(msg);
+      popup.error(msg);
     }
   }, [tourId]);
 
@@ -164,11 +179,15 @@ export default function Reviews({ tourId }) {
 
         const results = await Promise.all(
           need.map(async (ref) => {
-            const url = ref.startsWith("http") ? ref : `/user/${ref}`;
-            const res = await fetchWithJwt(url, { method: "GET" });
-            if (!res.ok) return [ref, null];
-            const u = await res.json();
-            return [ref, u];
+            try {
+              const url = ref.startsWith("http") ? ref : `/user/${ref}`;
+              const res = await fetchWithJwt(url, { method: "GET" });
+              if (!res.ok) return [ref, null];
+              const u = await res.json();
+              return [ref, u];
+            } catch {
+              return [ref, null];
+            }
           })
         );
 
@@ -201,7 +220,8 @@ export default function Reviews({ tourId }) {
     if (href && userMap[href]?.name) return userMap[href].name;
 
     const uid = getUserIdFromReview(r);
-    if (uid != null && userMap[String(uid)]?.name) return userMap[String(uid)].name;
+    if (uid != null && userMap[String(uid)]?.name)
+      return userMap[String(uid)].name;
 
     return "Anonymous";
   };
@@ -219,12 +239,28 @@ export default function Reviews({ tourId }) {
 
   const visibleReviews = showAll ? reviews : reviews.slice(0, 6);
 
+  const requireLogin = async () => {
+    popup.error("Bạn cần đăng nhập để thực hiện thao tác này.");
+    // nếu bạn muốn mở login modal theo hệ thống:
+    // window.dispatchEvent(new Event("open-login"));
+  };
+
   // ✅ CREATE
   const handleCreate = async (e) => {
     e.preventDefault();
-    if (!isLoggedIn) return; // ✅ không login thì khỏi làm gì
-    if (!newComment.trim()) return setActionErr("Vui lòng nhập comment.");
-    if (!tourId) return setActionErr("Thiếu tourId.");
+    if (!isLoggedIn) return requireLogin();
+    if (!newComment.trim()) {
+      const msg = "Vui lòng nhập comment.";
+      setActionErr(msg);
+      popup.error(msg);
+      return;
+    }
+    if (!tourId) {
+      const msg = "Thiếu tourId.";
+      setActionErr(msg);
+      popup.error(msg);
+      return;
+    }
 
     setSubmitting(true);
     setActionErr("");
@@ -241,9 +277,12 @@ export default function Reviews({ tourId }) {
       await fetchReviews();
       setNewComment("");
       setNewRating(5);
+      popup.success("Gửi review thành công!");
     } catch (err) {
       console.error("❌ create error:", err);
-      setActionErr(err?.message || "Tạo review lỗi.");
+      const msg = err?.message || "Tạo review lỗi.";
+      setActionErr(msg);
+      popup.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -251,7 +290,12 @@ export default function Reviews({ tourId }) {
 
   const startEdit = (r) => {
     const id = getReviewId(r);
-    if (!id) return setActionErr("Không tìm thấy id review.");
+    if (!id) {
+      const msg = "Không tìm thấy id review.";
+      setActionErr(msg);
+      popup.error(msg);
+      return;
+    }
     setEditingId(id);
     setEditRating(Number(r?.rating ?? 5));
     setEditComment(r?.comment ?? "");
@@ -266,8 +310,13 @@ export default function Reviews({ tourId }) {
 
   // ✅ UPDATE
   const handleUpdate = async (id) => {
-    if (!isLoggedIn) return; // ✅ không login thì khỏi làm
-    if (!editComment.trim()) return setActionErr("Vui lòng nhập comment.");
+    if (!isLoggedIn) return requireLogin();
+    if (!editComment.trim()) {
+      const msg = "Vui lòng nhập comment.";
+      setActionErr(msg);
+      popup.error(msg);
+      return;
+    }
 
     setSavingEdit(true);
     setActionErr("");
@@ -283,9 +332,12 @@ export default function Reviews({ tourId }) {
 
       await fetchReviews();
       cancelEdit();
+      popup.success("Cập nhật review thành công!");
     } catch (err) {
       console.error("❌ update error:", err);
-      setActionErr(err?.message || "Sửa review lỗi.");
+      const msg = err?.message || "Sửa review lỗi.";
+      setActionErr(msg);
+      popup.error(msg);
     } finally {
       setSavingEdit(false);
     }
@@ -293,8 +345,9 @@ export default function Reviews({ tourId }) {
 
   // ✅ DELETE
   const handleDelete = async (id) => {
-    if (!isLoggedIn) return; // ✅ không login thì khỏi làm
-    const ok = window.confirm("Bạn chắc chắn muốn xoá review này?");
+    if (!isLoggedIn) return requireLogin();
+
+    const ok = await popup.confirm("Bạn chắc chắn muốn xoá review này?");
     if (!ok) return;
 
     setActionErr("");
@@ -306,9 +359,12 @@ export default function Reviews({ tourId }) {
       if (!res.ok) throw new Error(await readText(res));
 
       await fetchReviews();
+      popup.success("Đã xoá review!");
     } catch (err) {
       console.error("❌ delete error:", err);
-      setActionErr(err?.message || "Xoá review lỗi.");
+      const msg = err?.message || "Xoá review lỗi.";
+      setActionErr(msg);
+      popup.error(msg);
     }
   };
 
@@ -317,6 +373,7 @@ export default function Reviews({ tourId }) {
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
         <h2 className="text-5xl font-podcast text-gray-800">Reviews</h2>
 
+        {/* giữ lại box error nếu bạn muốn */}
         {actionErr && (
           <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2">
             {actionErr}

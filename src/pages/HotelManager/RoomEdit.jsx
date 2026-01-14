@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { popup } from "@/utils/popup"; // ✅ ADD
 
 const API_BASE = "http://localhost:8080";
 const UPDATE_ROOM_URL = `${API_BASE}/hotel_manager/rooms`; // ✅ BE saveOrUpdateRoom mapping "/rooms"
@@ -93,7 +94,12 @@ export default function RoomEdit() {
   const room = location.state?.room;
 
   useEffect(() => {
-    if (!room) navigate(-1, { replace: true });
+    if (!room) {
+      // ✅ optional: báo nhẹ rồi back
+      popup.error("Không tìm thấy dữ liệu phòng để chỉnh sửa.").finally(() => {
+        navigate(-1, { replace: true });
+      });
+    }
   }, [room, navigate]);
 
   const [isEditing, setIsEditing] = useState(false);
@@ -174,7 +180,6 @@ export default function RoomEdit() {
   // ✅ price handler: cho phép paste "7.200.000₫" -> tự làm sạch
   const handlePriceChange = (e) => {
     const v = e.target.value ?? "";
-    // cho gõ bình thường, nhưng nếu có ký tự lạ thì làm sạch
     const cleaned = String(v).replace(/[^\d]/g, "");
     setField("price", cleaned);
   };
@@ -234,10 +239,14 @@ export default function RoomEdit() {
   /** ---------- SAVE (UPDATE) ---------- */
   const onSave = async () => {
     const err = validate();
-    if (err) return alert(err);
+    if (err) return popup.error(err);
 
     const priceNum = parseVNDToNumber(form.price);
-    if (!Number.isFinite(priceNum)) return alert("Price invalid.");
+    if (!Number.isFinite(priceNum)) return popup.error("Price invalid.");
+
+    // ✅ (optional) hỏi confirm trước khi save
+    const ok = await popup.confirm("Bạn có chắc muốn lưu thay đổi?", "Xác nhận");
+    if (!ok) return;
 
     // ✅ JSON gửi vào @RequestPart("room") phải match entity Room
     const roomPayload = {
@@ -272,8 +281,9 @@ export default function RoomEdit() {
         body: fd,
       });
 
-      alert("Updated room success!");
+      await popup.success("Cập nhật phòng thành công!");
 
+      // update original
       const bedOld = bedPreview?.startsWith("blob:")
         ? bedPreview
         : original?.bedOld || "";
@@ -291,12 +301,12 @@ export default function RoomEdit() {
     } catch (e) {
       console.error(e);
       if (e?.status === 403) {
-        alert(
+        popup.error(
           "403 Forbidden khi update /hotel_manager/rooms.\n" +
             "=> BE chưa nhận JWT / role HOTEL_MANAGER chưa đúng / OPTIONS bị chặn."
         );
       } else {
-        alert(e?.message || "Update failed");
+        popup.error(e?.message || "Update failed");
       }
     } finally {
       setSubmitting(false);
@@ -391,7 +401,6 @@ export default function RoomEdit() {
             </Field>
 
             <Field label="Price" required>
-              {/* ✅ Edit: input raw number; Read-only: show VND */}
               {isEditing ? (
                 <input
                   name="price"
@@ -447,7 +456,7 @@ export default function RoomEdit() {
             <SingleImage
               title="Bed Image (bedFile)"
               preview={bedPreview || FALLBACK_IMAGE}
-              onPick={() => isEditing && bedInputRef.current?.click()}
+              onPick={pickBed}
               onClear={clearBed}
               inputRef={bedInputRef}
               onChange={(e) => {
@@ -462,7 +471,7 @@ export default function RoomEdit() {
             <SingleImage
               title="WC Image (wcFile)"
               preview={wcPreview || FALLBACK_IMAGE}
-              onPick={() => isEditing && wcInputRef.current?.click()}
+              onPick={pickWc}
               onClear={clearWc}
               inputRef={wcInputRef}
               onChange={(e) => {

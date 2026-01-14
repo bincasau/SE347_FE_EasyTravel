@@ -19,7 +19,6 @@
     "date-fns": "^4.1.0",
     "file-saver": "^2.0.5",
     "html2canvas": "^1.4.1",
-    "jspdf": "^4.0.0",
     "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.548.0",
     "react": "^19.1.1",
@@ -31,6 +30,7 @@
     "react-router-dom": "^7.9.4",
     "react-select": "^5.10.2",
     "recharts": "^3.6.0",
+    "sweetalert2": "^11.26.17",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

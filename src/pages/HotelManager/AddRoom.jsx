@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
+import { popup } from "@/utils/popup";
 
 const API_BASE = "http://localhost:8080";
 const MY_HOTEL_URL = `${API_BASE}/hotel_manager/my-hotel`;
@@ -283,20 +284,14 @@ export default function AddRoom() {
 
       if (parsed.length === 0) throw new Error("No valid rows found in Excel.");
 
-      // ✅ Không popup nữa — set list luôn
       setExcelRows(parsed);
-
-      // auto fill dòng đầu tiên
       setForm((prev) => ({ ...prev, ...parsed[0] }));
 
-      // clear single images để UI khỏi rối
       clearBed();
       clearWc();
-
-      // scroll lên bulk list cho dễ thấy
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
-      alert(err?.message || "Import failed. Please check your Excel format.");
+      popup.error(err?.message || "Import failed. Please check your Excel format.");
     } finally {
       e.target.value = "";
     }
@@ -351,16 +346,16 @@ export default function AddRoom() {
   /** ===== 7) Submit single ===== */
   const handleSubmit = async () => {
     const err = validateOne(form);
-    if (err) return alert(err);
+    if (err) return popup.error(err);
 
     if (isBulkMode) {
-      return alert(
+      return popup.error(
         "Bạn đã import Excel rồi. Hãy dùng Bulk Create ở trên để tạo hàng loạt."
       );
     }
 
     if (!bedFile || !wcFile) {
-      return alert("Single add cần chọn Bed Image và WC Image.");
+      return popup.error("Single add cần chọn Bed Image và WC Image.");
     }
 
     const fd = buildFormData(form, bedFile, wcFile);
@@ -390,10 +385,10 @@ export default function AddRoom() {
         );
       }
 
-      alert("Add room success!");
+      await popup.success("Add room success!");
       navigate(-1);
     } catch (e) {
-      alert(e?.message || "Add room failed");
+      popup.error(e?.message || "Add room failed");
     } finally {
       setSubmitting(false);
     }
@@ -401,14 +396,17 @@ export default function AddRoom() {
 
   /** ===== 8) Bulk create from Excel ===== */
   const handleBulkCreate = async () => {
-    if (!excelRows.length) return alert("Bạn chưa import Excel.");
+    if (!excelRows.length) return popup.error("Bạn chưa import Excel.");
     if (!bulkBedFile || !bulkWcFile) {
-      return alert("Bulk create cần chọn Default Bed Image và Default WC Image.");
+      return popup.error("Bulk create cần chọn Default Bed Image và Default WC Image.");
     }
-    if (!token) return alert("Bạn chưa đăng nhập.");
-    if (!hotelId) return alert("Chưa có hotelId.");
+    if (!token) return popup.error("Bạn chưa đăng nhập.");
+    if (!hotelId) return popup.error("Chưa có hotelId.");
 
-    const ok = confirm(`Create ${excelRows.length} rooms from Excel?`);
+    const ok = await popup.confirm(
+      `Create ${excelRows.length} rooms from Excel?`,
+      "Bulk Create"
+    );
     if (!ok) return;
 
     try {
@@ -443,13 +441,11 @@ export default function AddRoom() {
         }
       }
 
-      alert(`Bulk done ✅ Success: ${success} | Failed: ${fail}`);
-
-      // ✅ Bulk xong -> reset về trạng thái Add Room + scroll lên
+      await popup.success(`Bulk done ✅ Success: ${success} | Failed: ${fail}`);
       resetBulkState();
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
-      alert(e?.message || "Bulk create failed");
+      popup.error(e?.message || "Bulk create failed");
     } finally {
       setSubmitting(false);
     }
@@ -506,7 +502,9 @@ export default function AddRoom() {
         <div className="bg-white rounded-2xl shadow-sm border p-6">
           <div className="mb-3 text-sm">
             {loadingHotel ? (
-              <span className="text-gray-500">Đang lấy thông tin khách sạn...</span>
+              <span className="text-gray-500">
+                Đang lấy thông tin khách sạn...
+              </span>
             ) : hotelError ? (
               <span className="text-red-600">Lỗi: {hotelError}</span>
             ) : (
@@ -529,9 +527,7 @@ export default function AddRoom() {
 
                 <div className="flex gap-2">
                   <button
-                    onClick={() => {
-                      resetBulkState();
-                    }}
+                    onClick={() => resetBulkState()}
                     disabled={submitting}
                     className={[
                       "px-4 py-2 rounded-xl font-semibold border",
@@ -562,7 +558,7 @@ export default function AddRoom() {
                 <SingleImage
                   title="Default Bed Image (for bulk)"
                   preview={bulkBedPreview}
-                  onPick={() => bulkBedInputRef.current?.click()}
+                  onPick={pickBulkBed}
                   onClear={clearBulkBed}
                   inputRef={bulkBedInputRef}
                   onChange={(e) => {
@@ -580,7 +576,7 @@ export default function AddRoom() {
                 <SingleImage
                   title="Default WC Image (for bulk)"
                   preview={bulkWcPreview}
-                  onPick={() => bulkWcInputRef.current?.click()}
+                  onPick={pickBulkWc}
                   onClear={clearBulkWc}
                   inputRef={bulkWcInputRef}
                   onChange={(e) => {
@@ -732,7 +728,7 @@ export default function AddRoom() {
               <SingleImage
                 title="Bed Image (bedFile)"
                 preview={bedPreview}
-                onPick={() => bedInputRef.current?.click()}
+                onPick={pickBed}
                 onClear={clearBed}
                 inputRef={bedInputRef}
                 onChange={(e) => {
@@ -745,7 +741,7 @@ export default function AddRoom() {
               <SingleImage
                 title="WC Image (wcFile)"
                 preview={wcPreview}
-                onPick={() => wcInputRef.current?.click()}
+                onPick={pickWc}
                 onClear={clearWc}
                 inputRef={wcInputRef}
                 onChange={(e) => {

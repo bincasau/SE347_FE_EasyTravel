@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { FaStar, FaRegStar } from "react-icons/fa";
+import { popup } from "@/utils/popup";
 
 const API_BASE = "http://localhost:8080";
 
@@ -60,7 +61,6 @@ export default function HotelReviews({ hotelId }) {
   const [editingId, setEditingId] = useState(null);
   const [editRating, setEditRating] = useState(5);
   const [editComment, setEditComment] = useState("");
-  const [error, setError] = useState("");
 
   const isLoggedIn = !!localStorage.getItem("jwt");
 
@@ -73,7 +73,8 @@ export default function HotelReviews({ hotelId }) {
       const data = await res.json();
       setReviews(data.content || []);
     } catch (e) {
-      setError(e.message);
+      console.error(e);
+      popup.error(e?.message || "Không tải được danh sách review.");
     }
   }, [hotelId]);
 
@@ -84,8 +85,15 @@ export default function HotelReviews({ hotelId }) {
   // CREATE
   const handleCreate = async (e) => {
     e.preventDefault();
-    if (!isLoggedIn) return setError("Bạn cần đăng nhập để review.");
-    if (!newComment.trim()) return setError("Vui lòng nhập comment.");
+
+    if (!isLoggedIn) {
+      popup.error("Bạn cần đăng nhập để review.");
+      return;
+    }
+    if (!newComment.trim()) {
+      popup.error("Vui lòng nhập comment.");
+      return;
+    }
 
     try {
       const res = await fetchWithJwt(
@@ -99,16 +107,25 @@ export default function HotelReviews({ hotelId }) {
         }
       );
       if (!res.ok) throw new Error(await readText(res));
+
       setNewComment("");
       setNewRating(5);
+
+      popup.success("Gửi review thành công!");
       fetchReviews();
     } catch (e) {
-      setError(e.message);
+      console.error(e);
+      popup.error(e?.message || "Gửi review thất bại!");
     }
   };
 
   // UPDATE
   const handleUpdate = async (id) => {
+    if (!editComment.trim()) {
+      popup.error("Vui lòng nhập comment.");
+      return;
+    }
+
     try {
       const res = await fetchWithJwt(`/custom-reviews/update/${id}`, {
         method: "PUT",
@@ -118,36 +135,38 @@ export default function HotelReviews({ hotelId }) {
         }),
       });
       if (!res.ok) throw new Error(await readText(res));
+
       setEditingId(null);
+      popup.success("Cập nhật review thành công!");
       fetchReviews();
     } catch (e) {
-      setError(e.message);
+      console.error(e);
+      popup.error(e?.message || "Cập nhật review thất bại!");
     }
   };
 
   // DELETE
   const handleDelete = async (id) => {
-    if (!window.confirm("Xoá review này?")) return;
+    const ok = await popup.confirm("Xoá review này?");
+    if (!ok) return;
+
     try {
       const res = await fetchWithJwt(`/custom-reviews/delete/${id}`, {
         method: "DELETE",
       });
       if (!res.ok) throw new Error(await readText(res));
+
+      popup.success("Đã xoá review!");
       fetchReviews();
     } catch (e) {
-      setError(e.message);
+      console.error(e);
+      popup.error(e?.message || "Không thể xoá review!");
     }
   };
 
   return (
     <section className="mt-14">
       <h2 className="text-3xl font-podcast mb-6">Hotel Reviews</h2>
-
-      {error && (
-        <div className="mb-4 text-sm text-red-600 bg-red-50 p-3 rounded-xl">
-          {error}
-        </div>
-      )}
 
       {/* WRITE */}
       <form
@@ -189,16 +208,10 @@ export default function HotelReviews({ hotelId }) {
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {reviews.map((r) => (
-            <div
-              key={r.reviewId}
-              className="bg-white border rounded-2xl p-5"
-            >
+            <div key={r.reviewId} className="bg-white border rounded-2xl p-5">
               {editingId === r.reviewId ? (
                 <>
-                  <StarPicker
-                    value={editRating}
-                    onChange={setEditRating}
-                  />
+                  <StarPicker value={editRating} onChange={setEditRating} />
                   <textarea
                     value={editComment}
                     onChange={(e) => setEditComment(e.target.value)}
@@ -207,12 +220,14 @@ export default function HotelReviews({ hotelId }) {
                   />
                   <div className="flex gap-2 mt-3">
                     <button
+                      type="button"
                       onClick={() => handleUpdate(r.reviewId)}
                       className="bg-orange-500 text-white px-3 py-1 rounded-lg text-xs"
                     >
                       Lưu
                     </button>
                     <button
+                      type="button"
                       onClick={() => setEditingId(null)}
                       className="border px-3 py-1 rounded-lg text-xs"
                     >
@@ -228,9 +243,11 @@ export default function HotelReviews({ hotelId }) {
                     <span className="text-gray-500">
                       {r.reviewerName || "Anonymous"}
                     </span>
+
                     {isLoggedIn && (
                       <div className="flex gap-2">
                         <button
+                          type="button"
                           onClick={() => {
                             setEditingId(r.reviewId);
                             setEditRating(r.rating);
@@ -241,6 +258,7 @@ export default function HotelReviews({ hotelId }) {
                           Sửa
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleDelete(r.reviewId)}
                           className="text-red-600"
                         >

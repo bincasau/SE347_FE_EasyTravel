@@ -5,6 +5,7 @@ import {
   getCommentsByBlogId,
   updateComment,
 } from "@/apis/CommentAPI";
+import { popup } from "@/utils/popup";
 
 const API_BASE = "http://localhost:8080";
 
@@ -95,14 +96,12 @@ export default function BlogComments({ blogId }) {
       try {
         const data = await getCommentsByBlogId(blogId);
 
-        // ✅ nếu API trả HAL object: { _embedded: { comments: [...] } }
         const list = Array.isArray(data)
           ? data
           : data?._embedded?.comments
           ? data._embedded.comments
           : [];
 
-        // ✅ sort mới nhất lên đầu (optional)
         const sorted = [...list].sort((a, b) => {
           const ta = new Date(getTime(a) || 0).getTime();
           const tb = new Date(getTime(b) || 0).getTime();
@@ -179,7 +178,6 @@ export default function BlogComments({ blogId }) {
     try {
       await addComment(blogId, content.trim());
 
-      // ✅ reload lại list (đảm bảo đúng HAL + có link user)
       const data = await getCommentsByBlogId(blogId);
       const list = Array.isArray(data)
         ? data
@@ -197,9 +195,12 @@ export default function BlogComments({ blogId }) {
 
       setVisibleCount(4);
       setContent("");
+
+      // ✅ optional đẹp hơn
+      popup.success("Đã gửi bình luận!");
     } catch (e) {
       console.error(e);
-      alert(e.message || "Không thể gửi bình luận (cần đăng nhập?)");
+      popup.error(e?.message || "Không thể gửi bình luận (cần đăng nhập?)");
     } finally {
       setSubmitting(false);
     }
@@ -225,19 +226,20 @@ export default function BlogComments({ blogId }) {
     try {
       await updateComment(editingId, editingContent.trim());
 
-      // reload lại để đồng bộ
       const data = await getCommentsByBlogId(blogId);
       const list = Array.isArray(data)
         ? data
         : data?._embedded?.comments
         ? data._embedded.comments
         : [];
+
       setComments(list);
 
       cancelEdit();
+      popup.success("Đã cập nhật bình luận!");
     } catch (e) {
       console.error(e);
-      alert(e.message || "Không thể sửa bình luận");
+      popup.error(e?.message || "Không thể sửa bình luận");
     } finally {
       setSavingEdit(false);
     }
@@ -245,13 +247,16 @@ export default function BlogComments({ blogId }) {
 
   // ✅ DELETE
   const onDelete = async (id) => {
-    if (!confirm("Xoá bình luận này?")) return;
+    const ok = await popup.confirm("Xoá bình luận này?");
+    if (!ok) return;
+
     try {
       await deleteComment(id);
       setComments((prev) => prev.filter((c) => getId(c) !== id));
+      popup.success("Đã xoá bình luận!");
     } catch (e) {
       console.error(e);
-      alert(e.message || "Không thể xoá bình luận");
+      popup.error(e?.message || "Không thể xoá bình luận");
     }
   };
 
@@ -295,7 +300,6 @@ export default function BlogComments({ blogId }) {
                     </div>
                   </div>
 
-                  {/* ⚠️ tạm vẫn cho hiện Sửa/Xoá (muốn owner-only thì mình chỉnh tiếp) */}
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => startEdit(c)}
@@ -368,7 +372,6 @@ export default function BlogComments({ blogId }) {
         </div>
       )}
 
-      {/* form */}
       <form
         onSubmit={onSubmit}
         className="mt-8 bg-gray-50 p-5 rounded-xl shadow-sm border"

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { getAccountDetail, changePasswordApi } from "@/apis/AccountAPI";
 import { updateMyProfileApi, deleteMineApi } from "@/apis/ProfileAPI";
 import { logout } from "@/apis/AccountAPI";
+import { popup } from "@/utils/popup";
 
 const S3_USER_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/user";
@@ -113,26 +114,34 @@ export default function EditProfile() {
     setSaving(true);
     try {
       await updateMyProfileApi({ user: payloadUser, file });
-      alert("Cập nhật profile thành công!");
+
+      await popup.success("Cập nhật profile thành công!");
       navigate("/profile");
     } catch (err) {
       console.error(err);
-      alert(`Update lỗi: ${err.message}`);
+      popup.error(err?.message || "Cập nhật thất bại!");
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!confirm("Bạn chắc chắn muốn xoá tài khoản?")) return;
+    // ✅ popup confirm đẹp
+    const ok = await popup.confirmDanger(
+      "Bạn chắc chắn muốn xoá tài khoản? Hành động này không thể hoàn tác.",
+      "Xoá tài khoản"
+    );
+    if (!ok) return;
+
     try {
       await deleteMineApi();
       logout();
-      alert("Đã xoá tài khoản.");
+
+      await popup.success("Đã xoá tài khoản.");
       navigate("/");
     } catch (err) {
       console.error(err);
-      alert(`Delete lỗi: ${err.message}`);
+      popup.error(err?.message || "Xoá tài khoản thất bại!");
     }
   };
 
@@ -324,29 +333,27 @@ function ChangePasswordModal({ onClose }) {
 
   const pwdError = useMemo(() => validatePassword(newPassword), [newPassword]);
 
+  const confirmError = useMemo(() => {
+    if (!confirmPw) return "";
+    if (newPassword !== confirmPw) return "Xác nhận mật khẩu không khớp!";
+    return "";
+  }, [newPassword, confirmPw]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErr("");
 
-    // ✅ rule mật khẩu mạnh
-    if (pwdError) {
-      setErr(pwdError);
-      return;
-    }
-
-    if (newPassword !== confirmPw) {
-      setErr("Xác nhận mật khẩu không khớp!");
-      return;
-    }
+    if (pwdError) return setErr(pwdError);
+    if (newPassword !== confirmPw) return setErr("Xác nhận mật khẩu không khớp!");
 
     setLoading(true);
     try {
       await changePasswordApi({ oldPassword, newPassword });
-      alert("Đổi mật khẩu thành công!");
+      await popup.success("Đổi mật khẩu thành công!");
       onClose?.();
-    } catch (e) {
-      console.error(e);
-      setErr(e?.message || "Đổi mật khẩu thất bại!");
+    } catch (e2) {
+      console.error(e2);
+      setErr(e2?.message || "Đổi mật khẩu thất bại!");
     } finally {
       setLoading(false);
     }
@@ -371,6 +378,7 @@ function ChangePasswordModal({ onClose }) {
         {err && <p className="text-sm text-red-600 mb-3">{err}</p>}
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* CURRENT */}
           <div className="space-y-1">
             <label className="text-sm font-medium text-gray-800">
               Current Password
@@ -384,6 +392,7 @@ function ChangePasswordModal({ onClose }) {
             />
           </div>
 
+          {/* NEW */}
           <div className="space-y-1">
             <label className="text-sm font-medium text-gray-800">
               New Password
@@ -395,24 +404,9 @@ function ChangePasswordModal({ onClose }) {
               required
               className="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:ring-2 focus:ring-orange-400"
             />
-
-            {/* ✅ Rules + realtime error */}
-            <div className="text-xs text-gray-500 space-y-1 mt-2">
-              <p className="font-medium text-gray-600">Yêu cầu mật khẩu:</p>
-              <ul className="list-disc ml-5">
-                <li>Ít nhất 8 ký tự</li>
-                <li>Có chữ hoa (A-Z)</li>
-                <li>Có chữ thường (a-z)</li>
-                <li>Có số (0-9)</li>
-                <li>Có ký tự đặc biệt (ví dụ: !@#$%^&*)</li>
-              </ul>
-
-              {newPassword && pwdError && (
-                <p className="text-red-600 mt-1">{pwdError}</p>
-              )}
-            </div>
           </div>
 
+          {/* CONFIRM */}
           <div className="space-y-1">
             <label className="text-sm font-medium text-gray-800">
               Confirm New Password
@@ -424,6 +418,26 @@ function ChangePasswordModal({ onClose }) {
               required
               className="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:ring-2 focus:ring-orange-400"
             />
+
+            {confirmError && (
+              <p className="text-xs text-red-600 mt-1">{confirmError}</p>
+            )}
+          </div>
+
+          {/* ✅ RULES ĐƯA XUỐNG DƯỚI CONFIRM */}
+          <div className="text-xs text-gray-500 space-y-1 mt-2">
+            <p className="font-medium text-gray-600">Yêu cầu mật khẩu:</p>
+            <ul className="list-disc ml-5">
+              <li>Ít nhất 8 ký tự</li>
+              <li>Có chữ hoa (A-Z)</li>
+              <li>Có chữ thường (a-z)</li>
+              <li>Có số (0-9)</li>
+              <li>Có ký tự đặc biệt (ví dụ: !@#$%^&*)</li>
+            </ul>
+
+            {newPassword && pwdError && (
+              <p className="text-red-600 mt-1">{pwdError}</p>
+            )}
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-2">
@@ -439,7 +453,7 @@ function ChangePasswordModal({ onClose }) {
             <button
               type="submit"
               className="px-5 py-2.5 rounded-full bg-orange-500 text-white hover:bg-orange-400 disabled:opacity-60"
-              disabled={loading || !!pwdError || newPassword !== confirmPw}
+              disabled={loading || !!pwdError || !!confirmError}
             >
               {loading ? "Saving..." : "Update"}
             </button>

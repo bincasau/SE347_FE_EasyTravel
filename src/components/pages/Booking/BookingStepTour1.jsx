@@ -3,6 +3,7 @@ import { FaCalendarAlt } from "react-icons/fa";
 import DatePicker from "react-datepicker";
 import Select from "react-select";
 import "react-datepicker/dist/react-datepicker.css";
+import { popup } from "@/utils/popup";
 
 // Format VND
 const formatVND = (n) =>
@@ -11,11 +12,6 @@ const formatVND = (n) =>
     currency: "VND",
   });
 
-/**
- * QtyControl:
- *  - Nút "-" chỉ disable khi value = 0
- *  - Nút "+" disable theo props disablePlus (dùng khi đã đủ ghế)
- */
 function QtyControl({ value, onChange, disablePlus }) {
   return (
     <div className="flex items-center gap-2">
@@ -49,7 +45,6 @@ export default function BookingStepTour1({
     bookingData.date ? new Date(bookingData.date) : null
   );
 
-  // 1️⃣ Dữ liệu tour + ghế
   const tour = bookingData.tourInfo;
   const availableSeats = bookingData.availableSeats ?? 0;
 
@@ -57,7 +52,6 @@ export default function BookingStepTour1({
     return <div className="text-gray-500">Loading tour info...</div>;
   }
 
-  // 2️⃣ Giá gốc + giảm giá
   const basePriceAdult = tour.priceAdult ?? 0;
   const basePriceChild = tour.priceChild ?? 0;
   const discountPercent = tour.percentDiscount ?? 0;
@@ -94,7 +88,6 @@ export default function BookingStepTour1({
     });
   };
 
-  // 4️⃣ Tính total (đã áp dụng giảm giá)
   const total = adult * priceAdult + child * priceChild;
 
   useEffect(() => {
@@ -108,7 +101,7 @@ export default function BookingStepTour1({
 
   const handleContinue = () => {
     if (adult + child === 0) {
-      alert("Bạn phải chọn ít nhất 1 vé.");
+      popup.error("Bạn phải chọn ít nhất 1 vé.");
       return;
     }
     nextStep();
@@ -116,7 +109,6 @@ export default function BookingStepTour1({
 
   return (
     <div className="space-y-6">
-      {/* 🗓 DATE */}
       <div>
         <label className="block text-sm text-gray-600 mb-2">Select a Date</label>
         <div className="relative flex items-center border rounded-lg px-3 py-2 bg-white shadow-sm">
@@ -133,9 +125,7 @@ export default function BookingStepTour1({
         </div>
       </div>
 
-      {/* 🎫 TICKET SELECTION */}
       <div className="space-y-4 mt-4">
-        {/* Adult */}
         <div className="border rounded-lg p-4 flex items-center justify-between">
           <div>
             <div className="font-semibold text-gray-800">Adult</div>
@@ -159,7 +149,6 @@ export default function BookingStepTour1({
           />
         </div>
 
-        {/* Child */}
         <div className="border rounded-lg p-4 flex items-center justify-between">
           <div>
             <div className="font-semibold text-gray-800">Child</div>
@@ -188,7 +177,6 @@ export default function BookingStepTour1({
         </p>
       </div>
 
-      {/* ✅ BUTTONS (y chang Step 2/3) */}
       <div className="flex justify-between pt-4">
         <button
           onClick={() => window.history.back()}

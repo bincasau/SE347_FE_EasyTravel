@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { popup } from "@/utils/popup";
 
 const formatVND = (n) =>
   Number(n ?? 0).toLocaleString("vi-VN", {
@@ -28,7 +29,7 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
     const realTourId = tourInfo?.tourId ?? tourInfo?.id ?? null;
 
     if (!realTourId) {
-      alert("Thiếu tourId (tourInfo bị sai dữ liệu).");
+      popup.error("Thiếu tourId (tourInfo bị sai dữ liệu).");
       return;
     }
 
@@ -52,7 +53,10 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
         body: JSON.stringify(payload),
       });
 
-      if (!bookingRes.ok) throw new Error(await bookingRes.text());
+      if (!bookingRes.ok) {
+        const msg = await bookingRes.text().catch(() => "");
+        throw new Error(msg || `Booking failed (${bookingRes.status})`);
+      }
 
       const bookingDataRes = await bookingRes.json();
       const bookingId =
@@ -61,15 +65,17 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
         bookingDataRes?.data?.bookingId;
 
       if (!bookingId) {
-        alert("❌ Booking failed: missing bookingId!");
+        popup.error("Booking failed: missing bookingId!");
         return;
       }
 
+      // ✅ CASH
       if (payment === "cash") {
-        alert("🎉 Booking successfully! Please pay at departure.");
+        await popup.success("Booking successfully! Please pay at departure.");
         return;
       }
 
+      // ✅ VNPAY
       if (payment === "vnpay") {
         const params = new URLSearchParams();
         params.append("amount", total || 0);
@@ -88,7 +94,7 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
 
         if (!payRes.ok) {
           const msg = await payRes.text().catch(() => "");
-          alert(`VNPay request failed: ${payRes.status} ${msg}`);
+          popup.error(`VNPay request failed: ${payRes.status} ${msg}`);
           return;
         }
 
@@ -96,16 +102,17 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
         const paymentUrl = payData?.data?.paymentUrl;
 
         if (!paymentUrl) {
-          alert("❌ Cannot get VNPay payment URL!");
+          popup.error("Cannot get VNPay payment URL!");
           return;
         }
 
+        await popup.success("Đang chuyển hướng đến VNPay...");
         window.location.assign(paymentUrl);
         return;
       }
     } catch (err) {
       console.error("❌ Booking error:", err);
-      alert("Booking failed!");
+      popup.error(err?.message || "Booking failed!");
     } finally {
       setLoading(false);
     }

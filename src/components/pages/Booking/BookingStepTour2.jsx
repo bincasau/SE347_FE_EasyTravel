@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from "react";
+import { popup } from "@/utils/popup";
 
-export default function BookingStepTour2({ bookingData, setBookingData, nextStep, prevStep }) {
-
+export default function BookingStepTour2({
+  bookingData,
+  setBookingData,
+  nextStep,
+  prevStep,
+}) {
   const [userInfo, setUserInfo] = useState({
     name: "",
     email: "",
@@ -20,7 +25,9 @@ export default function BookingStepTour2({ bookingData, setBookingData, nextStep
     const token = getToken();
     if (!token) {
       console.warn("⚠ No JWT token found!");
-      return; // Không crash
+      // optional: báo nhẹ
+      // popup.error("Bạn chưa đăng nhập. Vui lòng đăng nhập để tự động điền thông tin.");
+      return;
     }
 
     fetch("http://localhost:8080/account/detail", {
@@ -29,8 +36,12 @@ export default function BookingStepTour2({ bookingData, setBookingData, nextStep
         Authorization: `Bearer ${token}`,
       },
     })
-      .then((res) => {
-        if (!res.ok) throw new Error("Unauthorized");
+      .then(async (res) => {
+        if (!res.ok) {
+          // cố gắng đọc message BE trả về
+          const msg = await res.text().catch(() => "");
+          throw new Error(msg || `Unauthorized (${res.status})`);
+        }
         return res.json();
       })
       .then((data) => {
@@ -41,7 +52,11 @@ export default function BookingStepTour2({ bookingData, setBookingData, nextStep
           address: data.address || "",
         });
       })
-      .catch((err) => console.error("❌ Error fetching user:", err));
+      .catch((err) => {
+        console.error("❌ Error fetching user:", err);
+        // popup nhẹ, không bắt buộc
+        popup.error("Không thể lấy thông tin người dùng. Vui lòng nhập thủ công.");
+      });
   }, []);
 
   const handleChange = (field, value) => {
@@ -52,14 +67,20 @@ export default function BookingStepTour2({ bookingData, setBookingData, nextStep
   };
 
   const handleContinue = () => {
-    if (!userInfo.name.trim())
-      return alert("Please enter your full name.");
+    if (!userInfo.name.trim()) {
+      popup.error("Please enter your full name.");
+      return;
+    }
 
-    if (!userInfo.phone.trim() || userInfo.phone.length < 8)
-      return alert("Invalid phone number.");
+    if (!userInfo.phone.trim() || userInfo.phone.length < 8) {
+      popup.error("Invalid phone number.");
+      return;
+    }
 
-    if (!userInfo.email.includes("@"))
-      return alert("Invalid email address.");
+    if (!userInfo.email.includes("@")) {
+      popup.error("Invalid email address.");
+      return;
+    }
 
     setBookingData((prev) => ({
       ...prev,
