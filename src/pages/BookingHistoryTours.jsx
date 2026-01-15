@@ -3,6 +3,49 @@ import { NavLink } from "react-router-dom";
 import { fetchTourBookingHistory } from "@/apis/bookingHistory";
 import { buildTourSlug } from "@/utils/slug";
 
+// ✅ Popup: chọn 1 kiểu import đúng với popup.js của bạn
+// (1) Nếu popup.js export default:
+import {popup}  from "@/utils/popup";
+// (2) Nếu popup.js export named:
+// import { popup } from "@/utils/popup";
+
+const BASE_URL = "http://localhost:8080";
+
+const getToken = () =>
+  localStorage.getItem("jwt") ||
+  localStorage.getItem("token") ||
+  localStorage.getItem("accessToken") ||
+  "";
+
+// ✅ parse + throw error chuẩn
+async function fetchJSON(url, options = {}) {
+  const res = await fetch(url, options);
+  const text = await res.text();
+
+  if (!res.ok) {
+    throw new Error(text || `HTTP ${res.status}`);
+  }
+
+  // backend của bạn trả JSON: {status,message}
+  return text ? JSON.parse(text) : null;
+}
+
+// ✅ Refund API theo bookingId, type = TOUR/HOTEL
+async function refundByBooking(bookingType, bookingId) {
+  const token = getToken();
+
+  // Nếu token rỗng -> sẽ bị redirect OAuth, nên chặn từ FE cho rõ
+  if (!token) throw new Error("Bạn chưa đăng nhập (thiếu JWT token).");
+
+  return fetchJSON(`${BASE_URL}/payment/refund/${bookingType}/${bookingId}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    },
+  });
+}
+
 const fmtDate = (d) => {
   if (!d) return "-";
   const s = String(d);
@@ -18,9 +61,10 @@ export default function BookingHistoryTours() {
   const [page, setPage] = useState(0);
   const [size] = useState(8);
 
-  // ✅ lọc ngày (backend nhận start/end dạng yyyy-mm-dd)
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
+
+  const [refundingId, setRefundingId] = useState(null);
 
   const [data, setData] = useState({
     content: [],
@@ -30,6 +74,21 @@ export default function BookingHistoryTours() {
   });
 
   const rows = data.content || [];
+
+  const notifySuccess = (msg) => {
+    if (popup && typeof popup.success === "function") popup.success(msg);
+    else alert(msg);
+  };
+
+  const notifyError = (msg) => {
+    if (popup && typeof popup.error === "function") popup.error(msg);
+    else alert(msg);
+  };
+
+  const confirmRefund = async (msg) => {
+    if (popup && typeof popup.confirm === "function") return await popup.confirm(msg);
+    return window.confirm(msg);
+  };
 
   const load = async (overridePage) => {
     const p = typeof overridePage === "number" ? overridePage : page;
@@ -45,6 +104,7 @@ export default function BookingHistoryTours() {
     } catch (e) {
       console.error(e);
       setData({ content: [], totalPages: 0, totalElements: 0, number: 0 });
+      notifyError(e?.message || "Không tải được lịch sử tour.");
     } finally {
       setLoading(false);
     }
@@ -64,8 +124,30 @@ export default function BookingHistoryTours() {
     setStart("");
     setEnd("");
     setPage(0);
-    // chạy lại với filter rỗng
     setTimeout(() => load(0), 0);
+  };
+
+  const onRefund = async (bookingId) => {
+    if (!bookingId) return;
+
+    const ok = await confirmRefund(
+      `Bạn có chắc muốn refund tiền cho booking #${bookingId} không?`
+    );
+    if (!ok) return;
+
+    setRefundingId(bookingId);
+    try {
+      const res = await refundByBooking("TOUR", bookingId);
+
+      // backend trả {status:"success", message:"Hoàn tiền TOUR thành công!"}
+      notifySuccess(res?.message || "Refund thành công!");
+      load();
+    } catch (e) {
+      console.error(e);
+      notifyError(e?.message || "Refund thất bại!");
+    } finally {
+      setRefundingId(null);
+    }
   };
 
   const canPrev = page > 0;
@@ -100,7 +182,7 @@ export default function BookingHistoryTours() {
         </div>
       </div>
 
-      {/* ✅ Filters */}
+      {/* Filters */}
       <div className="mt-5 bg-white border rounded-2xl p-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div className="flex flex-col md:flex-row gap-3">
           <div>
@@ -129,10 +211,7 @@ export default function BookingHistoryTours() {
             Apply
           </button>
 
-          <button
-            onClick={onClearFilter}
-            className="border rounded-xl px-4 py-2"
-          >
+          <button onClick={onClearFilter} className="border rounded-xl px-4 py-2">
             Clear
           </button>
         </div>
@@ -142,7 +221,7 @@ export default function BookingHistoryTours() {
         </div>
       </div>
 
-      {/* ✅ Cards (ĐÃ BỎ BOOKING ID) */}
+      {/* Cards */}
       <div className="mt-6">
         {loading ? (
           <div className="p-6 text-gray-500">Loading...</div>
@@ -155,6 +234,7 @@ export default function BookingHistoryTours() {
             {rows.map((r, idx) => {
               const tour = r?.tour;
 
+              const bookingId = r?.bookingId ?? null;
               const tourId = tour?.tourId ?? tour?.id ?? null;
               const tourTitle = tour?.title || "Tour";
 
@@ -163,15 +243,16 @@ export default function BookingHistoryTours() {
               const total = r?.totalPrice ?? 0;
               const status = r?.status || "Pending";
 
-              // bookingDate bạn set = currentTimeMillis
               const date = fmtDate(r?.bookingDate);
 
               const tourSlug =
                 tourId ? buildTourSlug(Number(tourId), String(tourTitle)) : null;
 
+              const isRefunding = refundingId === bookingId;
+
               return (
                 <div
-                  key={r?.bookingId ?? `${tourId || "tour"}-${idx}`}
+                  key={bookingId ?? `${tourId || "tour"}-${idx}`}
                   className="bg-white border rounded-2xl p-5 shadow-sm"
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -203,16 +284,26 @@ export default function BookingHistoryTours() {
                     </div>
                   </div>
 
-                  {tourSlug && (
-                    <div className="mt-4">
+                  <div className="mt-4 flex items-center justify-between gap-3">
+                    {tourSlug ? (
                       <a
                         href={`/detailtour/${tourSlug}`}
                         className="text-orange-600 hover:underline text-sm font-medium"
                       >
                         View tour detail →
                       </a>
-                    </div>
-                  )}
+                    ) : (
+                      <span />
+                    )}
+
+                    <button
+                      disabled={!bookingId || isRefunding || loading}
+                      onClick={() => onRefund(bookingId)}
+                      className="px-4 py-2 rounded-xl border text-sm font-medium disabled:opacity-50 hover:bg-gray-50"
+                    >
+                      {isRefunding ? "Refunding..." : "Refund"}
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -220,7 +311,7 @@ export default function BookingHistoryTours() {
         )}
       </div>
 
-      {/* ✅ Pagination */}
+      {/* Pagination */}
       {data.totalPages > 1 && (
         <div className="mt-8 flex items-center justify-center gap-3">
           <button

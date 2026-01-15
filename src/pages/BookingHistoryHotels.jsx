@@ -3,6 +3,43 @@ import { NavLink } from "react-router-dom";
 import { fetchHotelBookingHistory } from "@/apis/bookingHistory";
 import { buildTourSlug } from "@/utils/slug";
 
+// ✅ popup: nếu popup.js export default
+import { popup } from "@/utils/popup";
+// nếu popup.js export named thì dùng:
+// import { popup } from "@/utils/popup";
+
+const BASE_URL = "http://localhost:8080";
+
+const getToken = () =>
+  localStorage.getItem("jwt") ||
+  localStorage.getItem("token") ||
+  localStorage.getItem("accessToken") ||
+  "";
+
+async function fetchJSON(url, options = {}) {
+  const res = await fetch(url, options);
+  const text = await res.text();
+
+  if (!res.ok) {
+    throw new Error(text || `HTTP ${res.status}`);
+  }
+  return text ? JSON.parse(text) : null;
+}
+
+// ✅ Refund HOTEL theo bookingId
+async function refundByBooking(bookingType, bookingId) {
+  const token = getToken();
+  if (!token) throw new Error("Bạn chưa đăng nhập (thiếu JWT token).");
+
+  return fetchJSON(`${BASE_URL}/payment/refund/${bookingType}/${bookingId}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    },
+  });
+}
+
 const fmtDate = (d) => {
   if (!d) return "-";
   const s = String(d);
@@ -18,9 +55,11 @@ export default function BookingHistoryHotels() {
   const [page, setPage] = useState(0);
   const [size] = useState(8);
 
-  // ✅ lọc ngày check-in/check-out (backend đang filter theo repo findMyHistoryFullInfo)
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
+
+  // ✅ trạng thái refund theo bookingId
+  const [refundingId, setRefundingId] = useState(null);
 
   const [data, setData] = useState({
     content: [],
@@ -30,6 +69,21 @@ export default function BookingHistoryHotels() {
   });
 
   const rows = data.content || [];
+
+  const notifySuccess = (msg) => {
+    if (popup && typeof popup.success === "function") popup.success(msg);
+    else alert(msg);
+  };
+
+  const notifyError = (msg) => {
+    if (popup && typeof popup.error === "function") popup.error(msg);
+    else alert(msg);
+  };
+
+  const confirmRefund = async (msg) => {
+    if (popup && typeof popup.confirm === "function") return await popup.confirm(msg);
+    return window.confirm(msg);
+  };
 
   const load = async (overridePage) => {
     const p = typeof overridePage === "number" ? overridePage : page;
@@ -45,6 +99,7 @@ export default function BookingHistoryHotels() {
     } catch (e) {
       console.error(e);
       setData({ content: [], totalPages: 0, totalElements: 0, number: 0 });
+      notifyError(e?.message || "Không tải được lịch sử khách sạn.");
     } finally {
       setLoading(false);
     }
@@ -67,8 +122,36 @@ export default function BookingHistoryHotels() {
     setTimeout(() => load(0), 0);
   };
 
+  // ✅ click refund HOTEL
+  const onRefund = async (bookingId) => {
+    if (!bookingId) return;
+
+    const ok = await confirmRefund(
+      `Bạn có chắc muốn refund tiền cho booking #${bookingId} không?`
+    );
+    if (!ok) return;
+
+    setRefundingId(bookingId);
+    try {
+      const res = await refundByBooking("HOTEL", bookingId);
+      notifySuccess(res?.message || "Refund khách sạn thành công!");
+      load(); // refresh list để status cập nhật => nút refund sẽ biến mất
+    } catch (e) {
+      console.error(e);
+      notifyError(e?.message || "Refund thất bại!");
+    } finally {
+      setRefundingId(null);
+    }
+  };
+
   const canPrev = page > 0;
   const canNext = page + 1 < (data.totalPages || 0);
+
+  // ✅ helper: status nào thì ẩn Refund
+  const isRefundDone = (status) => {
+    const s = String(status || "").toLowerCase();
+    return s === "refunded" || s === "cancelled" || s === "canceled";
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">
@@ -99,7 +182,7 @@ export default function BookingHistoryHotels() {
         </div>
       </div>
 
-      {/* ✅ Filters */}
+      {/* Filters */}
       <div className="mt-5 bg-white border rounded-2xl p-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div className="flex flex-col md:flex-row gap-3">
           <div>
@@ -128,10 +211,7 @@ export default function BookingHistoryHotels() {
             Apply
           </button>
 
-          <button
-            onClick={onClearFilter}
-            className="border rounded-xl px-4 py-2"
-          >
+          <button onClick={onClearFilter} className="border rounded-xl px-4 py-2">
             Clear
           </button>
         </div>
@@ -141,7 +221,7 @@ export default function BookingHistoryHotels() {
         </div>
       </div>
 
-      {/* ✅ Cards (ĐÃ BỎ BOOKING ID) */}
+      {/* Cards */}
       <div className="mt-6">
         {loading ? (
           <div className="p-6 text-gray-500">Loading...</div>
@@ -152,8 +232,10 @@ export default function BookingHistoryHotels() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {rows.map((r, idx) => {
-              const hotel = r?.hotel; // object
-              const room = r?.room;   // object
+              const hotel = r?.hotel;
+              const room = r?.room;
+
+              const bookingId = r?.bookingId ?? null;
 
               const hotelName = hotel?.name || "Hotel";
               const hotelId = hotel?.hotelId ?? hotel?.id ?? null;
@@ -167,9 +249,12 @@ export default function BookingHistoryHotels() {
               const hotelSlug =
                 hotelId ? buildTourSlug(Number(hotelId), String(hotelName)) : null;
 
+              const isRefunding = refundingId === bookingId;
+              const hideRefund = isRefundDone(status);
+
               return (
                 <div
-                  key={r?.bookingId ?? `${hotelId || "hotel"}-${idx}`}
+                  key={bookingId ?? `${hotelId || "hotel"}-${idx}`}
                   className="bg-white border rounded-2xl p-5 shadow-sm"
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -201,16 +286,29 @@ export default function BookingHistoryHotels() {
                     </div>
                   </div>
 
-                  {hotelSlug && (
-                    <div className="mt-4">
+                  <div className="mt-4 flex items-center justify-between gap-3">
+                    {hotelSlug ? (
                       <a
                         href={`/detailhotel/${hotelSlug}`}
                         className="text-orange-600 hover:underline text-sm font-medium"
                       >
                         View hotel detail →
                       </a>
-                    </div>
-                  )}
+                    ) : (
+                      <span />
+                    )}
+
+                    {/* ✅ Refund button: refund xong thì mất nút */}
+                    {!hideRefund && (
+                      <button
+                        disabled={!bookingId || isRefunding || loading}
+                        onClick={() => onRefund(bookingId)}
+                        className="px-4 py-2 rounded-xl border text-sm font-medium disabled:opacity-50 hover:bg-gray-50"
+                      >
+                        {isRefunding ? "Refunding..." : "Refund"}
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -218,7 +316,7 @@ export default function BookingHistoryHotels() {
         )}
       </div>
 
-      {/* ✅ Pagination */}
+      {/* Pagination */}
       {data.totalPages > 1 && (
         <div className="mt-8 flex items-center justify-center gap-3">
           <button

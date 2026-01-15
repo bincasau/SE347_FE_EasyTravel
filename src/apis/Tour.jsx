@@ -54,12 +54,29 @@ export async function searchByDuration(days) {
  * API: /tours/search/findByStartDateGreaterThanEqual
  * ========================================================
  */
-export async function searchByStartDate(date) {
-  const url = `${API_BASE}/tours/search/findByStartDateGreaterThanEqual?startDate=${date}`;
+/**
+ * ========================================================
+ * 📅 4. Tìm tour có startDate >= ngày chọn (có phân trang + sort)
+ * API:
+ * /tours/search/findByStartDateGreaterThanEqual{?startDate,page,size,sort*}
+ * ========================================================
+ */
+export async function searchByStartDate(date, page = 0, size = 8, sort = "startDate,asc") {
+  const params = new URLSearchParams();
+  params.set("startDate", date);
+  params.set("page", String(page));
+  params.set("size", String(size));
+
+  // sort có thể là: "startDate,asc" | "priceAdult,desc" | "percentDiscount,desc" ...
+  if (sort) params.set("sort", sort);
+
+  const url = `${API_BASE}/tours/search/findByStartDateGreaterThanEqual?${params.toString()}`;
 
   const res = await fetch(url);
+  if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
 
 /**
  * ========================================================
@@ -223,3 +240,4 @@ export async function getMonthlyTourStats(month, year) {
   }
   return res.json();
 }
+

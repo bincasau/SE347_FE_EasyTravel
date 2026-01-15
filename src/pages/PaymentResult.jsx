@@ -137,7 +137,7 @@ export default function PaymentResult() {
             {isSuccess ? (
               <button
                 type="button"
-                onClick={() => navigate("/booking-history")}
+                onClick={() => navigate("/booking-history/tours")}
                 className="px-5 py-3 rounded-full bg-orange-500 hover:bg-orange-600 text-white font-semibold"
               >
                 Xem booking của tôi

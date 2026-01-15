@@ -18,21 +18,18 @@ import travel2 from "../../../assets/images/Tour/travel2.jpg";
 import travel3 from "../../../assets/images/Tour/travel3.jpg";
 import travel4 from "../../../assets/images/Tour/travel4.jpg";
 
-// ✅ dùng chung với Header (project bạn đã có)
 import { getUserFromToken } from "@/utils/auth";
-
-// ✅ slug helpers
 import { extractIdFromSlug, buildTourSlug } from "@/utils/slug";
 
-// ✅ popup sweetalert2 helper
+// ✅ popup helper (đúng theo export của bạn)
 import { popup } from "@/utils/popup";
+// nếu popup.js export default thì dùng:
+// import popup from "@/utils/popup";
 
 export default function TourDetail() {
-  // ✅ route bây giờ là /detailtour/:slugId
   const { slugId } = useParams();
   const navigate = useNavigate();
 
-  // ✅ tách id từ slug-id
   const id = useMemo(() => extractIdFromSlug(slugId), [slugId]);
 
   const [tour, setTour] = useState(null);
@@ -48,7 +45,6 @@ export default function TourDetail() {
   useEffect(() => {
     const fetchTour = async () => {
       try {
-        // ✅ nếu id null => URL sai
         if (!id) {
           await popup.error("URL không hợp lệ (thiếu id).");
           setTour(null);
@@ -61,7 +57,6 @@ export default function TourDetail() {
         const data = await res.json();
         setTour(data);
 
-        // ✅ nếu người dùng gõ sai slug -> redirect về slug đúng
         const correctSlugId = buildTourSlug(id, data?.title);
         if (slugId !== correctSlugId) {
           navigate(`/detailtour/${correctSlugId}`, { replace: true });
@@ -113,7 +108,12 @@ export default function TourDetail() {
     startDate,
     endDate,
     destination,
+    availableSeats, // ✅ lấy trực tiếp từ tour
   } = tour;
+
+  // ✅ check seats
+  const seatsLeft = Number(availableSeats ?? 0);
+  const soldOut = seatsLeft <= 0;
 
   const formatCurrency = (val) =>
     Number(val ?? 0).toLocaleString("vi-VN", {
@@ -178,9 +178,7 @@ export default function TourDetail() {
 
         days.push(
           <div key={format(day, "yyyy-MM-dd")} className="relative">
-            {isInRange && (
-              <div className="absolute inset-0 bg-orange-200 z-0"></div>
-            )}
+            {isInRange && <div className="absolute inset-0 bg-orange-200 z-0" />}
             <div className={cellClass}>{formatted}</div>
           </div>
         );
@@ -206,7 +204,6 @@ export default function TourDetail() {
   const previewImages =
     images.length >= 4 ? images.slice(1, 4) : fallbackImages.slice(1, 4);
 
-  // ✅ helper: check login + role
   const getToken = () =>
     localStorage.getItem("jwt") ||
     localStorage.getItem("token") ||
@@ -214,9 +211,14 @@ export default function TourDetail() {
     "";
 
   const handleBuyNow = async () => {
+    // ✅ chặn luôn ở logic (kể cả bật nút bằng devtools)
+    if (soldOut) {
+      await popup.error("Tour đã hết chỗ. Vui lòng chọn tour khác.");
+      return;
+    }
+
     const token = getToken();
 
-    // ✅ chưa login -> popup confirm mở login
     if (!token) {
       const ok = await popup.confirm(
         "Bạn cần đăng nhập để đặt tour. Mở trang đăng nhập ngay?",
@@ -234,7 +236,6 @@ export default function TourDetail() {
       return;
     }
 
-    // ✅ IMPORTANT: dùng id thật (đã extract), không dùng slugId
     navigate(`/booking/${buildTourSlug(id, title)}`);
   };
 
@@ -340,14 +341,28 @@ export default function TourDetail() {
               {renderCells()}
             </div>
 
+            {/* ✅ Seats badge */}
+            <div className="mt-3 w-[280px] sm:w-[300px] text-sm">
+              {soldOut ? (
+                <span className="text-red-500 font-medium">Hết chỗ</span>
+              ) : (
+                <span className="text-green-600">
+                  Còn <span className="font-semibold">{seatsLeft}</span> chỗ
+                </span>
+              )}
+            </div>
+
             <button
               onClick={handleBuyNow}
-              className="bg-orange-500 hover:bg-orange-600 text-white
-                         w-[280px] sm:w-[300px]
-                         rounded-full px-6 py-3 shadow-md
-                         transition-all mt-4"
+              disabled={soldOut}
+              className={[
+                "w-[280px] sm:w-[300px] rounded-full px-6 py-3 shadow-md transition-all mt-3",
+                soldOut
+                  ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                  : "bg-orange-500 hover:bg-orange-600 text-white",
+              ].join(" ")}
             >
-              Book Now
+              {soldOut ? "Sold out" : "Book Now"}
             </button>
           </div>
         </div>

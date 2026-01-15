@@ -11,8 +11,7 @@ import {
   searchByTitle,
   searchByLocation,
   searchByDuration,
-  searchByStartDate,
-  getTours,
+  searchByStartDate, // ✅ đã sửa để nhận (date,page,size,sort)
   getDepartureLocations,
 } from "../apis/Tour";
 
@@ -49,6 +48,53 @@ export default function TourPage() {
   const [isLoading, setIsLoading] = useState(false);
   const pageSize = 8;
 
+  // ===== helpers =====
+  const toYMD = (d) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+
+  const getDefaultStartDatePlus2 = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 2);
+    return toYMD(d);
+  };
+
+  const mapSort = () => {
+    switch (sortOrder) {
+      case "recent":
+        // ✅ gợi ý: sắp theo ngày đi sớm nhất
+        return "startDate,asc";
+      case "discount":
+        return "percentDiscount,desc";
+      case "asc":
+        return "priceAdult,asc";
+      case "desc":
+        return "priceAdult,desc";
+      default:
+        return "startDate,asc";
+    }
+  };
+
+  const closeDesktopPop = () => {
+    setShowFilter(false);
+    setShowSort(false);
+    setShowDatePicker(false);
+  };
+
+  const closeMobilePanel = () => setMobilePanel(null);
+
+  // lock scroll on mobile panel
+  useEffect(() => {
+    document.body.style.overflow = mobilePanel ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobilePanel]);
+
+  // load locations
   useEffect(() => {
     const loadLocations = async () => {
       try {
@@ -73,6 +119,7 @@ export default function TourPage() {
     loadLocations();
   }, []);
 
+  // debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
@@ -81,44 +128,15 @@ export default function TourPage() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  const mapSort = () => {
-    switch (sortOrder) {
-      case "recent":
-        return "recent";
-      case "discount":
-        return "percentDiscount,desc";
-      case "asc":
-        return "priceAdult";
-      case "desc":
-        return "priceAdult,desc";
-      default:
-        return "recent";
-    }
-  };
-
-  const closeDesktopPop = () => {
-    setShowFilter(false);
-    setShowSort(false);
-    setShowDatePicker(false);
-  };
-
-  const closeMobilePanel = () => setMobilePanel(null);
-
-  // lock scroll on mobile panel
-  useEffect(() => {
-    document.body.style.overflow = mobilePanel ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [mobilePanel]);
-
   const fetchTours = useCallback(async () => {
     setIsLoading(true);
 
     try {
       let data;
       let isSearchEndpoint = false;
-      let sortDateMode = false;
+
+      // ✅ nếu user không chọn date => mặc định hôm nay + 2 ngày
+      const startDateQuery = selectedDate || getDefaultStartDatePlus2();
 
       if (debouncedSearchTerm.trim()) {
         data = await searchByTitle(debouncedSearchTerm);
@@ -129,12 +147,14 @@ export default function TourPage() {
       } else if (selectedDuration) {
         data = await searchByDuration(selectedDuration);
         isSearchEndpoint = true;
-      } else if (selectedDate) {
-        data = await searchByStartDate(selectedDate);
-        isSearchEndpoint = true;
-        sortDateMode = true;
       } else {
-        data = await getTours(currentPage - 1, pageSize, mapSort());
+        // ✅ DEFAULT: dùng endpoint startDate >= (hôm nay+2 hoặc selectedDate)
+        data = await searchByStartDate(
+          startDateQuery,
+          currentPage - 1,
+          pageSize,
+          mapSort()
+        );
         isSearchEndpoint = false;
       }
 
@@ -162,24 +182,24 @@ export default function TourPage() {
           )
       );
 
-      if (sortDateMode) {
-        result.sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
-      }
-
       if (isSearchEndpoint) {
+        // ✅ search endpoints thường trả mảng -> FE paginate
         const total = result.length;
-        const pages = Math.ceil(total / pageSize);
+        const pages = Math.ceil(total / pageSize) || 1;
         setTotalPages(pages);
 
         const startIndex = (currentPage - 1) * pageSize;
         result = result.slice(startIndex, startIndex + pageSize);
       } else {
+        // ✅ backend paginate
         setTotalPages(data.page?.totalPages || 1);
       }
 
       setTours(result);
     } catch (error) {
       console.error("Fetch tours error:", error);
+      setTours([]);
+      setTotalPages(1);
     } finally {
       setIsLoading(false);
     }
@@ -241,7 +261,9 @@ export default function TourPage() {
   };
 
   const filterCount =
-    (selectedLocation ? 1 : 0) + (selectedDuration ? 1 : 0) + (selectedDate ? 1 : 0);
+    (selectedLocation ? 1 : 0) +
+    (selectedDuration ? 1 : 0) +
+    (selectedDate ? 1 : 0);
 
   return (
     <div className="bg-gray-50 py-10 sm:py-12 flex flex-col items-center min-h-screen">
@@ -275,7 +297,7 @@ export default function TourPage() {
             <FaSearch size={16} className="text-gray-600" />
           </div>
 
-          {/* ✅ MOBILE: 3 nút full width */}
+          {/* ✅ MOBILE: 3 buttons */}
           <div className="grid grid-cols-3 gap-2 sm:hidden">
             <button
               onClick={() => setMobilePanel("date")}
@@ -446,7 +468,7 @@ export default function TourPage() {
                 <div className="absolute right-0 mt-2 w-56 bg-white border rounded-2xl shadow-lg p-3 z-50">
                   <p className="font-semibold mb-2">Sort by</p>
                   {[
-                    ["recent", "Recently Added"],
+                    ["recent", "Nearest Start Date"],
                     ["discount", "Biggest Discount"],
                     ["asc", "Low → High"],
                     ["desc", "High → Low"],
@@ -625,7 +647,7 @@ export default function TourPage() {
               {mobilePanel === "sort" && (
                 <div className="space-y-2">
                   {[
-                    ["recent", "Recently Added"],
+                    ["recent", "Nearest Start Date"],
                     ["discount", "Biggest Discount"],
                     ["asc", "Low → High"],
                     ["desc", "High → Low"],
