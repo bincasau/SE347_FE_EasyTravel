@@ -4,7 +4,7 @@ import jsPDF from "jspdf";
 
 import RoomTypePie from "@/components/pages/HotelManager/RevenueReports/RoomTypePie.jsx";
 import ComparisonText from "@/components/pages/HotelManager/RevenueReports/ComparisonText.jsx";
-import { popup } from "@/utils/popup"; // ✅ ADD
+import { popup } from "@/utils/popup";
 
 const API_BASE = "http://localhost:8080";
 
@@ -31,6 +31,7 @@ function normalizeStats(raw) {
 export default function RevenueReport() {
   /** ===== State ===== */
   const [month, setMonth] = useState(12);
+  // ✅ cho phép year tạm thời là "" khi user đang xóa để nhập lại
   const [year, setYear] = useState(2025);
 
   const [stats, setStats] = useState(null);
@@ -42,7 +43,7 @@ export default function RevenueReport() {
   // ✅ vùng để chụp PDF
   const exportRef = useRef(null);
 
-  // ✅ bật layout riêng cho PDF (title giữa + 1 cột)
+  // ✅ bật layout riêng cho PDF
   const [pdfMode, setPdfMode] = useState(false);
 
   const token =
@@ -70,6 +71,29 @@ export default function RevenueReport() {
     }
     return { pm, py };
   }, [safeMonth, safeYear]);
+
+  /** ✅ đổi tháng ổn định: chỉ +/- year đúng 1 khi qua ranh giới 1↔12 */
+  const goPrevMonth = useCallback(() => {
+    setMonth((m) => {
+      const mm = clampInt(m, 1, 12, 1);
+      if (mm === 1) {
+        setYear((y) => clampInt(y, 1970, 2100, 2025) - 1);
+        return 12;
+      }
+      return mm - 1;
+    });
+  }, []);
+
+  const goNextMonth = useCallback(() => {
+    setMonth((m) => {
+      const mm = clampInt(m, 1, 12, 1);
+      if (mm === 12) {
+        setYear((y) => clampInt(y, 1970, 2100, 2025) + 1);
+        return 1;
+      }
+      return mm + 1;
+    });
+  }, []);
 
   /** ✅ fetch stats by month/year */
   const fetchStatsByMonth = useCallback(
@@ -162,7 +186,7 @@ export default function RevenueReport() {
     return Number.isFinite(pct) ? Number(pct.toFixed(1)) : null;
   }, [stats, prevStats]);
 
-  // ✅ Export CSV (đổi alert -> popup + confirm)
+  // ✅ Export CSV
   const exportCSV = async () => {
     if (!token) return popup.error("Bạn chưa đăng nhập!");
     if (loading) return popup.error("Đang tải dữ liệu, thử lại sau nhé!");
@@ -201,7 +225,7 @@ export default function RevenueReport() {
     popup.success("Export CSV thành công!");
   };
 
-  /** ✅ Export PDF: title giữa + pie trên + text dưới (đổi alert -> popup + confirm) */
+  /** ✅ Export PDF */
   const exportPDF = async () => {
     try {
       if (!token) return popup.error("Bạn chưa đăng nhập!");
@@ -215,10 +239,7 @@ export default function RevenueReport() {
       );
       if (!ok) return;
 
-      // bật mode layout cho PDF
       setPdfMode(true);
-
-      // đợi UI render + chart ổn định
       await new Promise((r) => setTimeout(r, 350));
 
       const el = exportRef.current;
@@ -267,19 +288,22 @@ export default function RevenueReport() {
     <div className="min-h-[calc(100vh-64px)] bg-gray-50">
       {/* ✅ VÙNG EXPORT PDF */}
       <div ref={exportRef} className="bg-white">
-        {/* ✅ HEADER cho PDF (giữa trên cùng) */}
+        {/* ✅ HEADER cho PDF */}
         {pdfMode && (
           <div className="px-6 pt-8 pb-4 text-center">
-            <h1 className="text-2xl font-semibold text-gray-900">REVENUE REPORT</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">
+              REVENUE REPORT
+            </h1>
             <div className="text-sm text-gray-600 mt-1">{monthLabel}</div>
             <div className="text-xs text-gray-500 mt-1">
-              Total Revenue: {revenueText} · Bookings: {bookings} · Avg/Booking: {avgRevenueText}
+              Total Revenue: {revenueText} · Bookings: {bookings} · Avg/Booking:{" "}
+              {avgRevenueText}
             </div>
             <div className="mt-4 h-px bg-gray-200" />
           </div>
         )}
 
-        {/* ✅ UI header bình thường (ẩn khi pdfMode) */}
+        {/* ✅ UI header bình thường */}
         {!pdfMode && (
           <div className="bg-white border-b">
             <div className="max-w-6xl mx-auto px-6 py-6">
@@ -293,16 +317,7 @@ export default function RevenueReport() {
               <div className="mt-6 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
                 <div className="flex items-center gap-4">
                   <button
-                    onClick={() => {
-                      setMonth((m) => {
-                        const mm = clampInt(m, 1, 12, 1);
-                        if (mm === 1) {
-                          setYear((y) => clampInt(y, 1970, 2100, 2025) - 1);
-                          return 12;
-                        }
-                        return mm - 1;
-                      });
-                    }}
+                    onClick={goPrevMonth}
                     className="px-3 py-1 border rounded"
                   >
                     ← Prev
@@ -311,16 +326,7 @@ export default function RevenueReport() {
                   <span className="font-medium">{monthLabel}</span>
 
                   <button
-                    onClick={() => {
-                      setMonth((m) => {
-                        const mm = clampInt(m, 1, 12, 1);
-                        if (mm === 12) {
-                          setYear((y) => clampInt(y, 1970, 2100, 2025) + 1);
-                          return 1;
-                        }
-                        return mm + 1;
-                      });
-                    }}
+                    onClick={goNextMonth}
                     className="px-3 py-1 border rounded"
                   >
                     Next →
@@ -346,8 +352,27 @@ export default function RevenueReport() {
                   <input
                     className="border rounded px-2 py-1 w-28"
                     type="number"
-                    value={safeYear}
-                    onChange={(e) => setYear(Number(e.target.value))}
+                    inputMode="numeric"
+                    min={1970}
+                    max={2100}
+                    value={year}
+                    onChange={(e) => {
+                      const v = e.target.value;
+
+                      // cho phép xóa để nhập lại, tránh giật
+                      if (v === "") {
+                        setYear("");
+                        return;
+                      }
+
+                      const n = Number(v);
+                      if (!Number.isFinite(n)) return;
+
+                      setYear(n);
+                    }}
+                    onBlur={() => {
+                      setYear((y) => clampInt(y, 1970, 2100, 2025));
+                    }}
                   />
 
                   <button
@@ -371,12 +396,14 @@ export default function RevenueReport() {
           </div>
         )}
 
-        {/* ✅ BODY: pdfMode => 1 cột (pie trên, text dưới). Normal => 2 cột */}
+        {/* ✅ BODY */}
         <div
           className={[
             "max-w-6xl mx-auto px-6",
             pdfMode ? "py-6" : "py-10",
-            pdfMode ? "grid grid-cols-1 gap-6" : "grid grid-cols-1 md:grid-cols-2 gap-8",
+            pdfMode
+              ? "grid grid-cols-1 gap-6"
+              : "grid grid-cols-1 md:grid-cols-2 gap-8",
           ].join(" ")}
         >
           {loading ? (
@@ -394,7 +421,9 @@ export default function RevenueReport() {
           ) : error ? (
             <div className="bg-white border rounded-2xl p-6 shadow-sm">
               <div className="text-lg font-semibold text-gray-900">Lỗi</div>
-              <div className="text-sm text-gray-600 mt-2 break-words">{error}</div>
+              <div className="text-sm text-gray-600 mt-2 break-words">
+                {error}
+              </div>
             </div>
           ) : (
             <ComparisonText
@@ -406,7 +435,7 @@ export default function RevenueReport() {
           )}
         </div>
 
-        {/* ✅ FOOTER nhỏ cho PDF */}
+        {/* ✅ FOOTER PDF */}
         {pdfMode && (
           <div className="px-6 pb-6 text-center text-xs text-gray-400">
             Generated by EasyTravel · {new Date().toLocaleString("vi-VN")}

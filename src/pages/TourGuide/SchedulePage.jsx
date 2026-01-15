@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import {
   addMonths,
   subMonths,
-  format,
   startOfMonth,
   endOfMonth,
   eachDayOfInterval,
@@ -102,6 +101,7 @@ export default function SchedulePage() {
       end: endOfMonth(currentMonth),
     });
   }, [currentMonth]);
+  // ^ daysInMonth bạn chưa dùng, nhưng giữ lại cũng không sao
 
   // ✅ map tours -> eventsList (lọc theo tháng đang xem)
   const eventsList = useMemo(() => {
@@ -110,22 +110,22 @@ export default function SchedulePage() {
 
     const safeParse = (d) => {
       try {
-        // backend đang trả "2025-12-10" => parseISO ok
         return d ? parseISO(d) : null;
       } catch {
         return null;
       }
     };
 
-    // tour -> event, gắn vào đúng "ngày startDate"
     const toursInMonth = rawTours
       .map((t) => {
         const start = safeParse(t.startDate);
-        const end = safeParse(t.endDate);
         if (!start) return null;
 
         // lọc: startDate thuộc tháng đang xem
-        const inMonth = isWithinInterval(start, { start: monthStart, end: monthEnd });
+        const inMonth = isWithinInterval(start, {
+          start: monthStart,
+          end: monthEnd,
+        });
         if (!inMonth) return null;
 
         return {
@@ -134,7 +134,7 @@ export default function SchedulePage() {
           img: toS3TourImage(t.mainImage),
           from: t.startDate,
           to: t.endDate,
-          time: t.time || "—", // nếu backend có field time thì xài, không thì —
+          time: t.time || "—",
           task: t.description || "",
           dayObj: start,
         };
@@ -148,16 +148,52 @@ export default function SchedulePage() {
   }, [rawTours, currentMonth]);
 
   /* PAGINATION */
-  const totalPages = Math.ceil(eventsList.length / pageSize);
-  const startIndex = (currentPage - 1) * pageSize;
-  const visibleEvents = eventsList.slice(startIndex, startIndex + pageSize);
+  const totalPages = useMemo(() => {
+    return Math.max(1, Math.ceil(eventsList.length / pageSize));
+  }, [eventsList.length]);
 
+  // nếu eventsList thay đổi làm currentPage vượt totalPages => kéo về trang cuối hợp lệ
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
+  const visibleEvents = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return eventsList.slice(startIndex, startIndex + pageSize);
+  }, [eventsList, currentPage]);
+
+  // đổi tháng => về page 1
   useEffect(() => {
     setCurrentPage(1);
   }, [currentMonth]);
 
+  // ✅ visible pages (gọn 3-5 nút)
+  const getVisiblePages = useCallback((page, total) => {
+    if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1);
+
+    if (page === 1) return [1, 2, 3];
+    if (page === 2) return [1, 2, 3, 4];
+    if (page === 3) return [1, 2, 3, 4, 5];
+
+    if (page === total) return [total - 2, total - 1, total];
+    if (page === total - 1) return [total - 3, total - 2, total - 1, total];
+    if (page === total - 2)
+      return [total - 4, total - 3, total - 2, total - 1, total];
+
+    const start = Math.max(1, page - 2);
+    const end = Math.min(total, page + 2);
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+  }, []);
+
+  const visiblePages = useMemo(() => {
+    return getVisiblePages(currentPage, totalPages);
+  }, [currentPage, totalPages, getVisiblePages]);
+
   /* MONTH NAV LOGIC */
   const canGoPrev = isAfter(startOfMonth(currentMonth), startOfMonth(today));
+
+  // chỉ show pagination khi thực sự > 1 trang
+  const shouldShowPagination = !loading && !errMsg && eventsList.length > pageSize;
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-10">
@@ -176,12 +212,13 @@ export default function SchedulePage() {
         <EventList events={visibleEvents} />
       )}
 
-      {!loading && !errMsg && totalPages > 1 && (
+      {shouldShowPagination && (
         <div className="mt-10 flex justify-center">
           <Pagination
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={setCurrentPage}
+            visiblePages={visiblePages}
           />
         </div>
       )}

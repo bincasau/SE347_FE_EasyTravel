@@ -1,20 +1,82 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useLang } from "@/contexts/LangContext";
 import bgImage from "@/assets/images/home/herosection_bg.png";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faUsers,
   faCalendarDays,
   faMapMarkerAlt,
   faMagnifyingGlass,
-  faGlobe,
-  faUserGroup,
-  faEnvelope,
 } from "@fortawesome/free-solid-svg-icons";
 
+import { getDepartureLocations } from "@/apis/Tour"; // ✅ cần export hàm này trong Tour API
+
 const HeroSection = () => {
-  const [tourType, setTourType] = useState("public");
   const { t } = useLang();
+  const navigate = useNavigate();
+
+  // ✅ form state
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [departure, setDeparture] = useState("");
+  const [destination, setDestination] = useState("");
+
+  // ✅ fetch departure locations
+  const [departureOptions, setDepartureOptions] = useState([]);
+  const [loadingDeparture, setLoadingDeparture] = useState(false);
+
+  // ✅ minStartDate = today + 2
+  const minStartDate = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 2);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }, []);
+
+  // ✅ fetch departure list
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      try {
+        setLoadingDeparture(true);
+        const list = await getDepartureLocations();
+        if (!mounted) return;
+
+        const safeList = Array.isArray(list) ? list : [];
+        setDepartureOptions(safeList);
+      } catch (e) {
+        console.error("getDepartureLocations failed", e);
+        if (!mounted) return;
+        setDepartureOptions(["Hà Nội", "Hồ Chí Minh", "Đà Nẵng"]); // fallback
+      } finally {
+        if (mounted) setLoadingDeparture(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // ✅ nếu endDate < startDate => clear
+  useEffect(() => {
+    if (!startDate || !endDate) return;
+    if (endDate < startDate) setEndDate("");
+  }, [startDate, endDate]);
+
+  const handleSearch = () => {
+    navigate("/tours", {
+      state: {
+        startDate: startDate || "", // rỗng thì TourPage tự default today+2
+        endDate: endDate || "",
+        departureLocation: departure || "",
+        destination: destination || "",
+      },
+    });
+  };
 
   return (
     <section
@@ -37,46 +99,8 @@ const HeroSection = () => {
           backdrop-blur-2xl border border-white/20 shadow-[0_8px_32px_0_rgba(0,0,0,0.25)]"
         >
           <div className="rounded-3xl bg-white/90 backdrop-blur-xl p-4 sm:p-6 md:p-8 border border-white/20">
-            <div className="flex flex-wrap justify-center sm:justify-start gap-3 sm:gap-4 mb-5 md:mb-6">
-              <button
-                className={`px-4 sm:px-5 py-2 rounded-xl flex items-center gap-2 font-medium transition ${
-                  tourType === "public"
-                    ? "bg-orange-500 text-white shadow-md"
-                    : "text-gray-700 bg-white/60 border border-gray-200 hover:bg-white/80"
-                }`}
-                onClick={() => setTourType("public")}
-              >
-                <FontAwesomeIcon icon={faGlobe} />
-                {t("home.hero.publicTour")}
-              </button>
-
-              <button
-                className={`px-4 sm:px-5 py-2 rounded-xl flex items-center gap-2 font-medium transition ${
-                  tourType === "private"
-                    ? "bg-orange-500 text-white shadow-md"
-                    : "text-gray-700 bg-white/60 border border-gray-200 hover:bg-white/80"
-                }`}
-                onClick={() => setTourType("private")}
-              >
-                <FontAwesomeIcon icon={faUserGroup} />
-                {t("home.hero.privateTour")}
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 items-center">
-              <div className="flex flex-col text-left">
-                <label className="text-sm text-gray-700 mb-1 flex items-center gap-1">
-                  <FontAwesomeIcon icon={faUsers} />
-                  {t("home.hero.people")}
-                </label>
-                <select className="p-3 border rounded-xl text-gray-700 h-[48px] bg-white/80">
-                  <option>{t("home.hero.chooseNumber")}</option>
-                  {[1, 2, 3, 4, 5, 6].map((n) => (
-                    <option key={n}>{n}</option>
-                  ))}
-                </select>
-              </div>
-
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-center">
+              {/* START DATE */}
               <div className="flex flex-col text-left">
                 <label className="text-sm text-gray-700 mb-1 flex items-center gap-1">
                   <FontAwesomeIcon icon={faCalendarDays} />
@@ -84,10 +108,17 @@ const HeroSection = () => {
                 </label>
                 <input
                   type="date"
+                  min={minStartDate}
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
                   className="p-3 border rounded-xl text-gray-700 h-[48px] bg-white/80"
                 />
+                <div className="text-[11px] text-gray-500 mt-1">
+                  * Min: {minStartDate}
+                </div>
               </div>
 
+              {/* END DATE */}
               <div className="flex flex-col text-left">
                 <label className="text-sm text-gray-700 mb-1 flex items-center gap-1">
                   <FontAwesomeIcon icon={faCalendarDays} />
@@ -95,46 +126,65 @@ const HeroSection = () => {
                 </label>
                 <input
                   type="date"
+                  min={startDate || minStartDate}
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
                   className="p-3 border rounded-xl text-gray-700 h-[48px] bg-white/80"
                 />
               </div>
 
+              {/* DEPARTURE */}
               <div className="flex flex-col text-left">
                 <label className="text-sm text-gray-700 mb-1 flex items-center gap-1">
                   <FontAwesomeIcon icon={faMapMarkerAlt} />
                   {t("home.hero.departure")}
                 </label>
-                <select className="p-3 border rounded-xl text-gray-700 h-[48px] bg-white/80">
-                  <option>{t("home.hero.selectDeparture")}</option>
-                  <option>Hà Nội</option>
-                  <option>Hồ Chí Minh</option>
-                  <option>Đà Nẵng</option>
+                <select
+                  value={departure}
+                  onChange={(e) => setDeparture(e.target.value)}
+                  className="p-3 border rounded-xl text-gray-700 h-[48px] bg-white/80"
+                  disabled={loadingDeparture}
+                >
+                  <option value="">
+                    {loadingDeparture
+                      ? "Loading..."
+                      : t("home.hero.selectDeparture")}
+                  </option>
+                  {departureOptions.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
                 </select>
               </div>
 
+              {/* DESTINATION + SEARCH */}
               <div className="flex flex-col text-left">
                 <label className="text-sm text-gray-700 mb-1 flex items-center gap-1">
                   <FontAwesomeIcon icon={faMapMarkerAlt} />
                   {t("home.hero.destination")}
                 </label>
+
                 <div className="flex w-full gap-2">
-                  <select className="flex-1 h-[48px] px-3 border border-gray-300 rounded-xl text-gray-700 bg-white/80">
-                    <option>{t("home.hero.selectDestination")}</option>
-                    <option>Phú Quốc</option>
-                    <option>Đà Lạt</option>
-                    <option>Huế</option>
+                  <select
+                    value={destination}
+                    onChange={(e) => setDestination(e.target.value)}
+                    className="flex-1 h-[48px] px-3 border border-gray-300 rounded-xl text-gray-700 bg-white/80"
+                  >
+                    <option value="">{t("home.hero.selectDestination")}</option>
+                    <option value="Phú Quốc">Phú Quốc</option>
+                    <option value="Đà Lạt">Đà Lạt</option>
+                    <option value="Huế">Huế</option>
                   </select>
 
                   <button
-                    className={`h-[48px] w-[48px] flex items-center justify-center text-white rounded-xl transition-all duration-300 
-                      ${
-                        tourType === "public"
-                          ? "bg-orange-500 hover:bg-orange-600"
-                          : "bg-green-600 hover:bg-green-700"
-                      } hover:scale-[1.05] active:scale-[0.95] shadow-md`}
+                    onClick={handleSearch}
+                    className="h-[48px] w-[48px] flex items-center justify-center text-white rounded-xl transition-all duration-300 
+                      bg-orange-500 hover:bg-orange-600 hover:scale-[1.05] active:scale-[0.95] shadow-md"
+                    title="Search tours"
                   >
                     <FontAwesomeIcon
-                      icon={tourType === "public" ? faMagnifyingGlass : faEnvelope}
+                      icon={faMagnifyingGlass}
                       className="text-lg"
                     />
                   </button>

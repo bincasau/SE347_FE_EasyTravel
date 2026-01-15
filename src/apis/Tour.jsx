@@ -241,3 +241,48 @@ export async function getMonthlyTourStats(month, year) {
   return res.json();
 }
 
+/**
+ * ========================================================
+ * ✅ FILTER TOURS (GỘP 1 ENDPOINT)
+ * API:
+ * /tours/search/filterTours{?keyword,startDate,durationDay,departureLocation,status,page,size,sort*}
+ * ========================================================
+ */
+export async function filterTours({
+  keyword = "",
+  startDate = "",
+  durationDay = "", // lưu ý: backend key là durationDay (không phải durationDays)
+  departureLocation = "",
+  status = "Activated", // ✅ bạn yêu cầu status mặc định Activated
+  page = 0,
+  size = 8,
+  sort = "startDate,asc",
+} = {}) {
+  const params = new URLSearchParams();
+
+  // backend nhận đúng key: keyword, startDate, durationDay, departureLocation, status
+  if (keyword && String(keyword).trim()) params.set("keyword", String(keyword).trim());
+  if (startDate) params.set("startDate", startDate);
+
+  // durationDay có thể là "" hoặc số
+  if (durationDay !== "" && durationDay != null) {
+    params.set("durationDay", String(durationDay));
+  }
+
+  if (departureLocation) params.set("departureLocation", departureLocation);
+
+  // ✅ luôn gửi status (Activated) để backend lọc đúng
+  if (status) params.set("status", status);
+
+  // pagination + sort
+  params.set("page", String(page));
+  params.set("size", String(size));
+  if (sort) params.set("sort", sort);
+
+  const url = `${API_BASE}/tours/search/filterTours?${params.toString()}`;
+
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+

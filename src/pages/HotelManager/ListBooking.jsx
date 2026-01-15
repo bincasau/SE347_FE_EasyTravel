@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import Pagination from "@/utils/Pagination"; // ✅ dùng file có sẵn của bạn
 
 export default function ListBooking() {
   const navigate = useNavigate();
@@ -27,7 +28,28 @@ export default function ListBooking() {
       total: 220,
       status: "PENDING",
     },
+    // thêm nhiều item nữa thì pagination sẽ thấy rõ
   ]);
+
+  // ✅ pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 5;
+
+  const totalPages = useMemo(() => {
+    return Math.max(1, Math.ceil(bookings.length / pageSize));
+  }, [bookings.length]);
+
+  // nếu data đổi làm currentPage vượt totalPages thì kéo về trang cuối hợp lệ
+  useMemo(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalPages]);
+
+  const pagedBookings = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    const end = start + pageSize;
+    return bookings.slice(start, end);
+  }, [bookings, currentPage]);
 
   const totalRevenue = useMemo(() => {
     return bookings.reduce((sum, b) => sum + Number(b.total ?? 0), 0);
@@ -115,8 +137,9 @@ export default function ListBooking() {
                 <th className="px-4 py-3 text-right">Status</th>
               </tr>
             </thead>
+
             <tbody>
-              {bookings.map((b) => (
+              {pagedBookings.map((b) => (
                 <tr key={b.booking_id} className="border-b last:border-none">
                   <td className="px-4 py-3 font-medium">{b.booking_id}</td>
                   <td className="px-4 py-3">{b.guest_name}</td>
@@ -149,6 +172,15 @@ export default function ListBooking() {
             </div>
           )}
         </div>
+
+        {/* ✅ Pagination */}
+        {bookings.length > pageSize && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onChange={setCurrentPage}
+          />
+        )}
       </div>
     </div>
   );

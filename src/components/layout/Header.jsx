@@ -57,9 +57,10 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
       return (tb || 0) - (ta || 0);
     });
 
-  const unreadCount = notifications.filter(
-    (n) => !normalizeNoti(n).read
-  ).length;
+  const unreadCount = notifications.filter((n) => !normalizeNoti(n).read).length;
+
+  // ✅ NEW: chưa login => luôn hiện chấm đỏ
+  const showBadge = !user ? true : unreadCount > 0;
 
   const userMenu = [
     { to: "/", key: "home" },
@@ -246,18 +247,17 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
   }, [openMobile]);
 
   const handleLogout = async () => {
-  const ok = await popup.confirm("Bạn có chắc muốn đăng xuất?", "Đăng xuất");
-  if (!ok) return;
+    const ok = await popup.confirm("Bạn có chắc muốn đăng xuất?", "Đăng xuất");
+    if (!ok) return;
 
-  logout();
-  setUser(null);
-  didRedirectRef.current = false;
-  setOpenUserMenu(false);
-  setOpenNoti(false);
-  setOpenMobile(false);
-  navigate("/");
-};
-
+    logout();
+    setUser(null);
+    didRedirectRef.current = false;
+    setOpenUserMenu(false);
+    setOpenNoti(false);
+    setOpenMobile(false);
+    navigate("/");
+  };
 
   const Flag = ({ code }) => (
     <div className="flex items-center gap-2 text-sm">
@@ -404,6 +404,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     const nn = normalizeNoti(n);
 
     if (!user) {
+      // ✅ bạn vẫn có thể set read local, nhưng badge vẫn luôn hiện vì showBadge = true
       setNotifications((prev) =>
         prev.map((x) => (x.id === nn.id ? { ...x, read: true } : x))
       );
@@ -462,7 +463,6 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
           {user.role === "CUSTOMER" ? (
             <div
               className="relative w-full"
-              // ✅ FIX: gắn ref theo context
               ref={mobile ? userMenuMobileRef : userMenuDesktopRef}
             >
               <button
@@ -490,7 +490,6 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
                     mobile ? "w-full" : "absolute right-0 w-44"
                   }`}
                 >
-                  {/* ✅ FIX: dùng onMouseDown để không bị mousedown-outside đóng menu trước */}
                   <button
                     onMouseDown={(e) => {
                       e.preventDefault();
@@ -579,7 +578,6 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
   };
 
   return (
-
     <header className="sticky top-0 z-[9998] bg-white border-b border-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="h-16 flex items-center justify-between gap-3">
@@ -643,9 +641,11 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
                 aria-label="Notifications"
               >
                 <Bell className="w-5 h-5 text-gray-900" />
-                {unreadCount > 0 && (
+
+                {/* ✅ CHANGE HERE: luôn hiện badge khi chưa login */}
+                {showBadge && (
                   <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 text-[11px] rounded-full bg-red-500 text-white grid place-items-center">
-                    {unreadCount > 9 ? "9+" : unreadCount}
+                    {!user ? "!" : unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
               </button>
@@ -664,9 +664,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
 
                   <div className="max-h-[360px] overflow-auto">
                     {loadingNoti ? (
-                      <div className="p-6 text-gray-500 text-sm">
-                        Loading...
-                      </div>
+                      <div className="p-6 text-gray-500 text-sm">Loading...</div>
                     ) : notifications.length === 0 ? (
                       <div className="p-6 text-gray-500 text-sm">
                         No notifications.
@@ -690,9 +688,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
                               />
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between gap-3">
-                                  <div className="font-medium truncate">
-                                    {nn.title}
-                                  </div>
+                                  <div className="font-medium truncate">{nn.title}</div>
                                   <div className="text-xs text-gray-400 shrink-0">
                                     {nn.time}
                                   </div>
@@ -734,14 +730,13 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
         </div>
       </div>
 
-      {/* ✅ MOBILE FULL-SCREEN MENU (white covers all) */}
+      {/* ✅ MOBILE FULL-SCREEN MENU */}
       <div
         className={`fixed inset-0 z-[9999] md:hidden bg-white transition-transform duration-200 ${
           openMobile ? "translate-x-0" : "translate-x-full"
         }`}
         aria-hidden={!openMobile}
       >
-        {/* top bar */}
         <div className="h-16 flex items-center justify-between border-b px-4">
           <div className="flex items-center gap-2">
             <img src={Logo} className="h-8 w-auto" alt="logo" />
@@ -756,14 +751,11 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
           </button>
         </div>
 
-        {/* content scroll */}
         <div className="h-[calc(100vh-64px)] overflow-y-auto px-4 py-4 space-y-6">
-          {/* menu links */}
           <nav>
             <ul className="space-y-3">{renderMenu()}</ul>
           </nav>
 
-          {/* preferences */}
           <div className="space-y-3">
             <div className="text-xs font-semibold text-gray-500">PREFERENCES</div>
 
@@ -812,9 +804,11 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
                 <Bell className="w-5 h-5" />
                 <span className="text-sm">Notifications</span>
               </div>
-              {unreadCount > 0 ? (
+
+              {/* ✅ CHANGE HERE: luôn hiện badge khi chưa login */}
+              {showBadge ? (
                 <span className="min-w-[22px] h-[22px] px-1 text-[12px] rounded-full bg-red-500 text-white grid place-items-center">
-                  {unreadCount > 9 ? "9+" : unreadCount}
+                  {!user ? "!" : unreadCount > 9 ? "9+" : unreadCount}
                 </span>
               ) : (
                 <span className="text-xs text-gray-500">›</span>
@@ -859,9 +853,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
                             />
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between gap-2">
-                                <div className="font-medium truncate">
-                                  {nn.title}
-                                </div>
+                                <div className="font-medium truncate">{nn.title}</div>
                                 <div className="text-[11px] text-gray-400 shrink-0">
                                   {nn.time}
                                 </div>
@@ -889,7 +881,6 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
             )}
           </div>
 
-          {/* account */}
           <div className="space-y-3 pb-6">
             <div className="text-xs font-semibold text-gray-500">ACCOUNT</div>
             <UserArea mobile />
@@ -899,4 +890,3 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     </header>
   );
 }
- 

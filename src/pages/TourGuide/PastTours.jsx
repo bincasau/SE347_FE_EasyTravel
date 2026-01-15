@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
+import Pagination from "@/utils/Pagination";
 
 const API_BASE = "http://localhost:8080";
 
@@ -13,6 +14,10 @@ export default function PastTours() {
   const [tours, setTours] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errMsg, setErrMsg] = useState("");
+
+  // ✅ pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 6; // bạn đổi 4/6/8 tùy ý
 
   // ✅ lấy token
   const getToken = () =>
@@ -48,11 +53,9 @@ export default function PastTours() {
 
   // ✅ map API -> UI
   const normalizeTour = (t) => {
-    // duration text: ưu tiên durationDays nếu có
     const durationText =
       t?.durationDays != null ? `${t.durationDays} days` : "--";
 
-    // date: ưu tiên endDate (tour đã qua), fallback startDate/createdAt
     const dateStr = t?.endDate || t?.startDate || t?.createdAt || "";
 
     return {
@@ -61,7 +64,7 @@ export default function PastTours() {
       date: dateStr,
       duration: durationText,
       image: toS3TourImage(t.mainImage),
-      status: t.status, // Passed...
+      status: t.status,
       destination: t.destination,
       departureLocation: t.departureLocation,
       priceAdult: t.priceAdult,
@@ -80,7 +83,6 @@ export default function PastTours() {
         const res = await fetchWithAuth(`${API_BASE}/tour_guide/history`);
         const data = await res.json();
 
-        // ✅ page response
         const list = Array.isArray(data?.content) ? data.content : [];
         const normalized = list.map(normalizeTour);
 
@@ -109,11 +111,55 @@ export default function PastTours() {
     };
 
     arr.sort((a, b) =>
-      sortOrder === "newest" ? toTime(b.date) - toTime(a.date) : toTime(a.date) - toTime(b.date)
+      sortOrder === "newest"
+        ? toTime(b.date) - toTime(a.date)
+        : toTime(a.date) - toTime(b.date)
     );
 
     return arr;
   }, [tours, sortOrder]);
+
+  // ✅ reset trang khi đổi sort
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [sortOrder]);
+
+  const totalPages = useMemo(() => {
+    return Math.max(1, Math.ceil(sortedTours.length / pageSize));
+  }, [sortedTours.length]);
+
+  // nếu data đổi làm currentPage vượt totalPages => kéo về trang cuối hợp lệ
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
+  const pagedTours = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    const end = start + pageSize;
+    return sortedTours.slice(start, end);
+  }, [sortedTours, currentPage]);
+
+  // ✅ visible pages (gọn 3-5 nút)
+  const getVisiblePages = useCallback((page, total) => {
+    if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1);
+
+    if (page === 1) return [1, 2, 3];
+    if (page === 2) return [1, 2, 3, 4];
+    if (page === 3) return [1, 2, 3, 4, 5];
+
+    if (page === total) return [total - 2, total - 1, total];
+    if (page === total - 1) return [total - 3, total - 2, total - 1, total];
+    if (page === total - 2)
+      return [total - 4, total - 3, total - 2, total - 1, total];
+
+    const start = Math.max(1, page - 2);
+    const end = Math.min(total, page + 2);
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+  }, []);
+
+  const visiblePages = useMemo(() => {
+    return getVisiblePages(currentPage, totalPages);
+  }, [currentPage, totalPages, getVisiblePages]);
 
   const formatDate = (d) => {
     const x = new Date(d);
@@ -149,56 +195,72 @@ export default function PastTours() {
       ) : errMsg ? (
         <div className="text-center text-red-500 py-10">{errMsg}</div>
       ) : sortedTours.length === 0 ? (
-        <div className="text-center text-gray-500 py-10">Không có tour đã đi.</div>
-      ) : (
-        <div className="space-y-6">
-          {sortedTours.map((tour) => (
-            <div
-              key={tour.tourId}
-              className="bg-white shadow rounded-xl p-4 flex items-center gap-6 hover:shadow-lg transition"
-            >
-              <img
-                src={tour.image}
-                alt={tour.title}
-                className="w-40 h-32 rounded-lg object-cover"
-                onError={(e) => {
-                  e.currentTarget.src = FALLBACK_IMAGE;
-                }}
-              />
-
-              <div className="flex-1 min-w-0">
-                <h3 className="text-xl font-semibold line-clamp-1">{tour.title}</h3>
-
-                <p className="text-sm text-gray-500 mt-1">
-                  📅 {formatDate(tour.date)}
-                </p>
-
-                <p className="text-sm text-gray-500">⏳ {tour.duration}</p>
-
-                {(tour.departureLocation || tour.destination) && (
-                  <p className="text-sm text-gray-500">
-                    📍 {tour.departureLocation || "--"} → {tour.destination || "--"}
-                  </p>
-                )}
-
-                {tour.status && (
-                  <p className="text-xs mt-1 inline-block px-2 py-1 rounded-full border bg-gray-50 text-gray-700">
-                    {tour.status}
-                  </p>
-                )}
-              </div>
-
-              {/* 👉 sang detail tour + ẩn book now */}
-              <Link
-                to={`/detailtour/${tour.tourId}`}
-                state={{ hideBookNow: true }}
-                className="px-5 py-2 border border-orange-400 text-orange-500 rounded-full hover:bg-orange-100 whitespace-nowrap"
-              >
-                View Tour
-              </Link>
-            </div>
-          ))}
+        <div className="text-center text-gray-500 py-10">
+          Không có tour đã đi.
         </div>
+      ) : (
+        <>
+          <div className="space-y-6">
+            {pagedTours.map((tour) => (
+              <div
+                key={tour.tourId}
+                className="bg-white shadow rounded-xl p-4 flex items-center gap-6 hover:shadow-lg transition"
+              >
+                <img
+                  src={tour.image}
+                  alt={tour.title}
+                  className="w-40 h-32 rounded-lg object-cover"
+                  onError={(e) => {
+                    e.currentTarget.src = FALLBACK_IMAGE;
+                  }}
+                />
+
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-xl font-semibold line-clamp-1">
+                    {tour.title}
+                  </h3>
+
+                  <p className="text-sm text-gray-500 mt-1">
+                    📅 {formatDate(tour.date)}
+                  </p>
+
+                  <p className="text-sm text-gray-500">⏳ {tour.duration}</p>
+
+                  {(tour.departureLocation || tour.destination) && (
+                    <p className="text-sm text-gray-500">
+                      📍 {tour.departureLocation || "--"} →{" "}
+                      {tour.destination || "--"}
+                    </p>
+                  )}
+
+                  {tour.status && (
+                    <p className="text-xs mt-1 inline-block px-2 py-1 rounded-full border bg-gray-50 text-gray-700">
+                      {tour.status}
+                    </p>
+                  )}
+                </div>
+
+                <Link
+                  to={`/detailtour/${tour.tourId}`}
+                  state={{ hideBookNow: true }}
+                  className="px-5 py-2 border border-orange-400 text-orange-500 rounded-full hover:bg-orange-100 whitespace-nowrap"
+                >
+                  View Tour
+                </Link>
+              </div>
+            ))}
+          </div>
+
+          {/* ✅ Pagination dưới cùng */}
+          {sortedTours.length > pageSize && (
+            <Pagination
+              totalPages={totalPages}
+              currentPage={currentPage}
+              onPageChange={setCurrentPage}
+              visiblePages={visiblePages}
+            />
+          )}
+        </>
       )}
     </div>
   );
