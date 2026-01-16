@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { getHotelById, fetchHotelImages } from "@/apis/hotel";
 import { buildTourSlug } from "@/utils/slug";
 
@@ -17,6 +17,9 @@ export default function HotelDetail({ hotelId }) {
   const [thumbnails, setThumbnails] = useState([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const location = useLocation();
+
+  const from = location.state?.from;
 
   useEffect(() => {
     if (!hotelId) {
@@ -62,15 +65,18 @@ export default function HotelDetail({ hotelId }) {
     fetchData();
   }, [hotelId, slugId, navigate]);
 
-  if (loading) return <div className="py-10 text-center">Đang tải dữ liệu...</div>;
-  if (!hotel) return <div className="py-10 text-center">Không tìm thấy khách sạn</div>;
+  if (loading)
+    return <div className="py-10 text-center">Đang tải dữ liệu...</div>;
+  if (!hotel)
+    return <div className="py-10 text-center">Không tìm thấy khách sạn</div>;
 
   return (
     <div className="py-10">
       <button
-        onClick={() =>
-          from ? navigate(from, { replace: true }) : navigate("/hotels")
-        }
+        onClick={() => {
+          if (from) navigate(from, { replace: true });
+          else navigate("/hotels");
+        }}
         className="mb-6 border border-orange-500 text-orange-500 px-4 py-1.5 rounded-md hover:bg-orange-500 hover:text-white transition"
       >
         Trở về
@@ -104,7 +110,11 @@ export default function HotelDetail({ hotelId }) {
                 alt="thumbnail"
                 onClick={() => setActiveIndex(index)}
                 className={`h-24 w-full object-cover rounded-xl cursor-pointer transition
-                  ${index === activeIndex ? "ring-2 ring-orange-500" : "hover:scale-105"}`}
+                  ${
+                    index === activeIndex
+                      ? "ring-2 ring-orange-500"
+                      : "hover:scale-105"
+                  }`}
               />
             ))}
           </div>

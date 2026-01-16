@@ -2,7 +2,7 @@
 // 📌 FILE: src/apis/TourAPI.js
 // 📌 Chứa toàn bộ API sử dụng cho Tour
 // =====================================
-
+import { adminSendNotificationToUsers } from "@/apis/NotificationAPI";
 const API_BASE = "http://localhost:8080";
 
 /**
@@ -61,7 +61,12 @@ export async function searchByDuration(days) {
  * /tours/search/findByStartDateGreaterThanEqual{?startDate,page,size,sort*}
  * ========================================================
  */
-export async function searchByStartDate(date, page = 0, size = 8, sort = "startDate,asc") {
+export async function searchByStartDate(
+  date,
+  page = 0,
+  size = 8,
+  sort = "startDate,asc"
+) {
   const params = new URLSearchParams();
   params.set("startDate", date);
   params.set("page", String(page));
@@ -76,7 +81,6 @@ export async function searchByStartDate(date, page = 0, size = 8, sort = "startD
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
-
 
 /**
  * ========================================================
@@ -141,7 +145,6 @@ export async function getAllTours() {
   }
 }
 
-
 function getAuthHeaders() {
   const token = localStorage.getItem("jwt");
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -167,16 +170,18 @@ async function fetchJsonAuth(url, options = {}) {
 
 /* GET public */
 export async function getTourFullById(id) {
-  const [tour, itRes, imgRes] = await Promise.all([
+  const [tour, itRes, imgRes, tgRes] = await Promise.all([
     fetchJsonPublic(`${API_BASE}/tours/${id}`),
     fetchJsonPublic(`${API_BASE}/tours/${id}/itineraries`),
     fetchJsonPublic(`${API_BASE}/tours/${id}/images`),
+    fetchJsonPublic(`${API_BASE}/tours/${id}/tourGuides`),
   ]);
 
   return {
     tour,
     itineraries: itRes?._embedded?.itineraries ?? [],
     images: imgRes?._embedded?.images ?? [],
+    tourGuides: tgRes?._embedded?.users ?? [],
   };
 }
 
@@ -209,7 +214,7 @@ export async function deleteTour(tourId) {
 }
 
 export async function getTourParticipants(tourId) {
-  const res = await fetch(`${API_BASE}/tour/${tourId}/participants`, {
+  const res = await fetch(`${API_BASE}/admin/tour/${tourId}/participants`, {
     method: "GET",
     headers: {
       ...getAuthHeaders(),
@@ -220,8 +225,7 @@ export async function getTourParticipants(tourId) {
   if (!res.ok) {
     throw new Error(await res.text());
   }
-
-  return res.json(); 
+  return res.json();
 }
 
 export async function getMonthlyTourStats(month, year) {
@@ -261,7 +265,8 @@ export async function filterTours({
   const params = new URLSearchParams();
 
   // backend nhận đúng key: keyword, startDate, durationDay, departureLocation, status
-  if (keyword && String(keyword).trim()) params.set("keyword", String(keyword).trim());
+  if (keyword && String(keyword).trim())
+    params.set("keyword", String(keyword).trim());
   if (startDate) params.set("startDate", startDate);
 
   // durationDay có thể là "" hoặc số
@@ -286,3 +291,86 @@ export async function filterTours({
   return res.json();
 }
 
+async function readJsonOrText(res) {
+  const ct = res.headers.get("content-type") || "";
+  const txt = await res.text();
+  if (ct.includes("application/json")) {
+    try {
+      return JSON.parse(txt);
+    } catch {
+      return txt;
+    }
+  }
+  return txt;
+}
+
+// lấy tour title từ GET /tours/{id}
+async function getTourTitle(tourId) {
+  try {
+    const res = await fetch(`${API_BASE}/tours/${tourId}`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    });
+    const data = await readJsonOrText(res);
+    if (!res.ok) return "";
+    return data?.title ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export async function adminCancelTourSideEffects(tourId) {
+  const tourTitle = await getTourTitle(tourId);
+
+  const participants = await getTourParticipants(tourId);
+  if (!Array.isArray(participants) || participants.length === 0) return;
+
+  const successBookings = participants.filter((p) => p?.status === "Success");
+
+  const userIds = Array.from(
+    new Set(
+      successBookings
+        .map((p) => p?.user?.userId)
+        .filter((id) => id !== null && id !== undefined)
+    )
+  );
+
+  const bookingIds = Array.from(
+    new Set(
+      successBookings
+        .map((p) => p?.bookingId)
+        .filter((id) => id !== null && id !== undefined)
+    )
+  );
+
+  const msg = tourTitle
+    ? `Tour "${tourTitle}" đã bị hủy. Hệ thống sẽ tự động hoàn tiền cho đơn đặt tour của bạn.`
+    : "Tour bạn đã đăng ký đã bị hủy. Hệ thống sẽ tự động hoàn tiền cho đơn đặt tour của bạn.";
+
+  // 1) notify
+  if (userIds.length > 0) {
+    const notifRes = await adminSendNotificationToUsers(msg, userIds);
+    console.log("notify result:", notifRes);
+  }
+
+  // 2) refund từng booking
+  for (const bookingId of bookingIds) {
+    const res = await fetch(`${API_BASE}/payment/refund/TOUR/${bookingId}`, {
+      method: "POST",
+      headers: { ...getAuthHeaders(), Accept: "application/json" },
+    });
+
+    const data = await readJsonOrText(res);
+
+    if (!res.ok) {
+      console.error("refund failed:", { bookingId, status: res.status, data });
+      throw new Error(
+        typeof data === "string"
+          ? data
+          : data?.message || `Refund failed for bookingId=${bookingId}`
+      );
+    }
+
+    console.log("refund ok:", bookingId, data);
+  }
+}

@@ -1,12 +1,15 @@
 // src/pages/Admin/AdminTourUpsert.jsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { getTourFullById, saveTourUpsert, deleteTour } from "@/apis/Tour";
+import { getTourFullById, saveTourUpsert } from "@/apis/Tour";
 import { getUsers } from "@/apis/User";
 
 import TourCurrentInfoCard from "@/components/pages/admin/Tour/TourCurrentInfoCard";
 import TourItineraryEditor from "@/components/pages/admin/Tour/TourItineraryEditor";
 import ExtraImagesManager from "@/components/pages/admin/Common/ExtraImagesManager";
+import TourParticipantsCard from "@/components/pages/admin/Tour/TourParticipantsCard";
+import AdminTourForm from "@/components/pages/admin/Tour/AdminTourForm";
+import { adminCancelTourSideEffects } from "@/apis/Tour";
 
 const S3_TOUR_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/tour";
@@ -27,8 +30,7 @@ function buildEmptyForm() {
     availableSeats: 0,
     limitSeats: 0,
     mainImage: "",
-    status: "Pending",
-
+    status: "Activated",
     tourGuideId: "",
   };
 }
@@ -39,8 +41,14 @@ function normalizeDate(d) {
   return "";
 }
 
-function mapTourToForm(tour) {
+function mapTourToForm(tour, tourGuides) {
   if (!tour) return buildEmptyForm();
+
+  const firstGuideId =
+    Array.isArray(tourGuides) && tourGuides.length > 0
+      ? tourGuides[0]?.userId ?? tourGuides[0]?.id ?? ""
+      : "";
+
   return {
     title: tour.title ?? "",
     linkVideo: tour.linkVideo ?? "",
@@ -56,9 +64,8 @@ function mapTourToForm(tour) {
     availableSeats: tour.availableSeats ?? 0,
     limitSeats: tour.limitSeats ?? 0,
     mainImage: tour.mainImage ?? "",
-    status: tour.status ?? "Pending",
-
-    tourGuideId: tour.tourGuideId ?? "",
+    status: tour.status ?? "Activated",
+    tourGuideId: firstGuideId || (tour.tourGuideId ?? ""),
   };
 }
 
@@ -95,7 +102,6 @@ function validateForm(next) {
     e.departureLocation = "Vui lòng nhập nơi xuất phát.";
   if (!next.destination?.trim()) e.destination = "Vui lòng nhập điểm đến.";
 
-  // guide required
   if (
     next.tourGuideId === "" ||
     next.tourGuideId === null ||
@@ -132,16 +138,11 @@ function validateForm(next) {
     e.endDate = "Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.";
   }
 
-  const allowedStatus = ["Pending", "Passed", "Activated"];
+  const allowedStatus = ["Canceled", "Passed", "Activated"];
   if (!allowedStatus.includes(next.status))
     e.status = "Trạng thái không hợp lệ.";
 
   return e;
-}
-
-function FieldError({ msg, show }) {
-  if (!show || !msg) return null;
-  return <div className="mt-1 text-sm text-red-600">{msg}</div>;
 }
 
 export default function AdminTourUpsert() {
@@ -151,7 +152,7 @@ export default function AdminTourUpsert() {
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [canceling, setCanceling] = useState(false);
   const [err, setErr] = useState("");
 
   const [form, setForm] = useState(buildEmptyForm());
@@ -164,12 +165,11 @@ export default function AdminTourUpsert() {
   const [pickedFile, setPickedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState("");
 
-  // modal success khi tạo mới
   const [openSuccess, setOpenSuccess] = useState(false);
 
-  // danh sách hướng dẫn viên
   const [guides, setGuides] = useState([]);
   const [loadingGuides, setLoadingGuides] = useState(false);
+  const [originalStatus, setOriginalStatus] = useState("");
 
   const currentMainImageUrl = useMemo(() => {
     if (previewUrl) return previewUrl;
@@ -186,9 +186,9 @@ export default function AdminTourUpsert() {
   }, [form.priceAdult, form.percentDiscount]);
 
   const canSubmit = useMemo(() => {
-    if (saving || deleting || loading) return false;
+    if (saving || canceling || loading) return false;
     return Object.keys(fieldErrors).length === 0;
-  }, [fieldErrors, saving, deleting, loading]);
+  }, [fieldErrors, saving, canceling, loading]);
 
   function resetForm() {
     const empty = buildEmptyForm();
@@ -200,16 +200,16 @@ export default function AdminTourUpsert() {
     setPickedFile(null);
     setPreviewUrl("");
     setErr("");
+
+    setOriginalStatus("");
   }
 
-  // cleanup preview
   useEffect(() => {
     return () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl]);
 
-  // load TOUR_GUIDE list
   useEffect(() => {
     (async () => {
       try {
@@ -239,7 +239,6 @@ export default function AdminTourUpsert() {
     })();
   }, []);
 
-  // load tour when edit
   useEffect(() => {
     let alive = true;
 
@@ -255,10 +254,7 @@ export default function AdminTourUpsert() {
       .then((data) => {
         if (!alive || !data) return;
 
-        // map tour -> form
-        const mapped0 = mapTourToForm(data.tour);
-
-        // NEW: luôn đồng bộ durationDays theo start/end
+        const mapped0 = mapTourToForm(data.tour, data.tourGuides);
         const mapped = {
           ...mapped0,
           durationDays: calcDurationDays(mapped0.startDate, mapped0.endDate),
@@ -271,6 +267,8 @@ export default function AdminTourUpsert() {
 
         setPickedFile(null);
         setPreviewUrl("");
+
+        setOriginalStatus(mapped.status || "");
       })
       .catch((e) => alive && setErr(e?.message || "Tải dữ liệu thất bại."))
       .finally(() => alive && setLoading(false));
@@ -278,7 +276,6 @@ export default function AdminTourUpsert() {
     return () => {
       alive = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isEdit]);
 
   function applyForm(next) {
@@ -298,7 +295,6 @@ export default function AdminTourUpsert() {
     const { name, value, type } = e.target;
     setErr("");
 
-    // số
     if (type === "number") {
       const nextVal = value === "" ? "" : value;
       const next = { ...form, [name]: nextVal };
@@ -315,7 +311,6 @@ export default function AdminTourUpsert() {
       return;
     }
 
-    // ngày => auto-calc durationDays
     if (type === "date") {
       const next = { ...form, [name]: value };
 
@@ -335,14 +330,11 @@ export default function AdminTourUpsert() {
         next.endDate = next.startDate;
       }
 
-      // NEW: tính durationDays
       next.durationDays = calcDurationDays(next.startDate, next.endDate);
-
       applyForm(next);
       return;
     }
 
-    // bình thường (select/text)
     applyForm({ ...form, [name]: value });
   }
 
@@ -370,13 +362,13 @@ export default function AdminTourUpsert() {
     payload.availableSeats = toNumberSafe(payload.availableSeats, 0);
     payload.limitSeats = toNumberSafe(payload.limitSeats, 0);
 
-    // NEW: guideId + durationDays auto-calc (chốt lại trước khi gửi)
     const guideId = toNumberSafe(payload.tourGuideId, 0);
     payload.tourGuideId = guideId;
+
     payload.durationDays = calcDurationDays(payload.startDate, payload.endDate);
 
-    if (!payload.status) payload.status = "Pending";
-    if (!["Pending", "Passed", "Activated"].includes(payload.status)) {
+    if (!payload.status) payload.status = "Activated";
+    if (!["Canceled", "Passed", "Activated"].includes(payload.status)) {
       setErr("Trạng thái không hợp lệ.");
       setTouched((prev) => ({ ...prev, status: true }));
       return;
@@ -410,11 +402,25 @@ export default function AdminTourUpsert() {
     setSaving(true);
 
     try {
-      // NEW: backend cần query param guideIds
       const saved = await saveTourUpsert(payload, pickedFile, guideId);
-
       const savedId =
         saved?.tourId ?? saved?.id ?? (isEdit ? Number(id) : null);
+      if (
+        isEdit &&
+        payload.status === "Canceled" &&
+        originalStatus !== "Canceled"
+      ) {
+        try {
+          await adminCancelTourSideEffects(savedId);
+        } catch (e3) {
+          console.error("Cancel side effects failed:", e3);
+          setErr(
+            "Đã lưu trạng thái Hủy tour, nhưng gửi thông báo/hoàn tiền bị lỗi."
+          );
+        }
+      }
+
+      if (isEdit) setOriginalStatus(payload.status || "");
 
       if (isEdit) {
         if (savedId) navigate(`/admin/tours/edit/${savedId}`);
@@ -430,22 +436,22 @@ export default function AdminTourUpsert() {
     }
   }
 
-  async function onDelete() {
+  async function onCancelTour() {
     if (!isEdit) return;
 
-    const ok = window.confirm("Bạn có chắc chắn muốn xóa tour này không?");
+    const ok = window.confirm("Bạn có chắc chắn muốn hủy tour này không?");
     if (!ok) return;
 
-    setDeleting(true);
+    setCanceling(true);
     setErr("");
 
+    const next = { ...form, status: "Canceled" };
+    applyForm(next);
+
     try {
-      await deleteTour(Number(id));
-      navigate("/admin/tours");
-    } catch (e) {
-      setErr(e?.message || "Xóa thất bại.");
+      await onSubmit({ preventDefault() {} });
     } finally {
-      setDeleting(false);
+      setCanceling(false);
     }
   }
 
@@ -454,11 +460,12 @@ export default function AdminTourUpsert() {
       ? "Đã duyệt"
       : form.status === "Activated"
       ? "Đã kích hoạt"
+      : form.status === "Canceled"
+      ? "Đã hủy"
       : "Chờ duyệt";
 
   return (
     <div className="max-w-6xl mx-auto p-6">
-      {/* success modal (chỉ khi tạo mới thành công) */}
       {openSuccess && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div
@@ -501,7 +508,6 @@ export default function AdminTourUpsert() {
         </div>
       )}
 
-      {/* header */}
       <div className="flex items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-semibold">
@@ -516,18 +522,18 @@ export default function AdminTourUpsert() {
           {isEdit ? (
             <button
               type="button"
-              onClick={onDelete}
-              disabled={deleting || saving}
+              onClick={onCancelTour}
+              disabled={canceling || saving || loading}
               className="px-4 py-2 rounded-xl border border-red-200 text-red-700 bg-red-50 disabled:opacity-60"
             >
-              {deleting ? "Đang xóa..." : "Xóa tour"}
+              {canceling ? "Đang hủy..." : "Hủy tour"}
             </button>
           ) : null}
 
           <button
             type="button"
             onClick={() => navigate("/admin/tours")}
-            disabled={saving || deleting}
+            disabled={saving || canceling}
             className="px-4 py-2 rounded-xl border bg-white disabled:opacity-60"
           >
             Quay lại
@@ -535,7 +541,6 @@ export default function AdminTourUpsert() {
         </div>
       </div>
 
-      {/* error */}
       {err ? (
         <div className="mb-5 p-3 rounded-xl bg-red-50 text-red-700 border border-red-100">
           {err}
@@ -548,320 +553,26 @@ export default function AdminTourUpsert() {
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* LEFT: form */}
-          <form
-            onSubmit={onSubmit}
-            className="lg:col-span-2 p-5 rounded-2xl border bg-white space-y-5"
-          >
-            <div>
-              <div className="text-sm font-medium mb-1">Tiêu đề tour</div>
-              <input
-                name="title"
-                value={form.title}
-                onChange={onChange}
-                onBlur={onBlur}
-                className="w-full border rounded-xl p-3"
-                placeholder="Nhập tiêu đề tour"
-              />
-              <FieldError
-                msg={fieldErrors.title}
-                show={submitted || touched.title}
-              />
-            </div>
+          <div className="lg:col-span-2 space-y-6">
+            <AdminTourForm
+              form={form}
+              fieldErrors={fieldErrors}
+              touched={touched}
+              submitted={submitted}
+              guides={guides}
+              loadingGuides={loadingGuides}
+              onChange={onChange}
+              onBlur={onBlur}
+              onPickMainImage={onPickMainImage}
+              currentMainImageUrl={currentMainImageUrl}
+              canSubmit={canSubmit}
+              saving={saving}
+              onSubmit={onSubmit}
+            />
 
-            <div>
-              <div className="text-sm font-medium mb-1">Link video</div>
-              <input
-                name="linkVideo"
-                value={form.linkVideo}
-                onChange={onChange}
-                onBlur={onBlur}
-                className="w-full border rounded-xl p-3"
-                placeholder="Dán link video"
-              />
-              <FieldError
-                msg={fieldErrors.linkVideo}
-                show={submitted || touched.linkVideo}
-              />
-            </div>
+            {isEdit ? <TourParticipantsCard tourId={id} /> : null}
+          </div>
 
-            <div>
-              <div className="text-sm font-medium mb-1">Mô tả</div>
-              <textarea
-                name="description"
-                value={form.description}
-                onChange={onChange}
-                onBlur={onBlur}
-                className="w-full border rounded-xl p-3"
-                rows={7}
-                placeholder="Nhập mô tả tour"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <div className="text-sm font-medium mb-1">Giá người lớn</div>
-                <input
-                  name="priceAdult"
-                  type="number"
-                  value={form.priceAdult}
-                  onChange={onChange}
-                  onBlur={onBlur}
-                  className="w-full border rounded-xl p-3"
-                  min={0}
-                />
-                <FieldError
-                  msg={fieldErrors.priceAdult}
-                  show={submitted || touched.priceAdult}
-                />
-              </div>
-
-              <div>
-                <div className="text-sm font-medium mb-1">Giá trẻ em</div>
-                <input
-                  name="priceChild"
-                  type="number"
-                  value={form.priceChild}
-                  onChange={onChange}
-                  onBlur={onBlur}
-                  className="w-full border rounded-xl p-3"
-                  min={0}
-                />
-                <FieldError
-                  msg={fieldErrors.priceChild}
-                  show={submitted || touched.priceChild}
-                />
-              </div>
-
-              <div>
-                <div className="text-sm font-medium mb-1">Giảm giá (%)</div>
-                <input
-                  name="percentDiscount"
-                  type="number"
-                  value={form.percentDiscount}
-                  onChange={onChange}
-                  onBlur={onBlur}
-                  className="w-full border rounded-xl p-3"
-                  min={0}
-                  max={100}
-                />
-                <FieldError
-                  msg={fieldErrors.percentDiscount}
-                  show={submitted || touched.percentDiscount}
-                />
-              </div>
-            </div>
-
-            {/* NEW: duration auto-calc => readonly */}
-            <div>
-              <div className="text-sm font-medium mb-1">Số ngày</div>
-              <input
-                name="durationDays"
-                type="number"
-                value={form.durationDays}
-                readOnly
-                className="w-full border rounded-xl p-3 bg-gray-50"
-              />
-              <FieldError
-                msg={fieldErrors.durationDays}
-                show={submitted || touched.durationDays}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <div className="text-sm font-medium mb-1">Ngày bắt đầu</div>
-                <input
-                  name="startDate"
-                  type="date"
-                  value={form.startDate}
-                  onChange={onChange}
-                  onBlur={onBlur}
-                  className="w-full border rounded-xl p-3"
-                  max={form.endDate || undefined}
-                />
-                <FieldError
-                  msg={fieldErrors.startDate}
-                  show={submitted || touched.startDate}
-                />
-              </div>
-
-              <div>
-                <div className="text-sm font-medium mb-1">Ngày kết thúc</div>
-                <input
-                  name="endDate"
-                  type="date"
-                  value={form.endDate}
-                  onChange={onChange}
-                  onBlur={onBlur}
-                  className="w-full border rounded-xl p-3"
-                  min={form.startDate || undefined}
-                />
-                <FieldError
-                  msg={fieldErrors.endDate}
-                  show={submitted || touched.endDate}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <div className="text-sm font-medium mb-1">Nơi xuất phát</div>
-                <input
-                  name="departureLocation"
-                  value={form.departureLocation}
-                  onChange={onChange}
-                  onBlur={onBlur}
-                  className="w-full border rounded-xl p-3"
-                  placeholder="Ví dụ: Hà Nội"
-                />
-                <FieldError
-                  msg={fieldErrors.departureLocation}
-                  show={submitted || touched.departureLocation}
-                />
-              </div>
-
-              <div>
-                <div className="text-sm font-medium mb-1">Điểm đến</div>
-                <input
-                  name="destination"
-                  value={form.destination}
-                  onChange={onChange}
-                  onBlur={onBlur}
-                  className="w-full border rounded-xl p-3"
-                  placeholder="Ví dụ: Hạ Long"
-                />
-                <FieldError
-                  msg={fieldErrors.destination}
-                  show={submitted || touched.destination}
-                />
-              </div>
-            </div>
-
-            {/* guide select */}
-            <div>
-              <div className="text-sm font-medium mb-1">
-                Hướng dẫn viên <span className="text-red-500">*</span>
-              </div>
-
-              <select
-                name="tourGuideId"
-                value={form.tourGuideId}
-                onChange={onChange}
-                onBlur={onBlur}
-                disabled={loadingGuides}
-                className="w-full border rounded-xl p-3 bg-white"
-              >
-                <option value="">
-                  {loadingGuides
-                    ? "Đang tải danh sách..."
-                    : "— Chọn hướng dẫn viên —"}
-                </option>
-
-                {guides.map((u) => {
-                  const gid = u.userId ?? u.id;
-                  const username = u.username ?? "";
-                  const name = u.name || u.fullName || "";
-                  return (
-                    <option key={gid} value={gid}>
-                      {gid} - {name}
-                      {username ? ` (${username})` : ""}
-                    </option>
-                  );
-                })}
-              </select>
-
-              <FieldError
-                msg={fieldErrors.tourGuideId}
-                show={submitted || touched.tourGuideId}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <div className="text-sm font-medium mb-1">Ghế còn</div>
-                <input
-                  name="availableSeats"
-                  type="number"
-                  value={form.availableSeats}
-                  onChange={onChange}
-                  onBlur={onBlur}
-                  className="w-full border rounded-xl p-3"
-                  min={0}
-                  max={form.limitSeats === "" ? undefined : form.limitSeats}
-                />
-                <FieldError
-                  msg={fieldErrors.availableSeats}
-                  show={submitted || touched.availableSeats}
-                />
-              </div>
-
-              <div>
-                <div className="text-sm font-medium mb-1">Tổng ghế</div>
-                <input
-                  name="limitSeats"
-                  type="number"
-                  value={form.limitSeats}
-                  onChange={onChange}
-                  onBlur={onBlur}
-                  className="w-full border rounded-xl p-3"
-                  min={0}
-                />
-                <FieldError
-                  msg={fieldErrors.limitSeats}
-                  show={submitted || touched.limitSeats}
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="text-sm font-medium mb-1">Trạng thái</div>
-              <select
-                name="status"
-                value={form.status}
-                onChange={onChange}
-                onBlur={onBlur}
-                className="w-full border rounded-xl p-3 bg-white"
-              >
-                <option value="Pending">Chờ duyệt</option>
-                <option value="Passed">Đã duyệt</option>
-                <option value="Activated">Đã kích hoạt</option>
-              </select>
-              <FieldError
-                msg={fieldErrors.status}
-                show={submitted || touched.status}
-              />
-            </div>
-
-            <div>
-              <div className="text-sm font-medium mb-2">Ảnh đại diện</div>
-              <input type="file" accept="image/*" onChange={onPickMainImage} />
-
-              {currentMainImageUrl ? (
-                <img
-                  src={currentMainImageUrl}
-                  alt="Ảnh đại diện"
-                  className="mt-3 w-full h-56 object-cover rounded-2xl bg-gray-100 border"
-                />
-              ) : (
-                <div className="mt-3 w-full h-56 rounded-2xl bg-gray-50 border flex items-center justify-center text-gray-400">
-                  Chưa có ảnh đại diện
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                type="submit"
-                disabled={!canSubmit}
-                className="px-5 py-3 rounded-xl bg-black text-white disabled:opacity-60"
-              >
-                {saving ? "Đang lưu..." : "Lưu thay đổi"}
-              </button>
-            </div>
-          </form>
-
-          {/* RIGHT */}
           <div className="lg:col-span-1 space-y-6">
             <TourCurrentInfoCard
               title={form.title}

@@ -76,7 +76,6 @@ export const markNotificationRead = async (id) => {
   });
 };
 
-
 function getAuthHeaders() {
   const token = localStorage.getItem("jwt");
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -104,10 +103,10 @@ export async function adminUpdateNotificationStatus(id, status) {
 
 // Delete notification
 export async function adminDeleteNotification(id) {
-  const res = await fetch(
-    `${BASE_URL}/admin/notif/delete/${id}`,
-    { method: "DELETE", headers: getAuthHeaders() }
-  );
+  const res = await fetch(`${BASE_URL}/admin/notif/delete/${id}`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) throw new Error(await res.text());
   return true;
 }
@@ -117,7 +116,6 @@ export async function adminSendNotificationToUsers(message, userIds = []) {
   const params = new URLSearchParams();
   params.append("message", message);
   userIds.forEach((id) => params.append("userIds", id));
-
   const res = await fetch(
     `${BASE_URL}/admin/notif/send-to-specific?${params.toString()}`,
     { method: "POST", headers: getAuthHeaders() }
@@ -138,10 +136,10 @@ export async function adminGetAllNotifications({
   if (search) params.append("search", search);
   if (targetUser) params.append("targetUser", targetUser);
 
-  const res = await fetch(
-    `${BASE_URL}/admin/notif/all?${params.toString()}`,
-    { method: "GET", headers: getAuthHeaders() }
-  );
+  const res = await fetch(`${BASE_URL}/admin/notif/all?${params.toString()}`, {
+    method: "GET",
+    headers: getAuthHeaders(),
+  });
 
   if (!res.ok) throw new Error(await res.text());
   return res.json();

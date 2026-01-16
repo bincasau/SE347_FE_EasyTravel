@@ -34,7 +34,11 @@ const HotelCard = ({
   const slugId = buildTourSlug(hotel_id, name);
 
   return (
-    <Link to={`/detailhotel/${slugId}`} className="block w-full">
+    <Link
+      to={`/detailhotel/${slugId}`}
+      state={{ from: location.pathname + location.search }}
+      className="block w-full"
+    >
       <div className="bg-white rounded-2xl shadow-md overflow-hidden flex flex-col hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer h-full">
         <img
           src={imageUrl}
