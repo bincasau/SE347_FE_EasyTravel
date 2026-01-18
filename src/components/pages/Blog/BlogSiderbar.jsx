@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FiSearch } from "react-icons/fi";
 import { FaCalendarAlt } from "react-icons/fa";
 import DatePicker from "react-datepicker";
@@ -25,6 +25,66 @@ const mapBlog = (b) => {
   return { id, image, date, title, description, raw: b };
 };
 
+/* =========================
+   Date helpers (Tour-like)
+========================= */
+// yyyy-mm-dd -> dd/mm/yyyy
+const ymdToDMY = (ymd) => {
+  if (!ymd) return "";
+  const [y, m, d] = String(ymd).split("-");
+  if (!y || !m || !d) return "";
+  return `${d}/${m}/${y}`;
+};
+
+// dd/mm/yyyy -> yyyy-mm-dd ("" nếu invalid)
+const dmyToYMD = (dmy) => {
+  if (!dmy) return "";
+  const s = String(dmy).trim();
+  const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return "";
+
+  const dd = Number(m[1]);
+  const mm = Number(m[2]);
+  const yyyy = Number(m[3]);
+
+  if (mm < 1 || mm > 12) return "";
+  if (dd < 1 || dd > 31) return "";
+
+  const dt = new Date(yyyy, mm - 1, dd);
+  if (
+    dt.getFullYear() !== yyyy ||
+    dt.getMonth() !== mm - 1 ||
+    dt.getDate() !== dd
+  )
+    return "";
+
+  const y = String(yyyy).padStart(4, "0");
+  const mo = String(mm).padStart(2, "0");
+  const da = String(dd).padStart(2, "0");
+  return `${y}-${mo}-${da}`;
+};
+
+// auto format: chỉ cho nhập số, tự chèn "/" theo dd/mm/yyyy
+const formatDMYInput = (value) => {
+  const digits = String(value || "").replace(/\D/g, "").slice(0, 8); // ddmmyyyy
+  const d = digits.slice(0, 2);
+  const m = digits.slice(2, 4);
+  const y = digits.slice(4, 8);
+  let out = d;
+  if (digits.length >= 3) out += "/" + m;
+  if (digits.length >= 5) out += "/" + y;
+  return out;
+};
+
+// Date -> yyyy-mm-dd
+const dateObjToYMD = (date) => {
+  if (!date) return "";
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
 export default function BlogSidebar({
   blogs = [],
   onSearch,
@@ -33,7 +93,17 @@ export default function BlogSidebar({
 }) {
   const navigate = useNavigate();
   const [tags, setTags] = useState([]);
-  const [selectedDate, setSelectedDate] = useState(null);
+
+  // ✅ date filter: committed = yyyy-mm-dd (gửi ra ngoài)
+  const [filterYMD, setFilterYMD] = useState("");
+  // ✅ input hiển thị dd/mm/yyyy
+  const [draftDMY, setDraftDMY] = useState("");
+  const [dateError, setDateError] = useState("");
+
+  // ✅ react-datepicker needs Date | null
+  const [pickerDate, setPickerDate] = useState(null);
+
+  const dpRef = useRef(null);
 
   useEffect(() => {
     fetch(`${BASE_URL}/blogs/tags`)
@@ -45,11 +115,6 @@ export default function BlogSidebar({
   const uiBlogs = useMemo(() => blogs.map(mapBlog), [blogs]);
   const recentPosts = uiBlogs.slice(0, 3);
   const gallery = uiBlogs.slice(0, 6);
-
-  const formatToYMD = (date) => {
-    if (!date) return "";
-    return date.toISOString().split("T")[0];
-  };
 
   const goDetail = (post) => {
     if (!post?.id) return;
@@ -63,6 +128,41 @@ export default function BlogSidebar({
         description: post.description,
       },
     });
+  };
+
+  // ✅ apply input dd/mm/yyyy -> commit yyyy-mm-dd
+  const applyDraftDate = () => {
+    const trimmed = String(draftDMY || "").trim();
+
+    // empty => clear
+    if (!trimmed) {
+      setFilterYMD("");
+      setDraftDMY("");
+      setPickerDate(null);
+      setDateError("");
+      onDateFilter?.("");
+      return;
+    }
+
+    const ymd = dmyToYMD(trimmed);
+    if (!ymd) {
+      setDateError("Ngày không hợp lệ. Nhập đúng dd/mm/yyyy.");
+      return;
+    }
+
+    setFilterYMD(ymd);
+    setDraftDMY(ymdToDMY(ymd));
+    setPickerDate(new Date(ymd));
+    setDateError("");
+    onDateFilter?.(ymd);
+  };
+
+  const clearDate = () => {
+    setFilterYMD("");
+    setDraftDMY("");
+    setPickerDate(null);
+    setDateError("");
+    onDateFilter?.("");
   };
 
   return (
@@ -81,38 +181,82 @@ export default function BlogSidebar({
         </div>
       </div>
 
-      {/* 🗓 DATE FILTER BOX */}
+      {/* 🗓 DATE FILTER BOX (Tour-like: dd/mm/yyyy + calendar) */}
       <div className="w-full bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition">
         <h3 className="font-semibold mb-3 text-gray-800">Filter by Date</h3>
 
-        <div className="relative flex items-center">
-          <DatePicker
-            selected={selectedDate}
-            onChange={(date) => {
-              setSelectedDate(date);
-              onDateFilter?.(formatToYMD(date));
+        {/* Input dd/mm/yyyy */}
+        <div className="relative">
+          <input
+            type="text"
+            inputMode="numeric"
+            placeholder="dd/mm/yyyy"
+            value={draftDMY}
+            onChange={(e) => {
+              setDraftDMY(formatDMYInput(e.target.value));
+              setDateError("");
             }}
-            dateFormat="yyyy-MM-dd"
-            placeholderText="Select date"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
-            popperClassName="z-[99999]"
-            popperPlacement="bottom-start"
-            showPopperArrow={false}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") applyDraftDate();
+            }}
+            className="w-full border border-gray-200 rounded-lg py-2 pl-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
           />
-          <FaCalendarAlt className="absolute right-3 text-gray-500 pointer-events-none" />
+
+          {/* Icon open calendar */}
+          <button
+            type="button"
+            onClick={() => dpRef.current?.setOpen?.(true)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 grid place-items-center rounded-md hover:bg-gray-100"
+            aria-label="Open calendar"
+          >
+            <FaCalendarAlt className="text-gray-500" />
+          </button>
+
+          {/* Hidden DatePicker (pop up calendar) */}
+          <div className="absolute left-0 top-full">
+            <DatePicker
+              ref={dpRef}
+              selected={pickerDate}
+              onChange={(date) => {
+                // pick from calendar -> commit ngay
+                setPickerDate(date);
+                const ymd = dateObjToYMD(date);
+                setFilterYMD(ymd);
+                setDraftDMY(ymdToDMY(ymd));
+                setDateError("");
+                onDateFilter?.(ymd);
+              }}
+              dateFormat="yyyy-MM-dd"
+              inline={false}
+              popperClassName="z-[99999]"
+              popperPlacement="bottom-start"
+              showPopperArrow={false}
+              // để tránh render 2 input: dùng customInput rỗng
+              customInput={<span />}
+            />
+          </div>
         </div>
 
-        {selectedDate && (
-          <button
-            onClick={() => {
-              setSelectedDate(null);
-              onDateFilter?.("");
-            }}
-            className="mt-3 w-full py-1.5 text-sm rounded bg-gray-200 hover:bg-gray-300"
-          >
-            Clear Date
-          </button>
+        {dateError && (
+          <div className="mt-2 text-sm text-red-600">{dateError}</div>
         )}
+
+        <div className="grid grid-cols-2 gap-2 mt-3">
+          <button
+            onClick={applyDraftDate}
+            className="py-2 text-sm rounded-lg bg-orange-500 text-white hover:bg-orange-600 font-semibold"
+          >
+            Apply
+          </button>
+
+          <button
+            onClick={clearDate}
+            className="py-2 text-sm rounded-lg bg-gray-200 hover:bg-gray-300 font-semibold"
+            disabled={!filterYMD && !draftDMY}
+          >
+            Clear
+          </button>
+        </div>
       </div>
 
       {/* 🏷 TAG FILTER */}

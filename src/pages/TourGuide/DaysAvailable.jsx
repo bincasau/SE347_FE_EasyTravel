@@ -13,6 +13,7 @@ import {
   max as dfMax,
   min as dfMin,
   isAfter,
+  differenceInCalendarDays,
 } from "date-fns";
 
 const API_BASE = "http://localhost:8080";
@@ -55,7 +56,50 @@ export default function DaysAvailable() {
     return res;
   };
 
-  // ✅ fetch schedule theo month/year mỗi khi đổi tháng
+  // ✅ normalize + merge by tourId
+  const normalizeAndMerge = (lists) => {
+    const map = new Map();
+
+    for (const list of lists) {
+      const arr = Array.isArray(list?.content) ? list.content : [];
+      for (const t of arr) {
+        const id = t?.tourId;
+        if (!id) continue;
+
+        const item = {
+          id,
+          title: t.title,
+          from: t.startDate,
+          to: t.endDate,
+        };
+
+        // merge trùng id thì lấy range rộng nhất
+        const old = map.get(id);
+        if (!old) {
+          map.set(id, item);
+        } else {
+          const a1 = old.from;
+          const a2 = old.to;
+          const b1 = item.from;
+          const b2 = item.to;
+
+          map.set(id, {
+            ...old,
+            ...item,
+            from: a1 && b1 ? (a1 < b1 ? a1 : b1) : a1 || b1,
+            to: a2 && b2 ? (a2 > b2 ? a2 : b2) : a2 || b2,
+          });
+        }
+      }
+    }
+
+    return Array.from(map.values());
+  };
+
+  /**
+   * ✅ FIX CHÍNH:
+   * Fetch thêm month-1 và month+1 để bắt tour span 2 tháng
+   */
   useEffect(() => {
     let mounted = true;
 
@@ -64,25 +108,32 @@ export default function DaysAvailable() {
         setLoading(true);
         setErrMsg("");
 
-        const month = currentMonth.getMonth() + 1; // JS 0..11 -> API 1..12
-        const year = currentMonth.getFullYear();
+        const baseMonth = currentMonth.getMonth() + 1;
+        const baseYear = currentMonth.getFullYear();
 
-        const res = await fetchWithAuth(
-          `${API_BASE}/tour_guide/schedule?month=${month}&year=${year}`
-        );
-        const data = await res.json();
+        const prev = subMonths(currentMonth, 1);
+        const next = addMonths(currentMonth, 1);
 
-        const list = Array.isArray(data?.content) ? data.content : [];
+        const q = (d) => `month=${d.getMonth() + 1}&year=${d.getFullYear()}`;
 
-        // normalize tours: from/to = startDate/endDate
-        const normalized = list.map((t) => ({
-          id: t.tourId,
-          title: t.title,
-          from: t.startDate, // "yyyy-MM-dd"
-          to: t.endDate,     // "yyyy-MM-dd"
-        }));
+        const [resPrev, resCur, resNext] = await Promise.all([
+          fetchWithAuth(`${API_BASE}/tour_guide/schedule?${q(prev)}`).then((r) =>
+            r.json()
+          ),
+          fetchWithAuth(
+            `${API_BASE}/tour_guide/schedule?month=${baseMonth}&year=${baseYear}`
+          ).then((r) => r.json()),
+          fetchWithAuth(`${API_BASE}/tour_guide/schedule?${q(next)}`).then((r) =>
+            r.json()
+          ),
+        ]);
 
-        if (mounted) setTours(normalized);
+        const merged = normalizeAndMerge([resPrev, resCur, resNext]);
+
+        // optional: sort theo startDate
+        merged.sort((a, b) => String(a.from || "").localeCompare(String(b.from || "")));
+
+        if (mounted) setTours(merged);
       } catch (e) {
         console.error("[SCHEDULE FETCH ERROR]", e);
         if (mounted) {
@@ -109,7 +160,6 @@ export default function DaysAvailable() {
       let d = parseISO(t.from);
       const end = parseISO(t.to);
 
-      // guard nếu date lỗi
       if (Number.isNaN(d.getTime()) || Number.isNaN(end.getTime())) continue;
 
       while (!isAfter(d, end)) {
@@ -147,7 +197,6 @@ export default function DaysAvailable() {
   }, [calendarDays]);
 
   const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
   const isBooked = (dateObj) => bookedDays.has(format(dateObj, "yyyy-MM-dd"));
 
   // ✅ clamp tour range vào range của tuần để vẽ bar
@@ -170,13 +219,9 @@ export default function DaysAvailable() {
       const overlapEnd = dfMin([tEnd, weekEnd]);
       if (isAfter(overlapStart, overlapEnd)) continue;
 
-      // cột bắt đầu/kết thúc trong tuần: 1..7
-      const startIdx = Math.round(
-        (overlapStart - weekStart) / (1000 * 60 * 60 * 24)
-      ); // 0..6
-      const endIdx = Math.round(
-        (overlapEnd - weekStart) / (1000 * 60 * 60 * 24)
-      ); // 0..6
+      // ✅ FIX: dùng differenceInCalendarDays cho chắc (không lệch timezone)
+      const startIdx = differenceInCalendarDays(overlapStart, weekStart); // 0..6
+      const endIdx = differenceInCalendarDays(overlapEnd, weekStart); // 0..6
 
       bars.push({
         id: `${t.id}-${format(weekStart, "yyyy-MM-dd")}`,

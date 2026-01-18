@@ -363,7 +363,7 @@ export default function TourScheduleDetail() {
                                     checked ? "text-gray-400" : "text-gray-500"
                                   }`}
                                 >
-                                  ⏱ {step.duration}
+                                  
                                 </p>
                               </div>
                             </label>

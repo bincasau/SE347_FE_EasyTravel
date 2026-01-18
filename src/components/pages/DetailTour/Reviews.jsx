@@ -3,11 +3,7 @@ import { FaStar, FaRegStar } from "react-icons/fa";
 import { popup } from "@/utils/popup";
 
 const API_BASE = "http://localhost:8080";
-const S3_AVATAR_BASE =
-  "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/image";
-
-const userAvatarUrl = (userId) =>
-  userId != null ? `${S3_AVATAR_BASE}/user_${userId}.jpg` : "";
+const S3_BASE = "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/image";
 
 async function fetchWithJwt(url, options = {}) {
   const token = localStorage.getItem("jwt");
@@ -39,34 +35,51 @@ function Avatar({ name, src }) {
 
   if (!src || !imgOk) {
     return (
-      <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-700 grid place-items-center text-xs font-semibold">
+      <div className="w-9 h-9 rounded-full bg-gray-200 text-gray-700 grid place-items-center text-xs font-semibold">
         {initial}
       </div>
     );
   }
+
   return (
     <img
       src={src}
       alt={name || "user"}
-      className="w-8 h-8 rounded-full object-cover border"
+      className="w-9 h-9 rounded-full object-cover border"
       onError={() => setImgOk(false)}
       loading="lazy"
     />
   );
 }
 
-function StarPicker({ value, onChange }) {
+function Stars({ value = 0 }) {
+  const v = Math.max(0, Math.min(5, Number(value || 0)));
+  return (
+    <div className="flex">
+      {[1, 2, 3, 4, 5].map((n) =>
+        n <= v ? (
+          <FaStar key={n} className="text-orange-400" />
+        ) : (
+          <FaRegStar key={n} className="text-gray-300" />
+        )
+      )}
+    </div>
+  );
+}
+
+function StarPicker({ value = 5, onChange }) {
+  const v = Math.max(1, Math.min(5, Number(value || 5)));
   return (
     <div className="flex gap-1">
       {[1, 2, 3, 4, 5].map((n) => (
         <button
-          type="button"
           key={n}
-          onClick={() => onChange(n)}
+          type="button"
+          onClick={() => onChange?.(n)}
           className="leading-none"
           aria-label={`rate ${n}`}
         >
-          {n <= value ? (
+          {n <= v ? (
             <FaStar className="text-orange-400" />
           ) : (
             <FaRegStar className="text-gray-300" />
@@ -77,42 +90,33 @@ function StarPicker({ value, onChange }) {
   );
 }
 
-function StarsView({ rating }) {
-  return (
-    <div className="flex">
-      {[...Array(5)].map((_, idx) =>
-        idx < (rating || 0) ? (
-          <FaStar key={idx} className="text-orange-400" />
-        ) : (
-          <FaRegStar key={idx} className="text-gray-300" />
-        )
-      )}
-    </div>
-  );
+function fmtDate(value) {
+  if (!value) return "--";
+  try {
+    // nếu BE trả "2025-03-05" hoặc ISO string đều OK
+    return new Date(value).toLocaleDateString("vi-VN");
+  } catch {
+    return "--";
+  }
 }
 
 export default function Reviews({ tourId }) {
   const [reviews, setReviews] = useState([]);
-  const [showAll, setShowAll] = useState(false);
-  const [userMap, setUserMap] = useState({});
+  const [visibleCount, setVisibleCount] = useState(4);
+  const [loading, setLoading] = useState(true);
 
-  // ✅ login check
+  // login state
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem("jwt"));
   useEffect(() => {
     const onStorage = () => setIsLoggedIn(!!localStorage.getItem("jwt"));
-    window.addEventListener("storage", onStorage);
-
-    // (optional) nếu bạn có dispatch event "jwt-changed" như login modal:
     const onJwtChanged = () => setIsLoggedIn(!!localStorage.getItem("jwt"));
+    window.addEventListener("storage", onStorage);
     window.addEventListener("jwt-changed", onJwtChanged);
-
     return () => {
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("jwt-changed", onJwtChanged);
     };
   }, []);
-
-  const [actionErr, setActionErr] = useState("");
 
   // create
   const [newRating, setNewRating] = useState(5);
@@ -125,123 +129,67 @@ export default function Reviews({ tourId }) {
   const [editComment, setEditComment] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
-  const getReviewId = (r) =>
-    r?.id ?? r?.reviewId ?? r?.review_id ?? r?.reviewID ?? null;
+  // ===== map DTO đúng theo sample bạn gửi =====
+  const getId = (r, i) => r?.reviewId ?? r?.id ?? i;
+  const getRating = (r) => Number(r?.rating ?? 0);
+  const getComment = (r) => r?.comment ?? "";
+  const getCreatedAt = (r) => r?.createdAt ?? r?.created_at ?? "";
+  const getName = (r) => r?.userName ?? r?.reviewerName ?? "Anonymous";
+  const getAvatar = (r) => {
+    // BE trả: "user_27.jpg"
+    const fn = r?.userAvatar || r?.avatar || "";
+    return fn ? `${S3_BASE}/${fn}` : "";
+  };
 
-  const fetchReviews = useCallback(async () => {
-    try {
-      setActionErr("");
-      if (!tourId) return;
+  const visibleReviews = useMemo(
+    () => reviews.slice(0, visibleCount),
+    [reviews, visibleCount]
+  );
 
-      const res = await fetchWithJwt(`/tours/${tourId}/reviews`, {
-        method: "GET",
-      });
-      if (!res.ok) throw new Error(await readText(res));
+  // ✅ LOAD LIST (ĐỔI ENDPOINT CHO ĐÚNG CONTROLLER)
+  const reload = useCallback(async () => {
+    if (!tourId) return;
 
-      const data = await res.json();
-      const items = data?._embedded?.reviews || data || [];
-      const sorted = [...items].sort(
-        (a, b) => (b.rating || 0) - (a.rating || 0)
-      );
-      setReviews(sorted);
-    } catch (err) {
-      console.error("❌ fetchReviews error:", err);
-      const msg = err?.message || "Fetch reviews lỗi.";
-      setActionErr(msg);
-      popup.error(msg);
-    }
+    const res = await fetchWithJwt(`/custom-reviews/${tourId}/tour`);
+    if (!res.ok) throw new Error(await readText(res));
+
+    const data = await res.json();
+    const list = Array.isArray(data) ? data : data?.content || [];
+
+    // sort newest first (phòng khi BE chưa sort)
+    const sorted = [...list].sort((a, b) => {
+      const ta = new Date(getCreatedAt(a) || 0).getTime();
+      const tb = new Date(getCreatedAt(b) || 0).getTime();
+      return tb - ta;
+    });
+
+    setReviews(sorted);
   }, [tourId]);
 
   useEffect(() => {
-    fetchReviews();
-  }, [fetchReviews]);
-
-  // user refs
-  const userRefs = useMemo(() => {
-    const refs = new Set();
-    for (const r of reviews) {
-      const href = r?._links?.user?.href;
-      if (href) refs.add(href);
-      else {
-        const uid = r?.user?.userId ?? r?.userId ?? r?.user_id;
-        if (uid != null) refs.add(String(uid));
-      }
-    }
-    return [...refs];
-  }, [reviews]);
-
-  // fetch users
-  useEffect(() => {
-    const fetchUsers = async () => {
+    let mounted = true;
+    (async () => {
+      if (!tourId) return;
+      setLoading(true);
       try {
-        const need = userRefs.filter((ref) => !userMap[ref]);
-        if (!need.length) return;
-
-        const results = await Promise.all(
-          need.map(async (ref) => {
-            try {
-              const url = ref.startsWith("http") ? ref : `/user/${ref}`;
-              const res = await fetchWithJwt(url, { method: "GET" });
-              if (!res.ok) return [ref, null];
-              const u = await res.json();
-              return [ref, u];
-            } catch {
-              return [ref, null];
-            }
-          })
-        );
-
-        setUserMap((prev) => {
-          const next = { ...prev };
-          results.forEach(([ref, u]) => {
-            if (u) next[ref] = u;
-          });
-          return next;
-        });
-      } catch (err) {
-        console.error("❌ fetchUsers error:", err);
+        await reload();
+      } catch (e) {
+        console.error(e);
+        if (mounted) {
+          setReviews([]);
+          popup.error(e?.message || "Không tải được danh sách review.");
+        }
+      } finally {
+        if (mounted) setLoading(false);
       }
+    })();
+    return () => {
+      mounted = false;
     };
+  }, [tourId, reload]);
 
-    if (userRefs.length) fetchUsers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userRefs]);
-
-  const getCreatedAt = (r) => r?.createdAt ?? r?.created_at ?? null;
-
-  const getUserIdFromReview = (r) =>
-    r?.user?.userId ?? r?.userId ?? r?.user_id ?? null;
-
-  const getReviewerName = (r) => {
-    if (r?.reviewerName) return r.reviewerName;
-    if (r?.user?.name) return r.user.name;
-
-    const href = r?._links?.user?.href;
-    if (href && userMap[href]?.name) return userMap[href].name;
-
-    const uid = getUserIdFromReview(r);
-    if (uid != null && userMap[String(uid)]?.name)
-      return userMap[String(uid)].name;
-
-    return "Anonymous";
-  };
-
-  const getReviewerAvatar = (r) => {
-    const uid = getUserIdFromReview(r);
-    if (r?.user?.avatar) return r.user.avatar;
-
-    const href = r?._links?.user?.href;
-    if (href && userMap[href]?.avatar) return userMap[href].avatar;
-
-    if (uid != null) return userAvatarUrl(uid);
-    return "";
-  };
-
-  const visibleReviews = showAll ? reviews : reviews.slice(0, 6);
-
-  const requireLogin = async () => {
+  const requireLogin = () => {
     popup.error("Bạn cần đăng nhập để thực hiện thao tác này.");
-    // nếu bạn muốn mở login modal theo hệ thống:
     // window.dispatchEvent(new Event("open-login"));
   };
 
@@ -249,57 +197,38 @@ export default function Reviews({ tourId }) {
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!isLoggedIn) return requireLogin();
-    if (!newComment.trim()) {
-      const msg = "Vui lòng nhập comment.";
-      setActionErr(msg);
-      popup.error(msg);
-      return;
-    }
-    if (!tourId) {
-      const msg = "Thiếu tourId.";
-      setActionErr(msg);
-      popup.error(msg);
-      return;
-    }
+    if (!newComment.trim()) return popup.error("Vui lòng nhập comment.");
 
     setSubmitting(true);
-    setActionErr("");
     try {
-      const payload = { rating: Number(newRating), comment: newComment.trim() };
-
       const res = await fetchWithJwt(`/custom-reviews/create?tourId=${tourId}`, {
         method: "POST",
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          rating: Number(newRating),
+          comment: newComment.trim(),
+        }),
       });
-
       if (!res.ok) throw new Error(await readText(res));
 
-      await fetchReviews();
-      setNewComment("");
-      setNewRating(5);
       popup.success("Gửi review thành công!");
-    } catch (err) {
-      console.error("❌ create error:", err);
-      const msg = err?.message || "Tạo review lỗi.";
-      setActionErr(msg);
-      popup.error(msg);
+      setNewRating(5);
+      setNewComment("");
+      setVisibleCount(4);
+      await reload();
+    } catch (e2) {
+      console.error(e2);
+      popup.error(e2?.message || "Gửi review thất bại!");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const startEdit = (r) => {
-    const id = getReviewId(r);
-    if (!id) {
-      const msg = "Không tìm thấy id review.";
-      setActionErr(msg);
-      popup.error(msg);
-      return;
-    }
+  // ✅ EDIT
+  const startEdit = (r, i) => {
+    const id = getId(r, i);
     setEditingId(id);
-    setEditRating(Number(r?.rating ?? 5));
-    setEditComment(r?.comment ?? "");
-    setActionErr("");
+    setEditRating(getRating(r) || 5);
+    setEditComment(getComment(r) || "");
   };
 
   const cancelEdit = () => {
@@ -308,36 +237,28 @@ export default function Reviews({ tourId }) {
     setEditComment("");
   };
 
-  // ✅ UPDATE
-  const handleUpdate = async (id) => {
+  const handleUpdate = async () => {
     if (!isLoggedIn) return requireLogin();
-    if (!editComment.trim()) {
-      const msg = "Vui lòng nhập comment.";
-      setActionErr(msg);
-      popup.error(msg);
-      return;
-    }
+    if (!editingId) return;
+    if (!editComment.trim()) return popup.error("Vui lòng nhập comment.");
 
     setSavingEdit(true);
-    setActionErr("");
     try {
-      const payload = { rating: Number(editRating), comment: editComment.trim() };
-
-      const res = await fetchWithJwt(`/custom-reviews/update/${id}`, {
+      const res = await fetchWithJwt(`/custom-reviews/update/${editingId}`, {
         method: "PUT",
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          rating: Number(editRating),
+          comment: editComment.trim(),
+        }),
       });
-
       if (!res.ok) throw new Error(await readText(res));
 
-      await fetchReviews();
-      cancelEdit();
       popup.success("Cập nhật review thành công!");
-    } catch (err) {
-      console.error("❌ update error:", err);
-      const msg = err?.message || "Sửa review lỗi.";
-      setActionErr(msg);
-      popup.error(msg);
+      cancelEdit();
+      await reload();
+    } catch (e) {
+      console.error(e);
+      popup.error(e?.message || "Cập nhật review thất bại!");
     } finally {
       setSavingEdit(false);
     }
@@ -346,156 +267,99 @@ export default function Reviews({ tourId }) {
   // ✅ DELETE
   const handleDelete = async (id) => {
     if (!isLoggedIn) return requireLogin();
-
     const ok = await popup.confirm("Bạn chắc chắn muốn xoá review này?");
     if (!ok) return;
 
-    setActionErr("");
     try {
       const res = await fetchWithJwt(`/custom-reviews/delete/${id}`, {
         method: "DELETE",
       });
-
       if (!res.ok) throw new Error(await readText(res));
 
-      await fetchReviews();
       popup.success("Đã xoá review!");
-    } catch (err) {
-      console.error("❌ delete error:", err);
-      const msg = err?.message || "Xoá review lỗi.";
-      setActionErr(msg);
-      popup.error(msg);
+      await reload();
+    } catch (e) {
+      console.error(e);
+      popup.error(e?.message || "Không thể xoá review!");
     }
   };
 
   return (
     <section className="max-w-6xl mx-auto px-6 py-10">
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
-        <h2 className="text-5xl font-podcast text-gray-800">Reviews</h2>
-
-        {/* giữ lại box error nếu bạn muốn */}
-        {actionErr && (
-          <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2">
-            {actionErr}
-          </div>
-        )}
-      </div>
-
-      {/* ✅ WRITE: chỉ hiện khi login */}
-      {isLoggedIn ? (
-        <div className="mb-8 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="text-gray-800 font-semibold">Viết review của bạn</div>
-
-          <form onSubmit={handleCreate} className="mt-4 grid gap-4">
-            <div className="flex items-center gap-3">
-              <div className="text-sm text-gray-700 w-20">Rating</div>
-              <StarPicker value={newRating} onChange={setNewRating} />
-            </div>
-
-            <div className="grid gap-2">
-              <label className="text-sm text-gray-700">Comment</label>
-              <textarea
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                rows={3}
-                placeholder="Chia sẻ trải nghiệm của bạn..."
-                className="w-full rounded-xl border border-gray-200 p-3 text-sm outline-none focus:ring-2 focus:ring-orange-200"
-                disabled={submitting}
-              />
-            </div>
-
-            <div className="rounded-2xl border border-dashed border-gray-300 p-4 bg-gray-50">
-              <div className="text-sm font-semibold text-gray-700 mb-2">
-                Preview
-              </div>
-              <StarsView rating={newRating} />
-              <p className="text-gray-700 text-sm mt-2 italic">
-                {newComment.trim()
-                  ? `"${newComment.trim()}"`
-                  : `"Chưa có nội dung..."`}
-              </p>
-            </div>
-
-            <div className="flex justify-end">
-              <button
-                type="submit"
-                disabled={submitting}
-                className={`px-5 py-2 rounded-xl text-sm font-medium transition ${
-                  submitting
-                    ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                    : "bg-orange-500 text-white hover:bg-orange-600"
-                }`}
-              >
-                {submitting ? "Đang gửi..." : "Gửi review"}
-              </button>
-            </div>
-          </form>
-        </div>
-      ) : (
-        <div className="mb-8 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="text-gray-800 font-semibold mb-1">
-            Bạn cần đăng nhập để viết review
-          </div>
-          <div className="text-sm text-gray-500">
-            Đăng nhập xong bạn sẽ có thể đánh giá và bình luận tour này.
-          </div>
-        </div>
-      )}
+      <h2 className="text-5xl font-podcast text-gray-800 mb-6">
+        Reviews ({reviews.length})
+      </h2>
 
       {/* LIST */}
-      {!reviews.length ? (
-        <div className="text-gray-500">No reviews yet for this tour.</div>
+      {loading ? (
+        <div className="text-center text-gray-400 italic py-5">
+          Đang tải review...
+        </div>
+      ) : reviews.length === 0 ? (
+        <p className="text-gray-500 text-center py-5">
+          Chưa có review nào. Hãy là người đầu tiên nhé!
+        </p>
       ) : (
         <>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="space-y-4">
             {visibleReviews.map((r, i) => {
-              const id = getReviewId(r) ?? i;
-              const name = getReviewerName(r);
-              const avatarSrc = getReviewerAvatar(r);
+              const id = getId(r, i);
               const isEditing = editingId === id;
+              const name = getName(r);
+              const avatar = getAvatar(r);
 
               return (
                 <div
                   key={id}
-                  className="rounded-2xl border border-gray-200 p-5 bg-white shadow-sm hover:shadow-md transition"
+                  className="bg-gray-50 p-4 rounded-xl shadow-sm border text-sm"
                 >
-                  <div className="flex items-center justify-between gap-3 mb-2">
-                    {!isEditing ? (
-                      <StarsView rating={r.rating || 0} />
-                    ) : (
-                      <StarPicker value={editRating} onChange={setEditRating} />
-                    )}
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div className="flex items-center gap-3">
+                      <Avatar name={name} src={avatar} />
+                      <div>
+                        <div className="font-semibold text-gray-800">{name}</div>
+                        <div className="text-xs text-gray-400">
+                          {fmtDate(getCreatedAt(r))}
+                        </div>
+                        <div className="mt-1">
+                          {!isEditing ? (
+                            <Stars value={getRating(r)} />
+                          ) : (
+                            <StarPicker value={editRating} onChange={setEditRating} />
+                          )}
+                        </div>
+                      </div>
+                    </div>
 
-                    {/* ✅ chỉ hiện Sửa/Xoá khi login */}
                     {isLoggedIn && (
-                      <>
+                      <div className="flex items-center gap-2">
                         {!isEditing ? (
-                          <div className="flex items-center gap-2">
+                          <>
                             <button
                               type="button"
-                              onClick={() => startEdit(r)}
-                              className="text-xs px-3 py-1 rounded-lg border border-gray-200 hover:bg-gray-50"
+                              onClick={() => startEdit(r, i)}
+                              className="text-xs px-3 py-1 rounded-full border hover:bg-white"
                             >
                               Sửa
                             </button>
                             <button
                               type="button"
                               onClick={() => handleDelete(id)}
-                              className="text-xs px-3 py-1 rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
+                              className="text-xs px-3 py-1 rounded-full border border-red-300 text-red-600 hover:bg-red-50"
                             >
                               Xoá
                             </button>
-                          </div>
+                          </>
                         ) : (
-                          <div className="flex items-center gap-2">
+                          <>
                             <button
                               type="button"
-                              onClick={() => handleUpdate(id)}
+                              onClick={handleUpdate}
                               disabled={savingEdit}
-                              className={`text-xs px-3 py-1 rounded-lg ${
+                              className={`text-xs px-3 py-1 rounded-full text-white ${
                                 savingEdit
-                                  ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                                  : "bg-orange-500 text-white hover:bg-orange-600"
+                                  ? "bg-gray-400 cursor-not-allowed"
+                                  : "bg-orange-500 hover:bg-orange-600"
                               }`}
                             >
                               {savingEdit ? "Đang lưu..." : "Lưu"}
@@ -503,57 +367,90 @@ export default function Reviews({ tourId }) {
                             <button
                               type="button"
                               onClick={cancelEdit}
-                              className="text-xs px-3 py-1 rounded-lg border border-gray-200 hover:bg-gray-50"
+                              className="text-xs px-3 py-1 rounded-full border hover:bg-white"
                             >
                               Huỷ
                             </button>
-                          </div>
+                          </>
                         )}
-                      </>
+                      </div>
                     )}
                   </div>
 
                   {!isEditing ? (
-                    <p className="text-gray-700 text-sm mb-4 italic line-clamp-4">
-                      "{r.comment}"
+                    <p className="text-gray-600 italic mt-2">
+                      "{getComment(r)}"
                     </p>
                   ) : (
                     <textarea
                       value={editComment}
                       onChange={(e) => setEditComment(e.target.value)}
-                      rows={3}
-                      className="w-full rounded-xl border border-gray-200 p-3 text-sm outline-none focus:ring-2 focus:ring-orange-200 mb-4"
+                      className="mt-3 w-full border rounded-xl px-3 py-2 text-sm h-24 resize-none outline-none focus:ring-2 focus:ring-orange-400"
                     />
                   )}
-
-                  <div className="flex items-center gap-3">
-                    <Avatar name={name} src={avatarSrc} />
-                    <div className="text-sm text-gray-600">
-                      <div className="font-semibold text-gray-800">{name}</div>
-                      {getCreatedAt(r) && (
-                        <div className="text-[12px] text-gray-400">
-                          {new Date(getCreatedAt(r)).toLocaleDateString("vi-VN")}
-                        </div>
-                      )}
-                    </div>
-                  </div>
                 </div>
               );
             })}
           </div>
 
-          {reviews.length > 6 && (
-            <div className="text-center mt-8">
-              <button
-                onClick={() => setShowAll((prev) => !prev)}
-                className="text-orange-500 text-sm font-medium hover:underline"
-              >
-                {showAll ? "Show less" : "Show more..."}
-              </button>
+          {reviews.length > 4 && (
+            <div className="text-center mt-5">
+              {visibleCount < reviews.length ? (
+                <button
+                  onClick={() => setVisibleCount((p) => p + 4)}
+                  className="px-5 py-2 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition"
+                >
+                  Show more
+                </button>
+              ) : (
+                <button
+                  onClick={() => setVisibleCount(4)}
+                  className="px-5 py-2 bg-gray-300 text-gray-700 rounded-full hover:bg-gray-400 transition"
+                >
+                  Show less
+                </button>
+              )}
             </div>
           )}
         </>
       )}
+
+      {/* FORM (nằm dưới list giống Blog) */}
+      <form
+        onSubmit={handleCreate}
+        className="mt-8 bg-gray-50 p-5 rounded-xl shadow-sm border"
+      >
+        <h4 className="font-semibold text-gray-800 mb-3">Viết review</h4>
+
+        {!isLoggedIn && (
+          <div className="text-xs text-gray-500 mb-3">
+            Bạn cần đăng nhập để review tour
+          </div>
+        )}
+
+        <StarPicker value={newRating} onChange={setNewRating} />
+
+        <textarea
+          disabled={!isLoggedIn}
+          value={newComment}
+          onChange={(e) => setNewComment(e.target.value)}
+          rows={3}
+          placeholder="Chia sẻ trải nghiệm của bạn..."
+          className="mt-3 w-full border rounded-md px-3 py-2 text-sm h-24 resize-none focus:ring-2 focus:ring-orange-400 outline-none disabled:bg-gray-100"
+        />
+
+        <button
+          type="submit"
+          disabled={!isLoggedIn || submitting}
+          className={`mt-3 px-5 py-2 rounded-full text-white font-medium transition ${
+            !isLoggedIn || submitting
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-orange-500 hover:bg-orange-600"
+          }`}
+        >
+          {submitting ? "Đang gửi..." : "Gửi review"}
+        </button>
+      </form>
     </section>
   );
 }

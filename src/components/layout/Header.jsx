@@ -75,6 +75,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
 
   const guideMenu = [
     { to: "/guide/schedule", label: "Tour Schedule" },
+    { to: "/guide/upcoming-tours", label: "Upcoming Tours" },
     { to: "/guide/available-days", label: "Days Available" },
     { to: "/guide/past-tours", label: "Past Tours" },
   ];
@@ -94,6 +95,8 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     { to: "/hotel-manager/reports/revenue", label: "Revenue Reports" },
     { to: "/hotel-manager/myhotel", label: "My Hotel" },
   ];
+
+  
 
   const fetchUser = async () => {
     setLoadingUser(true);

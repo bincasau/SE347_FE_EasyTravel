@@ -25,6 +25,8 @@ import SchedulePage from "./pages/TourGuide/SchedulePage";
 import DaysAvailable from "./pages/TourGuide/DaysAvailable";
 import GuideProfile from "./pages/TourGuide/GuideProfile";
 import TourScheduleDetail from "./pages/TourGuide/TourScheduleDetail";
+import ToursUpcoming from "./pages/TourGuide/ToursUpcoming";
+import TourParticipants from "./pages/TourGuide/TourParticipants";
 
 //  ADMIN
 import AdminDashboardPage from "./pages/Admin/AdminDashboardPage";
@@ -125,6 +127,26 @@ export default function App() {
               </RequireRole>
             }
           />
+
+          {/* ✅ Upcoming tours + participants + export */}
+          <Route
+            path="/guide/upcoming-tours"
+            element={
+              <RequireRole role="TOUR_GUIDE">
+                <ToursUpcoming />
+              </RequireRole>
+            }
+          />
+
+          <Route
+            path="/guide/tour/:tourId/participants"
+            element={
+              <RequireRole role="TOUR_GUIDE">
+                <TourParticipants />
+              </RequireRole>
+            }
+          />
+
           <Route
             path="/guide/available-days"
             element={

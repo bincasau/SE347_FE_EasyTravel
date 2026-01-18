@@ -11,6 +11,10 @@ import {
   isSameDay,
   isWithinInterval,
   parseISO,
+  addMonths,
+  subMonths,
+  isBefore,
+  isAfter,
 } from "date-fns";
 
 import { getUserFromToken } from "@/utils/auth";
@@ -28,10 +32,12 @@ export default function TourDetail() {
   const [selectedImg, setSelectedImg] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // ✅ NEW: month state cho calendar
+  const [currentMonth, setCurrentMonth] = useState(null);
+
   const S3_TOUR_IMG_BASE =
     "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/image";
 
-  // ✅ fallback images (tránh undefined + tránh broken image)
   const fallbackImages = useMemo(
     () => [
       "https://placehold.co/1200x800?text=Tour+Image",
@@ -55,13 +61,11 @@ export default function TourDetail() {
         const data = await res.json();
         setTour(data);
 
-        // ✅ đảm bảo URL slug đúng
         const correctSlugId = buildTourSlug(id, data?.title);
         if (slugId !== correctSlugId) {
           navigate(`/detailtour/${correctSlugId}`, { replace: true });
         }
 
-        // ✅ build ảnh từ S3
         const s3Images = Array.from({ length: 5 }, (_, idx) => {
           const n = idx + 1;
           return `${S3_TOUR_IMG_BASE}/tour_${id}_img_${n}.jpg`;
@@ -69,6 +73,12 @@ export default function TourDetail() {
 
         setImages(s3Images);
         setSelectedImg(s3Images[0]);
+
+        // ✅ init month = tháng của startDate
+        if (data?.startDate) {
+          const s = parseISO(data.startDate);
+          setCurrentMonth(startOfMonth(s));
+        }
       } catch (err) {
         console.error("❌ Lỗi khi fetch tour:", err);
         setTour(null);
@@ -124,11 +134,62 @@ export default function TourDetail() {
 
   const start = parseISO(startDate);
   const end = parseISO(endDate);
-  const currentMonth = start;
+
+  // ✅ giới hạn month có thể chuyển
+  const minMonth = startOfMonth(start);
+  const maxMonth = startOfMonth(end);
+
+  // fallback nếu chưa init
+  const shownMonth = currentMonth || startOfMonth(start);
+
+  const canPrev = !isBefore(subMonths(shownMonth, 1), minMonth);
+  const canNext = !isAfter(addMonths(shownMonth, 1), maxMonth);
+
+  const handlePrevMonth = () => {
+    if (!canPrev) return;
+    setCurrentMonth((m) => subMonths(m || minMonth, 1));
+  };
+
+  const handleNextMonth = () => {
+    if (!canNext) return;
+    setCurrentMonth((m) => addMonths(m || minMonth, 1));
+  };
 
   const renderHeader = () => (
-    <div className="flex justify-center items-center mb-1 text-sm text-gray-700 font-semibold">
-      {format(currentMonth, "MMMM yyyy")}
+    <div className="flex items-center justify-between mb-2 text-sm text-gray-700 font-semibold">
+      <button
+        type="button"
+        onClick={handlePrevMonth}
+        disabled={!canPrev}
+        className={[
+          "px-2 py-1 rounded-md border text-xs",
+          canPrev
+            ? "hover:bg-gray-50"
+            : "opacity-40 cursor-not-allowed bg-gray-50",
+        ].join(" ")}
+        aria-label="Previous month"
+      >
+        ←
+      </button>
+
+      <div className="text-center">
+        {format(shownMonth, "MMMM yyyy")}
+      </div>
+
+      <button
+        type="button"
+        onClick={handleNextMonth}
+        disabled={!canNext}
+        className={[
+          "px-2 py-1 rounded-md border text-xs",
+          canNext
+            ? "hover:bg-gray-50"
+            : "opacity-40 cursor-not-allowed bg-gray-50",
+        ].join(" ")}
+        aria-label="Next month"
+      >
+        →
+      </button>
     </div>
   );
 
@@ -149,7 +210,7 @@ export default function TourDetail() {
   };
 
   const renderCells = () => {
-    const monthStart = startOfMonth(currentMonth);
+    const monthStart = startOfMonth(shownMonth);
     const monthEnd = endOfMonth(monthStart);
     const startWeek = startOfWeek(monthStart);
     const endWeek = endOfWeek(monthEnd);
@@ -198,7 +259,6 @@ export default function TourDetail() {
     return <div>{rows}</div>;
   };
 
-  // ✅ preview images = lấy từ images, tránh undefined
   const previewImages = images.slice(0, 3);
   const mainImg = selectedImg || images[0] || fallbackImages[0];
 
@@ -253,7 +313,6 @@ export default function TourDetail() {
           ← Back
         </button>
 
-        {/* ✅ responsive height: mobile thấp hơn để không “bự quá” */}
         <div className="w-full rounded-2xl overflow-hidden shadow-md bg-gray-100">
           <img
             src={mainImg}
@@ -336,7 +395,6 @@ export default function TourDetail() {
 
           <p className="font-medium mb-2 text-gray-700">Trip Duration</p>
 
-          {/* ✅ Calendar + Book Now: full width mobile, gọn desktop */}
           <div className="flex flex-col mt-2 w-full max-w-[360px]">
             <div className="border rounded-2xl p-3 shadow-md w-full bg-white">
               {renderHeader()}

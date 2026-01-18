@@ -134,7 +134,6 @@ export default function SchedulePage() {
           img: toS3TourImage(t.mainImage),
           from: t.startDate,
           to: t.endDate,
-          time: t.time || "—",
           task: t.description || "",
           dayObj: start,
         };

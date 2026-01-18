@@ -25,9 +25,7 @@ export default function EventCard({ event }) {
           {format(new Date(event.to), "dd MMM yyyy")}
         </p>
 
-        <p className="text-gray-600">
-          <strong>Time:</strong> {event.time}
-        </p>
+        
 
         <p className="text-gray-700 mt-2">{event.task}</p>
 

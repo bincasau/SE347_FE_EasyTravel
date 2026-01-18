@@ -12,30 +12,23 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 
 import { getDepartureLocations } from "@/apis/Tour";
-import {
-  getPublicNotifications,
-  getMyNotifications,
-} from "@/apis/NotificationAPI";
+import { getPublicNotifications } from "@/apis/NotificationAPI";
 
 const HeroSection = () => {
   const { t } = useLang();
   const navigate = useNavigate();
 
-  // ====== 4 fields ======
-  const [startDate, setStartDate] = useState(""); // yyyy-mm-dd (for API)
-  const [durationDays, setDurationDays] = useState(""); // "2" | "3"...
+  const [startDate, setStartDate] = useState("");
+  const [durationDays, setDurationDays] = useState("");
   const [people, setPeople] = useState(1);
   const [departure, setDeparture] = useState("");
-
-  // departure options
   const [departureOptions, setDepartureOptions] = useState([]);
   const [loadingDeparture, setLoadingDeparture] = useState(false);
-
-  // broadcast ticker
   const [broadcastText, setBroadcastText] = useState("");
   const [showBroadcast, setShowBroadcast] = useState(true);
 
-  // minStartDate = today + 2
+  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem("jwt"));
+
   const minStartDate = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() + 2);
@@ -45,7 +38,6 @@ const HeroSection = () => {
     return `${y}-${m}-${day}`;
   }, []);
 
-  // ===== date helpers: yyyy-mm-dd -> dd/mm/yyyy =====
   const formatDMY = (ymd) => {
     if (!ymd) return "";
     const [y, m, d] = String(ymd).split("-");
@@ -61,7 +53,6 @@ const HeroSection = () => {
     else el.click();
   };
 
-  // load departure list
   useEffect(() => {
     let mounted = true;
 
@@ -72,7 +63,6 @@ const HeroSection = () => {
         if (!mounted) return;
         setDepartureOptions(Array.isArray(list) ? list : []);
       } catch (e) {
-        console.error("getDepartureLocations failed", e);
         if (!mounted) return;
         setDepartureOptions(["Hà Nội", "Hồ Chí Minh", "Đà Nẵng"]);
       } finally {
@@ -85,7 +75,6 @@ const HeroSection = () => {
     };
   }, []);
 
-  // ====== BROADCAST (luôn có ngay) ======
   const sortByTimeDesc = (arr) =>
     [...arr].sort((a, b) => {
       const ta = new Date(a.time || a.createdAt || a.updatedAt || 0).getTime();
@@ -95,67 +84,60 @@ const HeroSection = () => {
 
   const loadBroadcast = async () => {
     try {
-      // ✅ luôn lấy public để broadcast có ngay
       const publicList = await getPublicNotifications().catch(() => []);
-
-      // ✅ nếu có jwt thì lấy thêm my (optional)
-      const token = localStorage.getItem("jwt");
-      const myList = token
-        ? await getMyNotifications("ACTIVE").catch(() => [])
-        : [];
-
-      const merged = [
-        ...(Array.isArray(publicList) ? publicList : []),
-        ...(Array.isArray(myList) ? myList : []),
-      ];
-
-      const sorted = sortByTimeDesc(merged);
-      const latest = sorted[0];
-
-      setBroadcastText(latest?.message ? String(latest.message) : "");
-      // chỉ auto show lại khi có message
+      const sorted = sortByTimeDesc(Array.isArray(publicList) ? publicList : []);
+      const messages = sorted
+        .map((x) => (x?.message != null ? String(x.message).trim() : ""))
+        .filter(Boolean);
+      const joined = messages.join("  •  ");
+      setBroadcastText(joined);
       setShowBroadcast(true);
     } catch (e) {
-      console.error("load broadcast failed:", e);
       setBroadcastText("");
     }
   };
 
-  // ✅ Không cần dispatch jwt-changed:
-  // Poll vài lần đầu để bắt jwt set trễ (redirect/login)
   useEffect(() => {
     let alive = true;
     const timers = [];
 
-    const run = async () => {
+    const syncLogin = () => {
       if (!alive) return;
-      await loadBroadcast();
+      setIsLoggedIn(!!localStorage.getItem("jwt"));
     };
 
-    // chạy ngay + vài lần sau (jwt có thể set sau khi mount)
-    const delays = [0, 200, 600, 1200, 2000];
-    delays.forEach((ms) => {
-      timers.push(setTimeout(run, ms));
+    [0, 200, 600, 1200, 2000].forEach((ms) => {
+      timers.push(setTimeout(syncLogin, ms));
     });
+
+    const interval = setInterval(syncLogin, 1000);
 
     return () => {
       alive = false;
       timers.forEach(clearTimeout);
+      clearInterval(interval);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const shouldShowTicker = showBroadcast && !!broadcastText?.trim();
+  useEffect(() => {
+    if (isLoggedIn) return;
+    loadBroadcast();
+  }, [isLoggedIn]);
+
+  const shouldShowTicker = !isLoggedIn && showBroadcast && !!broadcastText?.trim();
 
   const handleSearch = () => {
-    navigate("/tours", {
-      state: {
-        startDate: startDate || "",
-        departureLocation: departure || "",
-        durationDay: durationDays || "",
-        people: Number(people || 1),
-      },
-    });
+    const payload = {
+      startDate: startDate || "",
+      endDate: "",
+      departureLocation: departure || "",
+      departure: departure || "",
+      durationDay: durationDays || "",
+      durationDays: durationDays || "",
+      people: Number(people || 1),
+    };
+
+    navigate("/tours", { state: payload, replace: true });
   };
 
   return (
@@ -183,7 +165,6 @@ const HeroSection = () => {
           {t("home.hero.subtitle")}
         </p>
 
-        {/* BROADCAST */}
         {shouldShowTicker && (
           <div className="max-w-7xl mx-auto mb-4">
             <div className="relative overflow-hidden rounded-2xl border border-white/25 bg-black/35 backdrop-blur-md">
@@ -203,25 +184,22 @@ const HeroSection = () => {
               </button>
 
               <div className="py-2 pl-28 pr-12">
-                <div
-                  className="whitespace-nowrap text-sm sm:text-base text-white/95 font-medium"
-                  style={{
-                    animation: "heroMarquee 14s linear infinite",
-                    willChange: "transform",
-                  }}
-                >
-                  {broadcastText}
-                  <span className="mx-10 opacity-70">•</span>
-                  {broadcastText}
-                  <span className="mx-10 opacity-70">•</span>
-                  {broadcastText}
+                <div className="relative overflow-hidden">
+                  <div
+                    className="whitespace-nowrap text-sm sm:text-base text-white/95 font-medium inline-block"
+                    style={{
+                      animation: "heroMarquee 18s linear infinite",
+                      willChange: "transform",
+                    }}
+                  >
+                    {broadcastText}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* SEARCH BOX */}
         <div
           className="relative w-full max-w-7xl mx-auto p-[2px] rounded-3xl 
           bg-gradient-to-b from-white/5 via-white/20 to-white/70 
@@ -229,7 +207,6 @@ const HeroSection = () => {
         >
           <div className="rounded-3xl bg-white/90 backdrop-blur-xl p-4 sm:p-6 md:p-8 border border-white/20">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
-              {/* 1) NGÀY ĐI (hiển thị dd/mm/yyyy) */}
               <div className="flex flex-col text-left">
                 <label className="text-sm text-gray-700 mb-1 flex items-center gap-2">
                   <FontAwesomeIcon icon={faCalendarDays} />
@@ -256,7 +233,6 @@ const HeroSection = () => {
                 />
               </div>
 
-              {/* 2) ĐI MẤY NGÀY */}
               <div className="flex flex-col text-left">
                 <label className="text-sm text-gray-700 mb-1 flex items-center gap-2">
                   <FontAwesomeIcon icon={faClock} />
@@ -276,7 +252,6 @@ const HeroSection = () => {
                 </select>
               </div>
 
-              {/* 3) SỐ NGƯỜI */}
               <div className="flex flex-col text-left">
                 <label className="text-sm text-gray-700 mb-1 flex items-center gap-2">
                   <FontAwesomeIcon icon={faUsers} />
@@ -292,7 +267,6 @@ const HeroSection = () => {
                 />
               </div>
 
-              {/* 4) ĐIỂM ĐI */}
               <div className="flex flex-col text-left">
                 <label className="text-sm text-gray-700 mb-1 flex items-center gap-2">
                   <FontAwesomeIcon icon={faMapMarkerAlt} />
@@ -304,9 +278,7 @@ const HeroSection = () => {
                   className="h-[48px] px-3 border rounded-xl text-gray-700 bg-white/80"
                   disabled={loadingDeparture}
                 >
-                  <option value="">
-                    {loadingDeparture ? "Loading..." : "Tất cả"}
-                  </option>
+                  <option value="">{loadingDeparture ? "Loading..." : "Tất cả"}</option>
                   {departureOptions.map((d) => (
                     <option key={d} value={d}>
                       {d}
@@ -315,17 +287,13 @@ const HeroSection = () => {
                 </select>
               </div>
 
-              {/* SEARCH BUTTON */}
               <button
                 onClick={handleSearch}
                 className="h-[48px] w-full flex items-center justify-center gap-2 text-white rounded-xl transition-all duration-300
                   bg-orange-500 hover:bg-orange-600 hover:scale-[1.02] active:scale-[0.98] shadow-md font-semibold"
                 title="Search tours"
               >
-                <FontAwesomeIcon
-                  icon={faMagnifyingGlass}
-                  className="text-base"
-                />
+                <FontAwesomeIcon icon={faMagnifyingGlass} className="text-base" />
                 <span>Search</span>
               </button>
             </div>

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useCallback, useState } from "react";
 import {
   addComment,
   deleteComment,
@@ -7,32 +7,8 @@ import {
 } from "@/apis/CommentAPI";
 import { popup } from "@/utils/popup";
 
-const API_BASE = "http://localhost:8080";
-
-// fetch có JWT (nếu user endpoint cần auth)
-async function fetchWithJwt(url, options = {}) {
-  const token = localStorage.getItem("jwt");
-  const finalUrl = url.startsWith("http") ? url : `${API_BASE}${url}`;
-
-  return fetch(finalUrl, {
-    cache: "no-store",
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
-}
-
-function AvatarLetter({ name }) {
-  const initial = (name || "A").trim().charAt(0).toUpperCase();
-  return (
-    <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-700 grid place-items-center text-xs font-semibold">
-      {initial}
-    </div>
-  );
-}
+const S3_USER_BASE =
+  "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/user";
 
 function fmtDate(value) {
   if (!value) return "--";
@@ -41,6 +17,31 @@ function fmtDate(value) {
   } catch {
     return "--";
   }
+}
+
+function Avatar({ name, avatar }) {
+  const initial = (name || "A").trim().charAt(0).toUpperCase();
+  const src = avatar ? `${S3_USER_BASE}/${avatar}` : "";
+
+  if (!avatar) {
+    return (
+      <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-700 grid place-items-center text-xs font-semibold">
+        {initial}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={name || "avatar"}
+      className="w-8 h-8 rounded-full object-cover border"
+      onError={(e) => {
+        // fallback -> đổi thành avatar chữ bằng cách ẩn img
+        e.currentTarget.style.display = "none";
+      }}
+    />
+  );
 }
 
 export default function BlogComments({ blogId }) {
@@ -55,158 +56,83 @@ export default function BlogComments({ blogId }) {
   const [editingContent, setEditingContent] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
-  // ✅ map cache user: { [userHref]: userObj }
-  const [userMap, setUserMap] = useState({});
-
   const visibleComments = useMemo(
     () => comments.slice(0, visibleCount),
     [comments, visibleCount]
   );
 
-  const getId = (c, i) => c?.commentId ?? c?.comment_id ?? c?.id ?? i;
-  const getTime = (c) => c?.createdAt || c?.created_at;
-  const getContent = (c) => c?.content || "";
+  // ===== field getters (theo response mới) =====
+  const getId = (c, i) => c?.commentId ?? c?.id ?? i;
+  const getTime = (c) => c?.createdAt ?? c?.time ?? c?.created_at;
+  const getContent = (c) => c?.content ?? "";
+  const getName = (c) => c?.userName ?? c?.name ?? "Anonymous";
+  const getAvatar = (c) => c?.userAvatar ?? c?.avatar ?? "";
 
-  // ✅ HAL: lấy user href từ _links.user.href
-  const getUserHref = (c) => c?._links?.user?.href || "";
+  // ===== reload list =====
+  const reload = useCallback(async () => {
+    if (!blogId) return;
 
-  // ✅ name ưu tiên userMap[href], fallback "Anonymous"
-  const getName = (c) => {
-    const href = getUserHref(c);
-    const u = href ? userMap[href] : null;
+    const data = await getCommentsByBlogId(blogId);
 
-    return (
-      u?.name ||
-      u?.username ||
-      u?.fullName ||
-      u?.email ||
-      c?.user?.name ||
-      c?.name ||
-      "Anonymous"
-    );
-  };
+    const list = Array.isArray(data)
+      ? data
+      : data?._embedded?.comments
+      ? data._embedded.comments
+      : [];
 
-  // =========================
-  // 1) LOAD COMMENTS (parse đúng HAL)
-  // =========================
+    const sorted = [...list].sort((a, b) => {
+      const ta = new Date(getTime(a) || 0).getTime();
+      const tb = new Date(getTime(b) || 0).getTime();
+      return tb - ta;
+    });
+
+    setComments(sorted);
+  }, [blogId]);
+
+  // ===== initial load =====
   useEffect(() => {
-    const load = async () => {
+    let mounted = true;
+
+    (async () => {
       if (!blogId) return;
       setLoading(true);
       try {
-        const data = await getCommentsByBlogId(blogId);
-
-        const list = Array.isArray(data)
-          ? data
-          : data?._embedded?.comments
-          ? data._embedded.comments
-          : [];
-
-        const sorted = [...list].sort((a, b) => {
-          const ta = new Date(getTime(a) || 0).getTime();
-          const tb = new Date(getTime(b) || 0).getTime();
-          return tb - ta;
-        });
-
-        setComments(sorted);
+        await reload();
       } catch (e) {
         console.error("Load comments failed:", e);
-        setComments([]);
+        if (mounted) setComments([]);
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
+    })();
+
+    return () => {
+      mounted = false;
     };
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [blogId]);
+  }, [blogId, reload]);
 
-  // =========================
-  // 2) FETCH USERS theo link comment/_links/user
-  // =========================
-  const userHrefs = useMemo(() => {
-    const s = new Set();
-    for (const c of comments) {
-      const href = getUserHref(c);
-      if (href) s.add(href);
-    }
-    return [...s];
-  }, [comments]);
-
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const need = userHrefs.filter((h) => !userMap[h]);
-        if (!need.length) return;
-
-        const results = await Promise.all(
-          need.map(async (href) => {
-            try {
-              const res = await fetchWithJwt(href, { method: "GET" });
-              if (!res.ok) return [href, null];
-              const u = await res.json();
-              return [href, u];
-            } catch {
-              return [href, null];
-            }
-          })
-        );
-
-        setUserMap((prev) => {
-          const next = { ...prev };
-          results.forEach(([href, u]) => {
-            if (u) next[href] = u;
-          });
-          return next;
-        });
-      } catch (e) {
-        console.error("fetchUsers failed:", e);
-      }
-    };
-
-    if (userHrefs.length) fetchUsers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userHrefs]);
-
-  // =========================
-  // ✅ ADD (xong thì reload lại để có _links user đầy đủ)
-  // =========================
+  // ===== ADD =====
   const onSubmit = async (e) => {
     e.preventDefault();
-    if (!content.trim()) return;
+    const text = content.trim();
+    if (!text) return;
 
     setSubmitting(true);
     try {
-      await addComment(blogId, content.trim());
-
-      const data = await getCommentsByBlogId(blogId);
-      const list = Array.isArray(data)
-        ? data
-        : data?._embedded?.comments
-        ? data._embedded.comments
-        : [];
-
-      const sorted = [...list].sort((a, b) => {
-        const ta = new Date(getTime(a) || 0).getTime();
-        const tb = new Date(getTime(b) || 0).getTime();
-        return tb - ta;
-      });
-
-      setComments(sorted);
-
+      await addComment(blogId, text);
+      await reload();
       setVisibleCount(4);
       setContent("");
-
-      // ✅ optional đẹp hơn
       popup.success("Đã gửi bình luận!");
-    } catch (e) {
-      console.error(e);
-      popup.error(e?.message || "Không thể gửi bình luận (cần đăng nhập?)");
+    } catch (e2) {
+      console.error(e2);
+      popup.error(e2?.message || "Không thể gửi bình luận (cần đăng nhập?)");
     } finally {
       setSubmitting(false);
     }
   };
 
-  // ✅ EDIT
+  // ===== EDIT =====
   const startEdit = (c) => {
     const id = getId(c);
     setEditingId(id);
@@ -220,21 +146,13 @@ export default function BlogComments({ blogId }) {
 
   const saveEdit = async () => {
     if (!editingId) return;
-    if (!editingContent.trim()) return;
+    const text = editingContent.trim();
+    if (!text) return;
 
     setSavingEdit(true);
     try {
-      await updateComment(editingId, editingContent.trim());
-
-      const data = await getCommentsByBlogId(blogId);
-      const list = Array.isArray(data)
-        ? data
-        : data?._embedded?.comments
-        ? data._embedded.comments
-        : [];
-
-      setComments(list);
-
+      await updateComment(editingId, text);
+      await reload();
       cancelEdit();
       popup.success("Đã cập nhật bình luận!");
     } catch (e) {
@@ -245,14 +163,14 @@ export default function BlogComments({ blogId }) {
     }
   };
 
-  // ✅ DELETE
+  // ===== DELETE =====
   const onDelete = async (id) => {
     const ok = await popup.confirm("Xoá bình luận này?");
     if (!ok) return;
 
     try {
       await deleteComment(id);
-      setComments((prev) => prev.filter((c) => getId(c) !== id));
+      await reload();
       popup.success("Đã xoá bình luận!");
     } catch (e) {
       console.error(e);
@@ -283,6 +201,7 @@ export default function BlogComments({ blogId }) {
           {visibleComments.map((c, i) => {
             const id = getId(c, i);
             const name = getName(c);
+            const avatar = getAvatar(c);
 
             return (
               <div
@@ -291,7 +210,17 @@ export default function BlogComments({ blogId }) {
               >
                 <div className="flex items-start justify-between gap-3 mb-2">
                   <div className="flex items-center gap-3">
-                    <AvatarLetter name={name} />
+                    {/* avatar image or fallback letter */}
+                    <div className="w-8 h-8">
+                      {avatar ? (
+                        <Avatar name={name} avatar={avatar} />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-700 grid place-items-center text-xs font-semibold">
+                          {(name || "A").trim().charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+
                     <div>
                       <div className="font-semibold text-gray-800">{name}</div>
                       <div className="text-xs text-gray-400">
