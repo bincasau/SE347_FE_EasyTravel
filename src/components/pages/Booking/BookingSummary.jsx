@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import imgFallback from "../../../assets/images/Tour/Booking.jpg";
 
 // Format to VND currency
 const formatVND = (n) =>
@@ -32,7 +31,7 @@ export default function BookingSummary({ bookingData }) {
   // ✅ main image dùng S3 theo id giống TourCard
   const [mainImageUrl, setMainImageUrl] = useState(() => {
     const s3Url = buildS3TourImage(resolvedTourId);
-    return s3Url || imgFallback;
+    return s3Url;
   });
 
   // ✅ nếu bookingData có tourInfo thì dùng luôn, khỏi fetch
@@ -44,7 +43,7 @@ export default function BookingSummary({ bookingData }) {
         tourInfoFromBooking?.id ?? tourInfoFromBooking?.tourId ?? tourId;
 
       const s3Url = buildS3TourImage(id);
-      setMainImageUrl(s3Url || imgFallback);
+      setMainImageUrl(s3Url);
 
       setLoading(false);
       return;
@@ -64,10 +63,10 @@ export default function BookingSummary({ bookingData }) {
 
         const id = data?.id ?? data?.tourId ?? tourId;
         const s3Url = buildS3TourImage(id);
-        setMainImageUrl(s3Url || imgFallback);
+        setMainImageUrl(s3Url);
       } catch (err) {
         console.error("❌ Error fetching tour:", err);
-        setMainImageUrl(imgFallback);
+        setMainImageUrl();
       } finally {
         setLoading(false);
       }
@@ -79,7 +78,7 @@ export default function BookingSummary({ bookingData }) {
   // ✅ nếu id đổi (người dùng chọn tour khác) thì update ảnh
   useEffect(() => {
     const s3Url = buildS3TourImage(resolvedTourId);
-    setMainImageUrl(s3Url || imgFallback);
+    setMainImageUrl(s3Url);
   }, [resolvedTourId]);
 
   if (loading)
@@ -110,10 +109,7 @@ export default function BookingSummary({ bookingData }) {
           src={mainImageUrl}
           alt={title}
           className="w-24 h-20 rounded-lg object-cover flex-shrink-0 border"
-          onError={(e) => {
-            // ✅ fallback nếu ảnh S3 không có
-            e.currentTarget.src = imgFallback;
-          }}
+          
         />
         <div className="flex flex-col justify-center">
           <div className="font-semibold text-gray-800 text-sm leading-tight mb-1">

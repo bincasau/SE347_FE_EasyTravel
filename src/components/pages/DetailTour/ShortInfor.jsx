@@ -13,18 +13,9 @@ import {
   parseISO,
 } from "date-fns";
 
-import travel1 from "../../../assets/images/Tour/travel1.jpg";
-import travel2 from "../../../assets/images/Tour/travel2.jpg";
-import travel3 from "../../../assets/images/Tour/travel3.jpg";
-import travel4 from "../../../assets/images/Tour/travel4.jpg";
-
 import { getUserFromToken } from "@/utils/auth";
 import { extractIdFromSlug, buildTourSlug } from "@/utils/slug";
-
-// ✅ popup helper (đúng theo export của bạn)
 import { popup } from "@/utils/popup";
-// nếu popup.js export default thì dùng:
-// import popup from "@/utils/popup";
 
 export default function TourDetail() {
   const { slugId } = useParams();
@@ -40,7 +31,14 @@ export default function TourDetail() {
   const S3_TOUR_IMG_BASE =
     "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/image";
 
-  const fallbackImages = useMemo(() => [travel1, travel2, travel3, travel4], []);
+  // ✅ fallback images (tránh undefined + tránh broken image)
+  const fallbackImages = useMemo(
+    () => [
+      "https://placehold.co/1200x800?text=Tour+Image",
+      "https://placehold.co/600x400?text=Preview",
+    ],
+    []
+  );
 
   useEffect(() => {
     const fetchTour = async () => {
@@ -57,11 +55,13 @@ export default function TourDetail() {
         const data = await res.json();
         setTour(data);
 
+        // ✅ đảm bảo URL slug đúng
         const correctSlugId = buildTourSlug(id, data?.title);
         if (slugId !== correctSlugId) {
           navigate(`/detailtour/${correctSlugId}`, { replace: true });
         }
 
+        // ✅ build ảnh từ S3
         const s3Images = Array.from({ length: 5 }, (_, idx) => {
           const n = idx + 1;
           return `${S3_TOUR_IMG_BASE}/tour_${id}_img_${n}.jpg`;
@@ -86,19 +86,21 @@ export default function TourDetail() {
     if (images?.length) setSelectedImg(images[0]);
   }, [images]);
 
-  if (loading)
+  if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen text-gray-500">
+      <div className="flex justify-center items-center min-h-[60vh] text-gray-500">
         Đang tải dữ liệu tour...
       </div>
     );
+  }
 
-  if (!tour)
+  if (!tour) {
     return (
-      <div className="flex justify-center items-center h-screen text-red-500">
+      <div className="flex justify-center items-center min-h-[60vh] text-red-500">
         Không tìm thấy tour.
       </div>
     );
+  }
 
   const {
     title,
@@ -108,10 +110,9 @@ export default function TourDetail() {
     startDate,
     endDate,
     destination,
-    availableSeats, // ✅ lấy trực tiếp từ tour
+    availableSeats,
   } = tour;
 
-  // ✅ check seats
   const seatsLeft = Number(availableSeats ?? 0);
   const soldOut = seatsLeft <= 0;
 
@@ -187,10 +188,7 @@ export default function TourDetail() {
       }
 
       rows.push(
-        <div
-          className="grid grid-cols-7 gap-[0px] mb-[1px]"
-          key={format(day, "yyyy-MM-dd")}
-        >
+        <div className="grid grid-cols-7 gap-[0px] mb-[1px]" key={String(day)}>
           {days}
         </div>
       );
@@ -200,9 +198,9 @@ export default function TourDetail() {
     return <div>{rows}</div>;
   };
 
+  // ✅ preview images = lấy từ images, tránh undefined
+  const previewImages = images.slice(0, 3);
   const mainImg = selectedImg || images[0] || fallbackImages[0];
-  const previewImages =
-    images.length >= 4 ? images.slice(1, 4) : fallbackImages.slice(1, 4);
 
   const getToken = () =>
     localStorage.getItem("jwt") ||
@@ -211,14 +209,12 @@ export default function TourDetail() {
     "";
 
   const handleBuyNow = async () => {
-    // ✅ chặn luôn ở logic (kể cả bật nút bằng devtools)
     if (soldOut) {
       await popup.error("Tour đã hết chỗ. Vui lòng chọn tour khác.");
       return;
     }
 
     const token = getToken();
-
     if (!token) {
       const ok = await popup.confirm(
         "Bạn cần đăng nhập để đặt tour. Mở trang đăng nhập ngay?",
@@ -240,14 +236,14 @@ export default function TourDetail() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-8 grid md:grid-cols-2 gap-6 md:gap-8 items-start">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 grid md:grid-cols-2 gap-6 md:gap-8 items-start overflow-x-hidden">
       {/* Left images */}
       <div className="flex flex-col relative">
         <button
           onClick={() =>
             window.history.length > 1 ? navigate(-1) : navigate("/tours")
           }
-          className="absolute -top-10 left-0 flex items-center gap-2 
+          className="mb-3 inline-flex w-fit items-center gap-2 
             border border-orange-500 text-orange-500 
             bg-white text-[15px] font-medium 
             px-4 py-1.5 rounded-md
@@ -257,16 +253,20 @@ export default function TourDetail() {
           ← Back
         </button>
 
-        <div className="w-full h-[620px] rounded-2xl overflow-hidden shadow-md bg-gray-100">
+        {/* ✅ responsive height: mobile thấp hơn để không “bự quá” */}
+        <div className="w-full rounded-2xl overflow-hidden shadow-md bg-gray-100">
           <img
             src={mainImg}
             alt={title}
-            className="w-full h-full object-cover transition-transform duration-200 hover:scale-[1.01]"
-            onError={(e) => (e.currentTarget.src = fallbackImages[0])}
+            className="w-full h-[320px] sm:h-[420px] lg:h-[560px] object-cover transition-transform duration-200 hover:scale-[1.01]"
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = fallbackImages[0];
+            }}
           />
         </div>
 
-        <div className="grid grid-cols-3 gap-4 mt-4">
+        <div className="grid grid-cols-3 gap-3 sm:gap-4 mt-3 sm:mt-4">
           {previewImages.map((img, i) => {
             const isActive = img === mainImg;
 
@@ -277,7 +277,7 @@ export default function TourDetail() {
                 onClick={() => setSelectedImg(img)}
                 className={[
                   "rounded-xl overflow-hidden bg-gray-100 shadow-sm",
-                  "h-[140px] w-full",
+                  "h-[90px] sm:h-[120px] lg:h-[140px] w-full",
                   "ring-2 ring-offset-2 transition",
                   isActive
                     ? "ring-orange-500"
@@ -288,7 +288,10 @@ export default function TourDetail() {
                   src={img}
                   alt={`preview-${i}`}
                   className="w-full h-full object-cover hover:scale-[1.03] transition-transform duration-200"
-                  onError={(e) => (e.currentTarget.src = fallbackImages[1])}
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = fallbackImages[1];
+                  }}
                 />
               </button>
             );
@@ -299,7 +302,7 @@ export default function TourDetail() {
       {/* Right info */}
       <div className="flex flex-col pb-4">
         <div className="mt-2 md:mt-0">
-          <h1 className="text-4xl font-podcast font-light mb-1 text-gray-800 leading-snug">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-podcast font-light mb-1 text-gray-800 leading-snug">
             {title}
           </h1>
 
@@ -312,7 +315,7 @@ export default function TourDetail() {
                   {formatCurrency(priceAdult)}
                 </p>
 
-                <p className="text-3xl text-orange-500 font-bold">
+                <p className="text-2xl sm:text-3xl text-orange-500 font-bold">
                   {formatCurrency(priceAdult * (1 - percentDiscount / 100))}
                 </p>
 
@@ -321,7 +324,7 @@ export default function TourDetail() {
                 </p>
               </div>
             ) : (
-              <p className="text-3xl text-orange-500 font-bold">
+              <p className="text-2xl sm:text-3xl text-orange-500 font-bold">
                 {formatCurrency(priceAdult)}
               </p>
             )}
@@ -333,16 +336,15 @@ export default function TourDetail() {
 
           <p className="font-medium mb-2 text-gray-700">Trip Duration</p>
 
-          {/* Calendar + Book Now stack dọc */}
-          <div className="flex flex-col mt-2">
-            <div className="border rounded-2xl p-3 shadow-md w-[280px] sm:w-[300px] bg-white">
+          {/* ✅ Calendar + Book Now: full width mobile, gọn desktop */}
+          <div className="flex flex-col mt-2 w-full max-w-[360px]">
+            <div className="border rounded-2xl p-3 shadow-md w-full bg-white">
               {renderHeader()}
               {renderDays()}
               {renderCells()}
             </div>
 
-            {/* ✅ Seats badge */}
-            <div className="mt-3 w-[280px] sm:w-[300px] text-sm">
+            <div className="mt-3 w-full text-sm">
               {soldOut ? (
                 <span className="text-red-500 font-medium">Hết chỗ</span>
               ) : (
@@ -356,7 +358,7 @@ export default function TourDetail() {
               onClick={handleBuyNow}
               disabled={soldOut}
               className={[
-                "w-[280px] sm:w-[300px] rounded-full px-6 py-3 shadow-md transition-all mt-3",
+                "w-full rounded-full px-6 py-3 shadow-md transition-all mt-3",
                 soldOut
                   ? "bg-gray-300 text-gray-600 cursor-not-allowed"
                   : "bg-orange-500 hover:bg-orange-600 text-white",
