@@ -18,6 +18,8 @@ import Profile from "./pages/Profile";
 import EditProfile from "./pages/EditProfile";
 import BookingHistoryTours from "./pages/BookingHistoryTours";
 import BookingHistoryHotels from "./pages/BookingHistoryHotels";
+import TermsPage from "./pages/Terms";
+import PrivacyPage from "./pages/Privacy";
 
 import RequireRole from "./pages/TourGuide/RequireRole";
 import PastTours from "./pages/TourGuide/PastTours";
@@ -100,6 +102,8 @@ export default function App() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/profile/edit" element={<EditProfile />} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
           <Route
             path="/booking-history/tours"
             element={<BookingHistoryTours />}

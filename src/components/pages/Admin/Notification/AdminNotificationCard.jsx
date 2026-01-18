@@ -47,15 +47,14 @@ export default function AdminNotificationCard({
 
   const id = notif?.notificationId ?? notif?.notification_id ?? notif?.id;
 
-  // ✅ đúng key BE trả về
   const isBroadcast = toBool(
-    notif?.broadCast ?? notif?.isBroadcast ?? notif?.is_broadcast
+    notif?.broadCast ?? notif?.isBroadcast ?? notif?.is_broadcast,
   );
   const isRead = toBool(notif?.read ?? notif?.isRead ?? notif?.is_read);
 
   const createdAtText = useMemo(
     () => formatDateTime(notif?.createdAt ?? notif?.created_at),
-    [notif?.createdAt, notif?.created_at]
+    [notif?.createdAt, notif?.created_at],
   );
 
   const status = useMemo(() => normalizeStatus(notif?.status), [notif?.status]);
@@ -74,6 +73,7 @@ export default function AdminNotificationCard({
 
   const handleToggleActive = async () => {
     if (!id || typeof onToggleActive !== "function") return;
+
     const nextStatus = isActive ? "NOT ACTIVE" : "ACTIVE";
     try {
       setErr("");
@@ -88,6 +88,7 @@ export default function AdminNotificationCard({
 
   const handleDelete = async () => {
     if (!id || typeof onDelete !== "function") return;
+
     const ok = window.confirm("Bạn có chắc chắn muốn xóa thông báo này không?");
     if (!ok) return;
 
@@ -114,7 +115,7 @@ export default function AdminNotificationCard({
 
             <span
               className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ring-1 ${badgeClass(
-                typeBadge
+                typeBadge,
               )}`}
             >
               {typeLabel}
@@ -122,7 +123,7 @@ export default function AdminNotificationCard({
 
             <span
               className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ring-1 ${badgeClass(
-                readBadge
+                readBadge,
               )}`}
             >
               {readLabel}
@@ -130,7 +131,7 @@ export default function AdminNotificationCard({
 
             <span
               className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ring-1 ${badgeClass(
-                activeBadge
+                activeBadge,
               )}`}
             >
               {activeLabel}

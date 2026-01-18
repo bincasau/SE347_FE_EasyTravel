@@ -59,7 +59,9 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
       return (tb || 0) - (ta || 0);
     });
 
-  const unreadCount = notifications.filter((n) => !normalizeNoti(n).read).length;
+  const unreadCount = notifications.filter(
+    (n) => !normalizeNoti(n).read,
+  ).length;
 
   // ✅ Khi đã login mới hiển thị badge (vì chưa login sẽ ẩn chuông luôn)
   const showBadge = !!user && unreadCount > 0;
@@ -129,7 +131,9 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     try {
       const [publicList, myList] = await Promise.all([
         getPublicNotifications().catch(() => []),
-        user ? getMyNotifications("ACTIVE").catch(() => []) : Promise.resolve([]),
+        user
+          ? getMyNotifications("ACTIVE").catch(() => [])
+          : Promise.resolve([]),
       ]);
 
       const incoming = [
@@ -160,9 +164,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
             ...old,
             ...n,
             read:
-              Boolean(old.read) ||
-              Boolean(n.read) ||
-              Boolean(oldPrev?.read),
+              Boolean(old.read) || Boolean(n.read) || Boolean(oldPrev?.read),
           });
         };
 
@@ -339,7 +341,8 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
 
   const isHotelActive =
     location.pathname.startsWith("/hotels") ||
-    location.pathname.startsWith("/rooms");
+    location.pathname.startsWith("/detailhotel") ||
+    /^\/booking-room(\/|$)/.test(location.pathname);
 
   const isBlogActive =
     location.pathname.startsWith("/blog") ||
@@ -359,7 +362,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     location.pathname.startsWith("/hotel-manager/rooms/view");
 
   const isHotelManagerRevenueActive = location.pathname.startsWith(
-    "/hotel-manager/revenue"
+    "/hotel-manager/revenue",
   );
 
   const renderNavClass = (it, isActive) => {
@@ -467,7 +470,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     // chưa login: chỉ mark local
     if (!user) {
       setNotifications((prev) =>
-        prev.map((x) => (x.id === nn.id ? { ...x, read: true } : x))
+        prev.map((x) => (x.id === nn.id ? { ...x, read: true } : x)),
       );
       return;
     }
@@ -477,7 +480,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
       try {
         await markNotificationRead(nn.id);
         setNotifications((prev) =>
-          prev.map((x) => (x.id === nn.id ? { ...x, read: true } : x))
+          prev.map((x) => (x.id === nn.id ? { ...x, read: true } : x)),
         );
       } catch (e) {
         console.error("Mark read failed:", e);

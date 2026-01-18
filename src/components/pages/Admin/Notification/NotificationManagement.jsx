@@ -35,13 +35,13 @@ export default function NotificationManagement() {
       setLoading(true);
 
       const list = await adminGetAllNotifications(filters);
-
+      console.log("Fetched notifications:", list);
       const sorted = (Array.isArray(list) ? list : []).slice().sort((a, b) => {
         const ida = Number(
-          a?.notificationId ?? a?.notification_id ?? a?.id ?? 0
+          a?.notificationId ?? a?.notification_id ?? a?.id ?? 0,
         );
         const idb = Number(
-          b?.notificationId ?? b?.notification_id ?? b?.id ?? 0
+          b?.notificationId ?? b?.notification_id ?? b?.id ?? 0,
         );
         return idb - ida;
       });
@@ -131,8 +131,8 @@ export default function NotificationManagement() {
               className="w-full rounded-xl ring-1 ring-gray-200 px-3 py-2 outline-none focus:ring-orange-300"
             >
               <option value="">Tất cả</option>
-              <option value="false">Chưa đọc</option>
-              <option value="true">Đã đọc</option>
+              <option value="ACTIVE">Đang kích hoạt</option>
+              <option value="NOT ACTIVE">Không kích hoạt</option>
             </select>
           </div>
 

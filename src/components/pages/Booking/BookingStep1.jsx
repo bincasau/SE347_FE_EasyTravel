@@ -12,7 +12,11 @@ const AWS_ROOM_IMAGE_BASE =
 // format VND
 const formatVND = (n) => `${Number(n || 0).toLocaleString("vi-VN")}₫`;
 
-export default function BookingStep1({ bookingData, setBookingData, nextStep }) {
+export default function BookingStep1({
+  bookingData,
+  setBookingData,
+  nextStep,
+}) {
   const { room = {}, hotel = {} } = bookingData;
 
   const realHotelId = hotel.hotelId || hotel.id;
@@ -21,10 +25,10 @@ export default function BookingStep1({ bookingData, setBookingData, nextStep }) 
 
   // === STATE ===
   const [checkInLocal, setCheckInLocal] = useState(
-    bookingData.checkInDate ? new Date(bookingData.checkInDate) : null
+    bookingData.checkInDate ? new Date(bookingData.checkInDate) : null,
   );
   const [checkOutLocal, setCheckOutLocal] = useState(
-    bookingData.checkOutDate ? new Date(bookingData.checkOutDate) : null
+    bookingData.checkOutDate ? new Date(bookingData.checkOutDate) : null,
   );
 
   const [disabledDates, setDisabledDates] = useState([]);
@@ -35,6 +39,7 @@ export default function BookingStep1({ bookingData, setBookingData, nextStep }) 
 
     getRoomBookedDates(realHotelId, realRoomId).then((dates) => {
       setDisabledDates(dates || []);
+      console.log("Blocked dates for room:", dates);
     });
   }, [realHotelId, realRoomId]);
 
@@ -100,7 +105,7 @@ export default function BookingStep1({ bookingData, setBookingData, nextStep }) 
   // Highlight ngày blocked
   const dayClassName = (date) => {
     const isBlocked = disabledDates.some(
-      (d) => d.toDateString() === date.toDateString()
+      (d) => d.toDateString() === date.toDateString(),
     );
     return isBlocked ? "blocked-day" : "";
   };
@@ -219,7 +224,9 @@ export default function BookingStep1({ bookingData, setBookingData, nextStep }) 
                 <span>
                   {it.qty} đêm · {it.label}
                 </span>
-                <span className="font-medium">{formatVND(it.qty * it.price)}</span>
+                <span className="font-medium">
+                  {formatVND(it.qty * it.price)}
+                </span>
               </div>
             ))}
           </div>
