@@ -18,8 +18,11 @@ const S3_USER_BASE =
 
 export default function Header({ onOpenLogin, onOpenSignup }) {
   const { lang, setLang, t } = useLang();
+
+  // ✅ FIX: tách ref desktop/mobile
   const [openLang, setOpenLang] = useState(false);
-  const langRef = useRef(null);
+  const langDesktopRef = useRef(null);
+  const langMobileRef = useRef(null);
 
   const [user, setUser] = useState(null);
   const [loadingUser, setLoadingUser] = useState(false);
@@ -38,7 +41,6 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
 
   // 👤 User dropdown (chỉ cho CUSTOMER)
   const [openUserMenu, setOpenUserMenu] = useState(false);
-  // ✅ FIX: tách ref desktop/mobile để click-outside không “đóng nhầm”
   const userMenuDesktopRef = useRef(null);
   const userMenuMobileRef = useRef(null);
 
@@ -212,13 +214,14 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
       if (notiRef.current && !notiRef.current.contains(e.target))
         setOpenNoti(false);
 
-      // ✅ user menu: coi click nằm trong desktop hoặc mobile user menu thì không đóng
       const inDesktop = userMenuDesktopRef.current?.contains(e.target);
       const inMobile = userMenuMobileRef.current?.contains(e.target);
       if (!inDesktop && !inMobile) setOpenUserMenu(false);
 
-      if (langRef.current && !langRef.current.contains(e.target))
-        setOpenLang(false);
+      // ✅ FIX: tách lang desktop/mobile
+      const inLangDesktop = langDesktopRef.current?.contains(e.target);
+      const inLangMobile = langMobileRef.current?.contains(e.target);
+      if (!inLangDesktop && !inLangMobile) setOpenLang(false);
     };
 
     const onEsc = (e) => {
@@ -238,11 +241,27 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     };
   }, []);
 
-  // khoá scroll khi mở mobile menu
+  // ✅ FIX: khoá scroll mà không bị “nhảy qua phải”
   useEffect(() => {
-    document.body.style.overflow = openMobile ? "hidden" : "";
+    const body = document.body;
+    const root = document.documentElement;
+
+    if (openMobile) {
+      const scrollbarWidth = window.innerWidth - root.clientWidth;
+      body.style.overflow = "hidden";
+      body.style.paddingRight = scrollbarWidth > 0 ? `${scrollbarWidth}px` : "";
+      // chống tràn ngang do vài dropdown cố định
+      root.style.overflowX = "hidden";
+    } else {
+      body.style.overflow = "";
+      body.style.paddingRight = "";
+      root.style.overflowX = "";
+    }
+
     return () => {
-      document.body.style.overflow = "";
+      body.style.overflow = "";
+      body.style.paddingRight = "";
+      root.style.overflowX = "";
     };
   }, [openMobile]);
 
@@ -404,7 +423,6 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     const nn = normalizeNoti(n);
 
     if (!user) {
-      // ✅ bạn vẫn có thể set read local, nhưng badge vẫn luôn hiện vì showBadge = true
       setNotifications((prev) =>
         prev.map((x) => (x.id === nn.id ? { ...x, read: true } : x))
       );
@@ -596,8 +614,8 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
           </nav>
 
           <div className="hidden md:flex items-center gap-4">
-            {/* Language */}
-            <div className="relative" ref={langRef}>
+            {/* Language (desktop) */}
+            <div className="relative" ref={langDesktopRef}>
               <button
                 className="flex items-center gap-2 border px-3 py-2 rounded-xl bg-gray-50 hover:bg-gray-100"
                 onClick={() => setOpenLang((v) => !v)}
@@ -629,7 +647,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
               )}
             </div>
 
-            {/* Notifications */}
+            {/* Notifications (desktop) */}
             <div className="relative" ref={notiRef}>
               <button
                 onClick={async () => {
@@ -642,7 +660,6 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
               >
                 <Bell className="w-5 h-5 text-gray-900" />
 
-                {/* ✅ CHANGE HERE: luôn hiện badge khi chưa login */}
                 {showBadge && (
                   <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 text-[11px] rounded-full bg-red-500 text-white grid place-items-center">
                     {!user ? "!" : unreadCount > 9 ? "9+" : unreadCount}
@@ -651,7 +668,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
               </button>
 
               {openNoti && (
-                <div className="absolute right-0 mt-2 w-[360px] bg-white border rounded-2xl shadow-lg overflow-hidden">
+                <div className="absolute right-0 mt-2 w-[min(360px,calc(100vw-16px))] bg-white border rounded-2xl shadow-lg overflow-hidden">
                   <div className="px-4 py-3 flex items-center justify-between border-b">
                     <div className="font-semibold">Notifications</div>
                     <button
@@ -732,7 +749,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
 
       {/* ✅ MOBILE FULL-SCREEN MENU */}
       <div
-        className={`fixed inset-0 z-[9999] md:hidden bg-white transition-transform duration-200 ${
+        className={`fixed inset-0 z-[10000] md:hidden bg-white transition-transform duration-200 will-change-transform ${
           openMobile ? "translate-x-0" : "translate-x-full"
         }`}
         aria-hidden={!openMobile}
@@ -759,7 +776,8 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
           <div className="space-y-3">
             <div className="text-xs font-semibold text-gray-500">PREFERENCES</div>
 
-            <div className="relative" ref={langRef}>
+            {/* Language (mobile) */}
+            <div className="relative" ref={langMobileRef}>
               <button
                 className="w-full flex items-center justify-between gap-2 border px-3 py-2 rounded-xl bg-gray-50 hover:bg-gray-100"
                 onClick={() => setOpenLang((v) => !v)}
@@ -805,7 +823,6 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
                 <span className="text-sm">Notifications</span>
               </div>
 
-              {/* ✅ CHANGE HERE: luôn hiện badge khi chưa login */}
               {showBadge ? (
                 <span className="min-w-[22px] h-[22px] px-1 text-[12px] rounded-full bg-red-500 text-white grid place-items-center">
                   {!user ? "!" : unreadCount > 9 ? "9+" : unreadCount}
