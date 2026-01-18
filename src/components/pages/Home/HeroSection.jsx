@@ -57,7 +57,6 @@ const HeroSection = () => {
   const openDatePicker = () => {
     const el = dateInputRef.current;
     if (!el) return;
-    // showPicker hỗ trợ trên Chromium
     if (typeof el.showPicker === "function") el.showPicker();
     else el.click();
   };
@@ -86,41 +85,64 @@ const HeroSection = () => {
     };
   }, []);
 
-  // load broadcast
+  // ====== BROADCAST (luôn có ngay) ======
+  const sortByTimeDesc = (arr) =>
+    [...arr].sort((a, b) => {
+      const ta = new Date(a.time || a.createdAt || a.updatedAt || 0).getTime();
+      const tb = new Date(b.time || b.createdAt || b.updatedAt || 0).getTime();
+      return (tb || 0) - (ta || 0);
+    });
+
+  const loadBroadcast = async () => {
+    try {
+      // ✅ luôn lấy public để broadcast có ngay
+      const publicList = await getPublicNotifications().catch(() => []);
+
+      // ✅ nếu có jwt thì lấy thêm my (optional)
+      const token = localStorage.getItem("jwt");
+      const myList = token
+        ? await getMyNotifications("ACTIVE").catch(() => [])
+        : [];
+
+      const merged = [
+        ...(Array.isArray(publicList) ? publicList : []),
+        ...(Array.isArray(myList) ? myList : []),
+      ];
+
+      const sorted = sortByTimeDesc(merged);
+      const latest = sorted[0];
+
+      setBroadcastText(latest?.message ? String(latest.message) : "");
+      // chỉ auto show lại khi có message
+      setShowBroadcast(true);
+    } catch (e) {
+      console.error("load broadcast failed:", e);
+      setBroadcastText("");
+    }
+  };
+
+  // ✅ Không cần dispatch jwt-changed:
+  // Poll vài lần đầu để bắt jwt set trễ (redirect/login)
   useEffect(() => {
-    let mounted = true;
+    let alive = true;
+    const timers = [];
 
-    const sortByTimeDesc = (arr) =>
-      [...arr].sort((a, b) => {
-        const ta = new Date(a.time || a.createdAt || a.updatedAt || 0).getTime();
-        const tb = new Date(b.time || b.createdAt || b.updatedAt || 0).getTime();
-        return (tb || 0) - (ta || 0);
-      });
+    const run = async () => {
+      if (!alive) return;
+      await loadBroadcast();
+    };
 
-    (async () => {
-      try {
-        const token = localStorage.getItem("jwt");
-        const list = token
-          ? await getMyNotifications("ACTIVE")
-          : await getPublicNotifications();
-
-        if (!mounted) return;
-
-        const sorted = sortByTimeDesc(Array.isArray(list) ? list : []);
-        const latest = sorted[0];
-
-        setBroadcastText(latest?.message ? String(latest.message) : "");
-        setShowBroadcast(true);
-      } catch (e) {
-        console.error("load broadcast failed:", e);
-        if (!mounted) return;
-        setBroadcastText("");
-      }
-    })();
+    // chạy ngay + vài lần sau (jwt có thể set sau khi mount)
+    const delays = [0, 200, 600, 1200, 2000];
+    delays.forEach((ms) => {
+      timers.push(setTimeout(run, ms));
+    });
 
     return () => {
-      mounted = false;
+      alive = false;
+      timers.forEach(clearTimeout);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const shouldShowTicker = showBroadcast && !!broadcastText?.trim();
@@ -214,7 +236,6 @@ const HeroSection = () => {
                   Ngày đi
                 </label>
 
-                {/* input text hiển thị dd/mm/yyyy */}
                 <button
                   type="button"
                   onClick={openDatePicker}
@@ -223,10 +244,8 @@ const HeroSection = () => {
                   <span className={startDate ? "" : "text-gray-400"}>
                     {startDate ? formatDMY(startDate) : "dd/mm/yyyy"}
                   </span>
-                  
                 </button>
 
-                {/* input date ẩn để mở picker + giữ value yyyy-mm-dd */}
                 <input
                   ref={dateInputRef}
                   type="date"
@@ -235,8 +254,6 @@ const HeroSection = () => {
                   onChange={(e) => setStartDate(e.target.value)}
                   className="sr-only"
                 />
-
-                
               </div>
 
               {/* 2) ĐI MẤY NGÀY */}
@@ -298,14 +315,17 @@ const HeroSection = () => {
                 </select>
               </div>
 
-              {/* SEARCH BUTTON (full ô + chữ Search) */}
+              {/* SEARCH BUTTON */}
               <button
                 onClick={handleSearch}
                 className="h-[48px] w-full flex items-center justify-center gap-2 text-white rounded-xl transition-all duration-300
                   bg-orange-500 hover:bg-orange-600 hover:scale-[1.02] active:scale-[0.98] shadow-md font-semibold"
                 title="Search tours"
               >
-                <FontAwesomeIcon icon={faMagnifyingGlass} className="text-base" />
+                <FontAwesomeIcon
+                  icon={faMagnifyingGlass}
+                  className="text-base"
+                />
                 <span>Search</span>
               </button>
             </div>
