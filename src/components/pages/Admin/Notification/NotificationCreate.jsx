@@ -1,10 +1,16 @@
 // src/pages/Admin/Notification/NotificationCreate.jsx
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   adminBroadcastNotification,
   adminSendNotificationToUsers,
 } from "@/apis/NotificationAPI";
+
+function Spinner() {
+  return (
+    <span className="inline-block w-4 h-4 rounded-full border-2 border-white/60 border-t-transparent animate-spin" />
+  );
+}
 
 export default function NotificationCreate() {
   const navigate = useNavigate();
@@ -15,6 +21,11 @@ export default function NotificationCreate() {
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
+
+  // nếu chuyển về broadcast thì clear userIdsText cho sạch
+  useEffect(() => {
+    if (type === "broadcast") setUserIdsText("");
+  }, [type]);
 
   const userIds = useMemo(() => {
     if (type !== "specific") return [];
@@ -30,7 +41,7 @@ export default function NotificationCreate() {
     if (!message.trim()) return false;
     if (type === "specific" && userIds.length === 0) return false;
     return true;
-  }, [type, message, userIds]);
+  }, [type, message, userIds.length]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -41,15 +52,16 @@ export default function NotificationCreate() {
       setOk("");
       setSending(true);
 
+      const msg = message.trim();
+
       if (type === "broadcast") {
-        await adminBroadcastNotification(message.trim());
+        await adminBroadcastNotification(msg);
         setOk("Đã gửi thông báo broadcast.");
       } else {
-        await adminSendNotificationToUsers(message.trim(), userIds);
+        await adminSendNotificationToUsers(msg, userIds);
         setOk("Đã gửi thông báo cho người dùng đã chọn.");
       }
 
-      // về trang list
       setTimeout(() => navigate("/admin/notifications"), 300);
     } catch (e2) {
       setErr(e2?.message || "Gửi thông báo thất bại");
@@ -58,14 +70,31 @@ export default function NotificationCreate() {
     }
   };
 
+  const handleReset = () => {
+    setMessage("");
+    setUserIdsText("");
+    setErr("");
+    setOk("");
+    setType("broadcast");
+  };
+
   return (
-    <div className="max-w-4xl mx-auto py-10">
-      <div className="flex items-center justify-between gap-4 mb-6">
-        <h1 className="text-3xl font-semibold">Thêm thông báo</h1>
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+      {/* Header responsive */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-semibold truncate">
+            Thêm thông báo
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Chọn broadcast hoặc gửi theo danh sách user IDs.
+          </p>
+        </div>
 
         <button
+          type="button"
           onClick={() => navigate("/admin/notifications")}
-          className="px-5 py-2.5 rounded-full font-semibold ring-1 ring-gray-200 hover:bg-gray-50"
+          className="w-full sm:w-auto px-5 py-2.5 rounded-full font-semibold ring-1 ring-gray-200 hover:bg-gray-50"
         >
           Quay lại
         </button>
@@ -73,10 +102,10 @@ export default function NotificationCreate() {
 
       <form
         onSubmit={handleSubmit}
-        className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 p-6"
+        className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 p-4 sm:p-6"
       >
-        {/* Type */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+          {/* Type */}
           <div className="md:col-span-4">
             <label className="block text-sm font-semibold text-gray-700 mb-1">
               Loại thông báo
@@ -85,12 +114,14 @@ export default function NotificationCreate() {
               value={type}
               onChange={(e) => setType(e.target.value)}
               className="w-full rounded-xl ring-1 ring-gray-200 px-3 py-2 outline-none focus:ring-orange-300"
+              disabled={sending}
             >
               <option value="broadcast">Broadcast (gửi tất cả)</option>
               <option value="specific">Gửi theo người dùng</option>
             </select>
           </div>
 
+          {/* User IDs */}
           <div className="md:col-span-8">
             <label className="block text-sm font-semibold text-gray-700 mb-1">
               Người nhận (User IDs)
@@ -98,19 +129,24 @@ export default function NotificationCreate() {
             <input
               value={userIdsText}
               onChange={(e) => setUserIdsText(e.target.value)}
-              disabled={type !== "specific"}
+              disabled={type !== "specific" || sending}
               placeholder="Ví dụ: 1,2,3 (chỉ nhập khi chọn 'Gửi theo người dùng')"
               className="w-full rounded-xl ring-1 ring-gray-200 px-3 py-2 outline-none focus:ring-orange-300 disabled:bg-gray-50 disabled:text-gray-500"
             />
-            {type === "specific" ? (
+            <div className="mt-1 text-xs text-gray-500">
+              {type === "specific"
+                ? "Nhập danh sách ID, ngăn cách bằng dấu phẩy."
+                : "Broadcast sẽ gửi cho tất cả người dùng."}
+            </div>
+
+            {type === "specific" && userIdsText.trim() ? (
               <div className="mt-1 text-xs text-gray-500">
-                Nhập danh sách ID, ngăn cách bằng dấu phẩy.
+                Parsed:{" "}
+                <span className="font-semibold text-gray-700">
+                  {userIds.length ? userIds.join(", ") : "—"}
+                </span>
               </div>
-            ) : (
-              <div className="mt-1 text-xs text-gray-500">
-                Broadcast sẽ gửi cho tất cả người dùng.
-              </div>
-            )}
+            ) : null}
           </div>
 
           {/* Message */}
@@ -122,8 +158,10 @@ export default function NotificationCreate() {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               rows={6}
+              maxLength={1000}
               placeholder="Nhập nội dung..."
-              className="w-full rounded-2xl ring-1 ring-gray-200 px-3 py-3 outline-none focus:ring-orange-300 resize-none"
+              disabled={sending}
+              className="w-full rounded-2xl ring-1 ring-gray-200 px-3 py-3 outline-none focus:ring-orange-300 resize-none disabled:bg-gray-50"
             />
             <div className="mt-1 text-xs text-gray-500">
               {message.length}/1000
@@ -143,18 +181,12 @@ export default function NotificationCreate() {
           </div>
         ) : null}
 
-        {/* Actions */}
-        <div className="mt-6 flex items-center justify-end gap-3">
+        {/* Actions responsive */}
+        <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 sm:gap-3">
           <button
             type="button"
-            onClick={() => {
-              setMessage("");
-              setUserIdsText("");
-              setErr("");
-              setOk("");
-              setType("broadcast");
-            }}
-            className="px-6 py-2.5 rounded-full font-semibold ring-1 ring-gray-200 hover:bg-gray-50"
+            onClick={handleReset}
+            className="w-full sm:w-auto px-6 py-2.5 rounded-full font-semibold ring-1 ring-gray-200 hover:bg-gray-50 disabled:opacity-60"
             disabled={sending}
           >
             Xóa
@@ -163,9 +195,15 @@ export default function NotificationCreate() {
           <button
             type="submit"
             disabled={!canSubmit || sending}
-            className="px-6 py-2.5 rounded-full font-semibold bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-60"
+            className="w-full sm:w-auto px-6 py-2.5 rounded-full font-semibold bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-60 inline-flex items-center justify-center gap-2"
           >
-            {sending ? "Đang gửi..." : "Gửi thông báo"}
+            {sending ? (
+              <>
+                <Spinner /> Đang gửi...
+              </>
+            ) : (
+              "Gửi thông báo"
+            )}
           </button>
         </div>
       </form>

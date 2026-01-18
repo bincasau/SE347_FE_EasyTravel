@@ -95,13 +95,13 @@ export default function SchedulePage() {
   }, []);
 
   /* BUILD EVENTS */
-  const daysInMonth = useMemo(() => {
+  useMemo(() => {
+    // giữ lại nếu sau này bạn cần render calendar days
     return eachDayOfInterval({
       start: startOfMonth(currentMonth),
       end: endOfMonth(currentMonth),
     });
   }, [currentMonth]);
-  // ^ daysInMonth bạn chưa dùng, nhưng giữ lại cũng không sao
 
   // ✅ map tours -> eventsList (lọc theo tháng đang xem)
   const eventsList = useMemo(() => {
@@ -192,33 +192,42 @@ export default function SchedulePage() {
   const canGoPrev = isAfter(startOfMonth(currentMonth), startOfMonth(today));
 
   // chỉ show pagination khi thực sự > 1 trang
-  const shouldShowPagination = !loading && !errMsg && eventsList.length > pageSize;
+  const shouldShowPagination =
+    !loading && !errMsg && eventsList.length > pageSize;
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-10">
-      <MonthHeader
-        month={currentMonth}
-        onNext={() => setCurrentMonth(addMonths(currentMonth, 1))}
-        onPrev={() => setCurrentMonth(subMonths(currentMonth, 1))}
-        canGoPrev={canGoPrev}
-      />
+    <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
+      {/* Sticky header giúp mobile tiện hơn */}
+      <div className="sticky top-0 z-10 -mx-4 sm:mx-0 px-4 sm:px-0 py-3 sm:py-0 bg-white/80 backdrop-blur border-b sm:border-0">
+        <MonthHeader
+          month={currentMonth}
+          onNext={() => setCurrentMonth(addMonths(currentMonth, 1))}
+          onPrev={() => setCurrentMonth(subMonths(currentMonth, 1))}
+          canGoPrev={canGoPrev}
+        />
+      </div>
 
-      {loading ? (
-        <div className="text-center text-gray-500 py-10">Loading...</div>
-      ) : errMsg ? (
-        <div className="text-center text-red-500 py-10">{errMsg}</div>
-      ) : (
-        <EventList events={visibleEvents} />
-      )}
+      <div className="mt-4 sm:mt-6">
+        {loading ? (
+          <div className="text-center text-gray-500 py-10">Loading...</div>
+        ) : errMsg ? (
+          <div className="text-center text-red-500 py-10">{errMsg}</div>
+        ) : (
+          <EventList events={visibleEvents} />
+        )}
+      </div>
 
       {shouldShowPagination && (
-        <div className="mt-10 flex justify-center">
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-            visiblePages={visiblePages}
-          />
+        <div className="mt-8 sm:mt-10 flex justify-center px-2">
+          {/* overflow-x-auto để pagination không tràn trên màn nhỏ */}
+          <div className="w-full sm:w-auto overflow-x-auto">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              visiblePages={visiblePages}
+            />
+          </div>
         </div>
       )}
     </div>

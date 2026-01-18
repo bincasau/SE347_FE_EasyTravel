@@ -170,7 +170,7 @@ export default function MyRooms() {
   // ✅ total pages
   const totalPages = useMemo(() => {
     return Math.max(1, Math.ceil(sortedRooms.length / pageSize));
-  }, [sortedRooms.length]);
+  }, [sortedRooms.length, pageSize]);
 
   // nếu dữ liệu thay đổi làm currentPage vượt totalPages => kéo về trang cuối hợp lệ
   useEffect(() => {
@@ -182,7 +182,7 @@ export default function MyRooms() {
     const start = (currentPage - 1) * pageSize;
     const end = start + pageSize;
     return sortedRooms.slice(start, end);
-  }, [sortedRooms, currentPage]);
+  }, [sortedRooms, currentPage, pageSize]);
 
   // ✅ visible pages (gọn như Blog)
   const getVisiblePages = useCallback((page, total) => {
@@ -286,93 +286,101 @@ export default function MyRooms() {
     <div className="min-h-[calc(100vh-64px)] bg-gray-50">
       {/* ===== HEADER ===== */}
       <div className="bg-white border-b">
-        <div className="max-w-6xl mx-auto px-6 py-6 relative">
-          {/* ✅ Left: Add Room + Export */}
-          <div className="absolute left-6 top-1/2 -translate-y-1/2 flex flex-col gap-2">
-            <button
-              onClick={() => navigate("/hotel-manager/hotels/addroom/new")}
-              className="px-4 py-2 rounded-lg bg-orange-500 text-white text-sm font-semibold
-                         hover:bg-orange-600 transition hover:-translate-y-[1px] active:scale-95"
-            >
-              + Add Room
-            </button>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 sm:py-6">
+          {/* ✅ Top bar responsive */}
+          <div className="flex flex-col gap-4 sm:gap-3">
+            {/* Row 1: Title center on desktop, but fine on mobile */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              {/* Left actions */}
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                <button
+                  onClick={() => navigate("/hotel-manager/hotels/addroom/new")}
+                  className="px-4 py-2 rounded-lg bg-orange-500 text-white text-sm font-semibold
+                             hover:bg-orange-600 transition active:scale-95 w-full sm:w-auto"
+                >
+                  + Add Room
+                </button>
 
-            <button
-              onClick={handleExportExcel}
-              disabled={loading || sortedRooms.length === 0}
-              className={[
-                "px-4 py-2 rounded-lg text-sm font-semibold border transition active:scale-95",
-                loading || sortedRooms.length === 0
-                  ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
-                  : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50",
-              ].join(" ")}
-              title="Export danh sách phòng (đang hiển thị) ra Excel"
-            >
-              Export to Excel
-            </button>
-          </div>
+                <button
+                  onClick={handleExportExcel}
+                  disabled={loading || sortedRooms.length === 0}
+                  className={[
+                    "px-4 py-2 rounded-lg text-sm font-semibold border transition active:scale-95 w-full sm:w-auto",
+                    loading || sortedRooms.length === 0
+                      ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50",
+                  ].join(" ")}
+                  title="Export danh sách phòng (đang hiển thị) ra Excel"
+                >
+                  Export to Excel
+                </button>
+              </div>
 
-          {/* Center title */}
-          <div className="text-center">
-            <h1 className="text-2xl font-semibold text-gray-900">My Rooms</h1>
-            <p className="text-sm text-gray-500 mt-1">Rooms you have added</p>
-          </div>
+              {/* Title */}
+              <div className="text-center sm:text-left">
+                <h1 className="text-2xl font-semibold text-gray-900">
+                  My Rooms
+                </h1>
+                <p className="text-sm text-gray-500 mt-1">
+                  Rooms you have added
+                </p>
+              </div>
 
-          {/* Sort (right) */}
-          <div className="absolute right-6 top-1/2 -translate-y-1/2 flex gap-2">
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="border rounded-md px-3 py-2 text-sm bg-white
-                         focus:outline-none focus:ring-2 focus:ring-orange-200"
-            >
-              <option value="price_asc">Price: Low → High</option>
-              <option value="price_desc">Price: High → Low</option>
-              <option value="date_desc">Newest</option>
-              <option value="date_asc">Oldest</option>
-            </select>
+              {/* Right controls */}
+              <div className="flex gap-2 items-center justify-center sm:justify-end">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="border rounded-md px-3 py-2 text-sm bg-white w-full sm:w-auto
+                             focus:outline-none focus:ring-2 focus:ring-orange-200"
+                >
+                  <option value="price_asc">Price: Low → High</option>
+                  <option value="price_desc">Price: High → Low</option>
+                  <option value="date_desc">Newest</option>
+                  <option value="date_asc">Oldest</option>
+                </select>
 
-            <button
-              onClick={loadRooms}
-              className="px-3 py-2 text-sm rounded-md border hover:bg-gray-50"
-              title="Reload"
-            >
-              ⟳
-            </button>
-          </div>
-        </div>
+                <button
+                  onClick={loadRooms}
+                  className="px-3 py-2 text-sm rounded-md border hover:bg-gray-50 whitespace-nowrap"
+                  title="Reload"
+                >
+                  ⟳
+                </button>
+              </div>
+            </div>
 
-        {/* ✅ SEARCH BAR */}
-        <div className="max-w-6xl mx-auto px-6 pb-5">
-          <div className="flex items-center gap-3">
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search by room number, type, description..."
-              className="w-full border rounded-xl px-4 py-2.5 bg-white
-                         focus:outline-none focus:ring-2 focus:ring-orange-200"
-            />
+            {/* ✅ SEARCH BAR */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search by room number, type, description..."
+                className="w-full border rounded-xl px-4 py-2.5 bg-white
+                           focus:outline-none focus:ring-2 focus:ring-orange-200"
+              />
 
-            {q.trim() && (
-              <button
-                onClick={() => setQ("")}
-                className="px-4 py-2.5 rounded-xl border border-gray-300 hover:bg-gray-50 text-sm"
-              >
-                Clear
-              </button>
-            )}
-          </div>
+              {q.trim() && (
+                <button
+                  onClick={() => setQ("")}
+                  className="px-4 py-2.5 rounded-xl border border-gray-300 hover:bg-gray-50 text-sm w-full sm:w-auto"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
 
-          <div className="mt-2 text-xs text-gray-500">
-            Showing{" "}
-            <span className="font-semibold">{sortedRooms.length}</span> /{" "}
-            <span className="font-semibold">{rooms.length}</span> rooms
+            <div className="text-xs text-gray-500">
+              Showing{" "}
+              <span className="font-semibold">{sortedRooms.length}</span> /{" "}
+              <span className="font-semibold">{rooms.length}</span> rooms
+            </div>
           </div>
         </div>
       </div>
 
       {/* ===== CONTENT ===== */}
-      <div className="max-w-6xl mx-auto px-6 py-6 space-y-6">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         {loading ? (
           <p className="text-gray-400 text-center">Loading...</p>
         ) : sortedRooms.length === 0 ? (
@@ -392,14 +400,18 @@ export default function MyRooms() {
           </div>
         )}
 
-        {/* ✅ Pagination dưới cùng */}
+        {/* ✅ Pagination dưới cùng (khỏi tràn mobile) */}
         {!loading && sortedRooms.length > pageSize && (
-          <Pagination
-            totalPages={totalPages}
-            currentPage={currentPage}
-            onPageChange={setCurrentPage}
-            visiblePages={visiblePages}
-          />
+          <div className="flex justify-center px-2">
+            <div className="w-full sm:w-auto overflow-x-auto">
+              <Pagination
+                totalPages={totalPages}
+                currentPage={currentPage}
+                onPageChange={setCurrentPage}
+                visiblePages={visiblePages}
+              />
+            </div>
+          </div>
         )}
       </div>
     </div>

@@ -43,16 +43,7 @@ function safe(v) {
   return v === null || v === undefined ? "" : v;
 }
 
-function fmtDateTime(d) {
-  if (!d) return "--";
-  try {
-    return new Date(d).toLocaleString("vi-VN");
-  } catch {
-    return "--";
-  }
-}
-
-// Map 1 participant row (TourBooking) -> excel row
+// Map 1 participant row -> excel row
 function toRow(p, idx) {
   const user = p?.user || p?.customer || p?.account || {};
   return {
@@ -65,6 +56,23 @@ function toRow(p, idx) {
     Note: safe(p?.note ?? p?.remark),
   };
 }
+
+function badgeClass(status) {
+  const s = String(status || "").toLowerCase();
+  if (s === "success") return "bg-emerald-50 text-emerald-700 ring-emerald-200";
+  if (s === "failed") return "bg-red-50 text-red-700 ring-red-200";
+  return "bg-gray-50 text-gray-700 ring-gray-200";
+}
+
+function Spinner() {
+  return (
+    <span className="inline-block w-4 h-4 rounded-full border-2 border-white/60 border-t-transparent animate-spin" />
+  );
+}
+
+const inputCls =
+  "w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 outline-none " +
+  "focus:ring-2 focus:ring-gray-200 focus:border-gray-300";
 
 export default function TourParticipants() {
   const nav = useNavigate();
@@ -85,7 +93,8 @@ export default function TourParticipants() {
     );
   }, [participants, q]);
 
-  const rows = useMemo(() => filtered.map(toRow), [filtered]);
+  // ✅ FIX: truyền idx vào toRow
+  const rows = useMemo(() => filtered.map((p, idx) => toRow(p, idx)), [filtered]);
 
   const load = useCallback(async () => {
     if (!tourId) return;
@@ -118,16 +127,16 @@ export default function TourParticipants() {
     }
 
     const ws = XLSX.utils.json_to_sheet(rows);
+
+    // ✅ cols đúng số cột
     ws["!cols"] = [
-      { wch: 5 },
-      { wch: 12 },
-      { wch: 22 },
-      { wch: 26 },
-      { wch: 14 },
-      { wch: 8 },
-      { wch: 14 },
-      { wch: 18 },
-      { wch: 24 },
+      { wch: 5 },  // No
+      { wch: 22 }, // FullName
+      { wch: 26 }, // Email
+      { wch: 14 }, // Phone
+      { wch: 8 },  // Seats
+      { wch: 12 }, // Status
+      { wch: 30 }, // Note
     ];
 
     const wb = XLSX.utils.book_new();
@@ -141,7 +150,7 @@ export default function TourParticipants() {
     saveAs(blob, `tour_${tourId}_participants.xlsx`);
   }, [rows, tourId]);
 
-  // nếu vào URL có ?export=1 thì load xong export luôn
+  // ✅ auto export by URL: ?export=1
   useEffect(() => {
     const wantExport = searchParams.get("export") === "1";
     if (!wantExport) return;
@@ -151,57 +160,66 @@ export default function TourParticipants() {
   }, [loading]);
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-10">
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-6">
-        <div>
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-6">
+        <div className="min-w-0">
           <button
             type="button"
             onClick={() => nav(-1)}
-            className="mb-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl border hover:bg-gray-50"
+            className="mb-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50"
           >
             ← Back
           </button>
 
-          <h1 className="text-3xl font-bold text-gray-800">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
             Tour Participants
           </h1>
           <p className="text-sm text-gray-500">
-            Tour ID: <b>{tourId}</b> • Tổng: <b>{filtered.length}</b> người (đang hiển thị)
+            Tour ID: <b>{tourId}</b> • Hiển thị: <b>{filtered.length}</b> /{" "}
+            <b>{participants.length}</b>
           </p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <button
             type="button"
             onClick={load}
-            className="px-4 py-2 rounded-xl border border-orange-300 text-orange-600 hover:bg-orange-50"
+            disabled={loading}
+            className="w-full sm:w-auto px-4 py-2 rounded-xl border border-orange-300 text-orange-600 hover:bg-orange-50 disabled:opacity-60"
           >
-            Reload
+            {loading ? "Loading..." : "Reload"}
           </button>
+
           <button
             type="button"
             onClick={exportExcel}
-            disabled={!rows.length}
-            className="px-4 py-2 rounded-xl bg-green-600 text-white hover:bg-green-700 disabled:bg-gray-300"
+            disabled={!rows.length || loading}
+            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-green-600 text-white hover:bg-green-700 disabled:bg-gray-300 inline-flex items-center justify-center gap-2"
           >
-            Export Excel
+            {loading ? (
+              <>
+                <Spinner /> Export Excel
+              </>
+            ) : (
+              "Export Excel"
+            )}
           </button>
         </div>
       </div>
 
       {errMsg && (
-        <div className="mb-5 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2">
+        <div className="mb-5 text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl px-4 py-2">
           {errMsg}
         </div>
       )}
 
-      <div className="bg-white border rounded-2xl p-5 shadow-sm">
+      <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 shadow-sm">
         <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search trong danh sách (tên/email/sđt...)"
-            className="w-full sm:max-w-md border rounded-xl px-3 py-2"
+            className={`${inputCls} sm:max-w-md`}
           />
 
           <div className="text-sm text-gray-600">
@@ -209,44 +227,98 @@ export default function TourParticipants() {
           </div>
         </div>
 
-        <div className="mt-5 overflow-auto">
-          <table className="min-w-[900px] w-full text-sm border-separate border-spacing-y-2">
-            <thead>
-              <tr className="text-left text-gray-600">
-                {Object.keys(rows[0] || { No: "" }).map((k) => (
-                  <th key={k} className="px-3 py-2">
-                    {k}
-                  </th>
-                ))}
-              </tr>
-            </thead>
+        {/* CONTENT */}
+        <div className="mt-5">
+          {loading ? (
+            <div className="text-sm text-gray-500">Loading...</div>
+          ) : rows.length === 0 ? (
+            <div className="text-sm text-gray-500">
+              Chưa có người booking tour này.
+            </div>
+          ) : (
+            <>
+              {/* ✅ Mobile: cards */}
+              <div className="space-y-3 lg:hidden">
+                {rows.map((r) => (
+                  <div
+                    key={r.No}
+                    className="rounded-2xl border border-gray-200 p-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-semibold text-gray-900 break-words">
+                          {r.FullName || "-"}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          {r.Email || "-"}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {r.Phone || "-"}
+                        </div>
+                      </div>
 
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td className="px-3 py-6 text-gray-500" colSpan={20}>
-                    Loading...
-                  </td>
-                </tr>
-              ) : rows.length === 0 ? (
-                <tr>
-                  <td className="px-3 py-6 text-gray-500" colSpan={20}>
-                    Chưa có người booking tour này.
-                  </td>
-                </tr>
-              ) : (
-                rows.map((row, idx) => (
-                  <tr key={idx} className="bg-gray-50 border">
-                    {Object.keys(row).map((k) => (
-                      <td key={k} className="px-3 py-3">
-                        {k === "CreatedAt" ? fmtDateTime(row[k]) : String(row[k])}
-                      </td>
+                      <span
+                        className={`shrink-0 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ring-1 ${badgeClass(
+                          r.Status
+                        )}`}
+                      >
+                        {r.Status || "-"}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <div className="text-xs text-gray-500">Seats</div>
+                        <div className="font-semibold text-gray-900">
+                          {r.Seats}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-gray-500">No</div>
+                        <div className="font-semibold text-gray-900">
+                          {r.No}
+                        </div>
+                      </div>
+
+                      <div className="col-span-2">
+                        <div className="text-xs text-gray-500">Note</div>
+                        <div className="text-sm text-gray-800 break-words">
+                          {r.Note || "-"}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* ✅ Desktop: table */}
+              <div className="hidden lg:block overflow-auto">
+                <table className="min-w-[900px] w-full text-sm border-separate border-spacing-y-2">
+                  <thead>
+                    <tr className="text-left text-gray-600">
+                      {Object.keys(rows[0]).map((k) => (
+                        <th key={k} className="px-3 py-2">
+                          {k}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {rows.map((row) => (
+                      <tr key={row.No} className="bg-gray-50">
+                        {Object.keys(row).map((k) => (
+                          <td key={k} className="px-3 py-3">
+                            {String(row[k])}
+                          </td>
+                        ))}
+                      </tr>
                     ))}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

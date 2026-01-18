@@ -317,7 +317,7 @@ export default function RevenueReport() {
       <div ref={exportRef} className="bg-white">
         {/* ✅ HEADER cho PDF */}
         {pdfMode && (
-          <div className="px-6 pt-8 pb-4 text-center">
+          <div className="px-4 sm:px-6 pt-8 pb-4 text-center">
             <h1 className="text-2xl font-semibold text-gray-900">REVENUE REPORT</h1>
             <div className="text-sm text-gray-600 mt-1">{monthLabel}</div>
             <div className="text-xs text-gray-500 mt-1">
@@ -330,28 +330,41 @@ export default function RevenueReport() {
         {/* ✅ UI header bình thường */}
         {!pdfMode && (
           <div className="bg-white border-b">
-            <div className="max-w-6xl mx-auto px-6 py-6">
-              <h1 className="text-2xl font-semibold text-gray-900 text-center">Revenue Report</h1>
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+              <h1 className="text-2xl font-semibold text-gray-900 text-center">
+                Revenue Report
+              </h1>
               <p className="text-sm text-gray-500 text-center mt-1">
                 Room distribution & monthly comparison
               </p>
 
-              <div className="mt-6 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
-                <div className="flex items-center gap-4">
-                  <button onClick={goPrevMonth} className="px-3 py-1 border rounded">
+              {/* ✅ responsive toolbar */}
+              <div className="mt-6 flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
+                {/* Left: prev/label/next */}
+                <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3">
+                  <button
+                    onClick={goPrevMonth}
+                    className="px-3 py-2 border rounded-lg text-sm hover:bg-gray-50"
+                  >
                     ← Prev
                   </button>
 
-                  <span className="font-medium">{monthLabel}</span>
+                  <span className="font-medium text-sm sm:text-base whitespace-nowrap">
+                    {monthLabel}
+                  </span>
 
-                  <button onClick={goNextMonth} className="px-3 py-1 border rounded">
+                  <button
+                    onClick={goNextMonth}
+                    className="px-3 py-2 border rounded-lg text-sm hover:bg-gray-50"
+                  >
                     Next →
                   </button>
                 </div>
 
-                <div className="flex items-center gap-3">
+                {/* Right: controls */}
+                <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center justify-center lg:justify-end gap-3">
                   <select
-                    className="border rounded px-2 py-1"
+                    className="border rounded-lg px-3 py-2 text-sm bg-white w-full sm:w-auto"
                     value={safeMonth}
                     onChange={(e) =>
                       dispatch({ type: "SET_MONTH", month: Number(e.target.value) })
@@ -369,7 +382,7 @@ export default function RevenueReport() {
 
                   {/* ✅ Year input stable */}
                   <input
-                    className="border rounded px-2 py-1 w-28"
+                    className="border rounded-lg px-3 py-2 text-sm w-full sm:w-32"
                     type="text"
                     inputMode="numeric"
                     value={draftYear}
@@ -389,7 +402,7 @@ export default function RevenueReport() {
 
                   <button
                     onClick={exportCSV}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm disabled:opacity-60"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm disabled:opacity-60 w-full sm:w-auto"
                     disabled={!stats || loading}
                   >
                     Export CSV
@@ -397,7 +410,7 @@ export default function RevenueReport() {
 
                   <button
                     onClick={exportPDF}
-                    className="px-4 py-2 bg-green-600 text-white rounded-md text-sm disabled:opacity-60"
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm disabled:opacity-60 w-full sm:w-auto"
                     disabled={!stats || loading}
                   >
                     Export PDF
@@ -411,9 +424,9 @@ export default function RevenueReport() {
         {/* ✅ BODY */}
         <div
           className={[
-            "max-w-6xl mx-auto px-6",
-            pdfMode ? "py-6" : "py-10",
-            pdfMode ? "grid grid-cols-1 gap-6" : "grid grid-cols-1 md:grid-cols-2 gap-8",
+            "max-w-6xl mx-auto px-4 sm:px-6",
+            pdfMode ? "py-6" : "py-8 sm:py-10",
+            pdfMode ? "grid grid-cols-1 gap-6" : "grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8",
           ].join(" ")}
         >
           {loading ? (
@@ -445,7 +458,7 @@ export default function RevenueReport() {
 
         {/* ✅ FOOTER PDF */}
         {pdfMode && (
-          <div className="px-6 pb-6 text-center text-xs text-gray-400">
+          <div className="px-4 sm:px-6 pb-6 text-center text-xs text-gray-400">
             Generated by EasyTravel · {new Date().toLocaleString("vi-VN")}
           </div>
         )}

@@ -4,11 +4,7 @@ import { getExtras, uploadExtra, deleteExtra } from "@/apis/ExtraImageAPI";
 const S3_IMAGE_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/image";
 
-export default function ExtraImagesManager({
-  type,
-  ownerId,
-  readOnly = false,
-}) {
+export default function ExtraImagesManager({ type, ownerId, readOnly = false }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -43,6 +39,7 @@ export default function ExtraImagesManager({
 
   useEffect(() => {
     refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [type, ownerId]);
 
   async function handleAdd(e) {
@@ -57,8 +54,8 @@ export default function ExtraImagesManager({
         await uploadExtra({ type, id: ownerId, file: f });
       }
       await refresh();
-    } catch (e) {
-      setErr(e?.message || "Upload failed");
+    } catch (e2) {
+      setErr(e2?.message || "Upload failed");
     } finally {
       setBusy(false);
     }
@@ -98,8 +95,8 @@ export default function ExtraImagesManager({
       await uploadExtra({ type, id: ownerId, file });
       await deleteExtra(target.imageId);
       await refresh();
-    } catch (e) {
-      setErr(e?.message || "Replace failed");
+    } catch (e2) {
+      setErr(e2?.message || "Replace failed");
       await refresh();
     } finally {
       setBusy(false);
@@ -107,17 +104,18 @@ export default function ExtraImagesManager({
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow p-5">
-      <div className="flex items-start justify-between mb-4">
-        <div>
+    <div className="bg-white rounded-2xl shadow p-4 sm:p-5">
+      {/* HEADER */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+        <div className="min-w-0">
           <h3 className="text-lg font-semibold">Ảnh phụ</h3>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-500 break-words">
             {type} — ID: {ownerId}
           </p>
         </div>
 
         {!readOnly && (
-          <label>
+          <label className="w-full sm:w-auto">
             <input
               type="file"
               multiple
@@ -127,8 +125,13 @@ export default function ExtraImagesManager({
               className="hidden"
             />
             <span
-              className={`px-4 py-2 rounded-xl text-sm font-medium cursor-pointer
-              ${busy ? "bg-gray-200 text-gray-600" : "bg-black text-white"}`}
+              className={[
+                "block text-center w-full sm:w-auto",
+                "px-4 py-2 rounded-xl text-sm font-medium cursor-pointer select-none",
+                busy || !canLoad
+                  ? "bg-gray-200 text-gray-600"
+                  : "bg-black text-white hover:opacity-90",
+              ].join(" ")}
             >
               {busy ? "Đang xử lý..." : "Thêm ảnh"}
             </span>
@@ -137,17 +140,21 @@ export default function ExtraImagesManager({
       </div>
 
       {err && (
-        <div className="mb-4 p-3 rounded-xl bg-red-50 text-red-700 text-sm">
+        <div className="mb-4 p-3 rounded-xl bg-red-50 text-red-700 text-sm break-words">
           {err}
         </div>
       )}
 
-      {loading ? (
+      {!canLoad ? (
+        <div className="text-sm text-gray-500">
+          Thiếu <b>type</b> hoặc <b>ownerId</b> nên chưa load được ảnh.
+        </div>
+      ) : loading ? (
         <div className="text-sm text-gray-500">Loading...</div>
       ) : items.length === 0 ? (
         <div className="text-sm text-gray-500">Chưa có ảnh phụ.</div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
           {items.map((it) => (
             <div
               key={it.imageId}
@@ -159,11 +166,13 @@ export default function ExtraImagesManager({
                   type="button"
                   onClick={() => handleDelete(it.imageId)}
                   disabled={busy}
-                  className="absolute top-1.5 right-1.5 z-10
-           w-5 h-5 rounded-full
-           bg-black/60 text-white text-[10px]
-           flex items-center justify-center
-           hover:bg-red-600 disabled:opacity-60"
+                  className="absolute top-2 right-2 z-10
+                             w-7 h-7 rounded-full
+                             bg-black/60 text-white text-xs
+                             flex items-center justify-center
+                             hover:bg-red-600 disabled:opacity-60"
+                  aria-label="Delete"
+                  title="Delete"
                 >
                   ✕
                 </button>
@@ -174,6 +183,7 @@ export default function ExtraImagesManager({
                   src={imageSrc(it)}
                   alt={it.altText || it.title || "extra"}
                   className="w-full h-full object-cover"
+                  loading="lazy"
                 />
               </div>
 

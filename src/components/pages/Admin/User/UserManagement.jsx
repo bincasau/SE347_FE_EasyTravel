@@ -43,6 +43,12 @@ function buildVisiblePages(currentPage, totalPages, windowSize = 5) {
   return pages;
 }
 
+function Spinner() {
+  return (
+    <span className="inline-block w-4 h-4 rounded-full border-2 border-white/60 border-t-transparent animate-spin" />
+  );
+}
+
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -75,7 +81,7 @@ export default function UserManagement() {
 
       setUsers(data?._embedded?.users ?? []);
       setTotalPages(data?.page?.totalPages ?? 1);
-    } catch (e) {
+    } catch {
       setUsers([]);
       setTotalPages(1);
     } finally {
@@ -114,14 +120,13 @@ export default function UserManagement() {
     loadUsers(currentPage, roleFilter);
   };
 
-  // Export Excel (đã tách file)
+  // Export Excel
   const handleExportExcel = async () => {
     setExporting(true);
     try {
       await exportUsersExcel({
         role: roleFilter,
         status: "ALL",
-        // fileName: "users.xlsx", // muốn đặt tên cứng thì mở
       });
     } catch (e) {
       alert("Export failed: " + (e?.message || "Unknown error"));
@@ -136,20 +141,17 @@ export default function UserManagement() {
     el?.click();
   };
 
-  // Import Excel (đã tách file)
+  // Import Excel
   const handleImportExcel = async (e) => {
     const file = e.target.files?.[0];
-    e.target.value = ""; // chọn lại cùng file vẫn trigger
+    e.target.value = "";
     if (!file) return;
 
     setImporting(true);
     try {
       const rs = await importUsersExcel(file, {
-        // nếu chọn role filter khác ALL thì có thể lấy role đó làm default
         defaultRole: roleFilter === "ALL" ? "CUSTOMER" : roleFilter,
         defaultStatus: "Activated",
-
-        // nếu file excel không có cột Password thì dùng default này
         defaultPassword: "123456",
       });
 
@@ -171,15 +173,17 @@ export default function UserManagement() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto py-10">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-semibold">User management</h1>
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+      {/* Header + toolbar responsive */}
+      <div className="flex flex-col gap-3 sm:gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <h1 className="text-xl sm:text-2xl font-semibold">User management</h1>
 
-        <div className="flex items-center gap-3">
+          {/* Role select (mobile full width) */}
           <select
             value={roleFilter}
             onChange={handleRoleChange}
-            className="px-4 py-2 rounded-full text-sm font-semibold bg-gray-100 text-gray-700 outline-none"
+            className="w-full sm:w-auto px-4 py-2 rounded-full text-sm font-semibold bg-gray-100 text-gray-700 outline-none"
           >
             {ROLES.map((r) => (
               <option key={r.value} value={r.value}>
@@ -187,7 +191,10 @@ export default function UserManagement() {
               </option>
             ))}
           </select>
+        </div>
 
+        {/* Actions: wrap + mobile full width */}
+        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-3">
           {/* input hidden import */}
           <input
             id={fileInputId}
@@ -197,48 +204,59 @@ export default function UserManagement() {
             onChange={handleImportExcel}
           />
 
-          {/* nút import */}
           <button
             onClick={handlePickImport}
             disabled={importing}
-            className="px-5 py-2 bg-purple-600 text-white rounded-full hover:bg-purple-700 transition disabled:opacity-60"
+            className="w-full sm:w-auto px-5 py-2 rounded-full bg-purple-600 text-white hover:bg-purple-700 transition disabled:opacity-60 inline-flex items-center justify-center gap-2"
           >
-            {importing ? "Importing..." : "Import Excel"}
+            {importing ? (
+              <>
+                <Spinner /> Importing...
+              </>
+            ) : (
+              "Import Excel"
+            )}
           </button>
 
-          {/* nút export */}
           <button
             onClick={handleExportExcel}
             disabled={exporting}
-            className="px-5 py-2 bg-green-600 text-white rounded-full hover:bg-green-700 transition disabled:opacity-60"
+            className="w-full sm:w-auto px-5 py-2 rounded-full bg-green-600 text-white hover:bg-green-700 transition disabled:opacity-60 inline-flex items-center justify-center gap-2"
           >
-            {exporting ? "Exporting..." : "Export Excel"}
+            {exporting ? (
+              <>
+                <Spinner /> Exporting...
+              </>
+            ) : (
+              "Export Excel"
+            )}
           </button>
 
-          <Link to="/admin/users/new">
-            <button className="px-5 py-2 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition">
+          <Link to="/admin/users/new" className="w-full sm:w-auto">
+            <button className="w-full sm:w-auto px-5 py-2 rounded-full bg-orange-500 text-white hover:bg-orange-600 transition">
               + Add User
             </button>
           </Link>
         </div>
       </div>
 
+      {/* List */}
       {loading ? (
-        <p className="text-center py-10">Loading users...</p>
+        <div className="py-10 flex items-center justify-center gap-3 text-gray-600">
+          <span className="w-4 h-4 rounded-full border-2 border-gray-300 border-t-transparent animate-spin" />
+          Loading users...
+        </div>
       ) : users.length === 0 ? (
         <p className="text-center py-10 text-gray-500">No users found.</p>
       ) : (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-4 sm:gap-6">
           {users.map((user) => (
-            <AdminUserCard
-              key={user.userId}
-              user={user}
-              onRemove={handleRemove}
-            />
+            <AdminUserCard key={user.userId} user={user} onRemove={handleRemove} />
           ))}
         </div>
       )}
 
+      {/* Pagination */}
       <Pagination
         totalPages={totalPages}
         currentPage={clamp(currentPage, 1, totalPages || 1)}

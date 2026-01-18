@@ -126,7 +126,7 @@ export default function PastTours() {
 
   const totalPages = useMemo(() => {
     return Math.max(1, Math.ceil(sortedTours.length / pageSize));
-  }, [sortedTours.length]);
+  }, [sortedTours.length, pageSize]);
 
   // nếu data đổi làm currentPage vượt totalPages => kéo về trang cuối hợp lệ
   useEffect(() => {
@@ -137,7 +137,7 @@ export default function PastTours() {
     const start = (currentPage - 1) * pageSize;
     const end = start + pageSize;
     return sortedTours.slice(start, end);
-  }, [sortedTours, currentPage]);
+  }, [sortedTours, currentPage, pageSize]);
 
   // ✅ visible pages (gọn 3-5 nút)
   const getVisiblePages = useCallback((page, total) => {
@@ -172,15 +172,15 @@ export default function PastTours() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-10">
-      <h2 className="text-3xl font-bold text-center text-orange-500 mb-12">
+    <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
+      <h2 className="text-2xl sm:text-3xl font-bold text-center text-orange-500 mb-6 sm:mb-12">
         Past Tours
       </h2>
 
       {/* SORT */}
-      <div className="flex justify-end mb-6">
+      <div className="flex justify-center sm:justify-end mb-4 sm:mb-6">
         <select
-          className="border rounded-full px-4 py-2 text-sm bg-white"
+          className="border rounded-full px-4 py-2 text-sm bg-white w-full sm:w-auto"
           value={sortOrder}
           onChange={(e) => setSortOrder(e.target.value)}
         >
@@ -200,65 +200,87 @@ export default function PastTours() {
         </div>
       ) : (
         <>
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {pagedTours.map((tour) => (
               <div
                 key={tour.tourId}
-                className="bg-white shadow rounded-xl p-4 flex items-center gap-6 hover:shadow-lg transition"
+                className="bg-white shadow-sm rounded-2xl p-4 sm:p-5 hover:shadow-lg transition"
               >
-                <img
-                  src={tour.image}
-                  alt={tour.title}
-                  className="w-40 h-32 rounded-lg object-cover"
-                  onError={(e) => {
-                    e.currentTarget.src = FALLBACK_IMAGE;
-                  }}
-                />
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+                  <img
+                    src={tour.image}
+                    alt={tour.title}
+                    className="w-full sm:w-40 h-48 sm:h-32 rounded-xl object-cover"
+                    loading="lazy"
+                    onError={(e) => {
+                      e.currentTarget.src = FALLBACK_IMAGE;
+                    }}
+                  />
 
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-xl font-semibold line-clamp-1">
-                    {tour.title}
-                  </h3>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg sm:text-xl font-semibold break-words">
+                      {tour.title}
+                    </h3>
 
-                  <p className="text-sm text-gray-500 mt-1">
-                    📅 {formatDate(tour.date)}
-                  </p>
+                    <div className="mt-2 space-y-1 text-sm text-gray-500">
+                      <p className="break-words">📅 {formatDate(tour.date)}</p>
+                      <p className="break-words">⏳ {tour.duration}</p>
 
-                  <p className="text-sm text-gray-500">⏳ {tour.duration}</p>
+                      {(tour.departureLocation || tour.destination) && (
+                        <p className="break-words">
+                          📍 {tour.departureLocation || "--"} →{" "}
+                          {tour.destination || "--"}
+                        </p>
+                      )}
+                    </div>
 
-                  {(tour.departureLocation || tour.destination) && (
-                    <p className="text-sm text-gray-500">
-                      📍 {tour.departureLocation || "--"} →{" "}
-                      {tour.destination || "--"}
-                    </p>
-                  )}
+                    {tour.status && (
+                      <div className="mt-2">
+                        <span className="text-xs inline-block px-2 py-1 rounded-full border bg-gray-50 text-gray-700">
+                          {tour.status}
+                        </span>
+                      </div>
+                    )}
 
-                  {tour.status && (
-                    <p className="text-xs mt-1 inline-block px-2 py-1 rounded-full border bg-gray-50 text-gray-700">
-                      {tour.status}
-                    </p>
-                  )}
+                    {/* Mobile button full width */}
+                    <div className="mt-4 sm:hidden">
+                      <Link
+                        to={`/detailtour/${tour.tourId}`}
+                        state={{ hideBookNow: true }}
+                        className="inline-flex items-center justify-center w-full px-5 py-2 border border-orange-400 text-orange-500 rounded-full hover:bg-orange-100"
+                      >
+                        View Tour
+                      </Link>
+                    </div>
+                  </div>
+
+                  {/* Desktop button */}
+                  <div className="hidden sm:block">
+                    <Link
+                      to={`/detailtour/${tour.tourId}`}
+                      state={{ hideBookNow: true }}
+                      className="px-5 py-2 border border-orange-400 text-orange-500 rounded-full hover:bg-orange-100 whitespace-nowrap"
+                    >
+                      View Tour
+                    </Link>
+                  </div>
                 </div>
-
-                <Link
-                  to={`/detailtour/${tour.tourId}`}
-                  state={{ hideBookNow: true }}
-                  className="px-5 py-2 border border-orange-400 text-orange-500 rounded-full hover:bg-orange-100 whitespace-nowrap"
-                >
-                  View Tour
-                </Link>
               </div>
             ))}
           </div>
 
           {/* ✅ Pagination dưới cùng */}
           {sortedTours.length > pageSize && (
-            <Pagination
-              totalPages={totalPages}
-              currentPage={currentPage}
-              onPageChange={setCurrentPage}
-              visiblePages={visiblePages}
-            />
+            <div className="mt-8 sm:mt-10 flex justify-center px-2">
+              <div className="w-full sm:w-auto overflow-x-auto">
+                <Pagination
+                  totalPages={totalPages}
+                  currentPage={currentPage}
+                  onPageChange={setCurrentPage}
+                  visiblePages={visiblePages}
+                />
+              </div>
+            </div>
           )}
         </>
       )}

@@ -5,6 +5,21 @@ import { updateHotel, getHotelById } from "@/apis/Hotel";
 const S3_HOTEL_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/hotel";
 
+function toStr(v) {
+  return (v ?? "").toString();
+}
+
+function toTrim(v) {
+  return toStr(v).trim();
+}
+
+function toNumberOrNull(v) {
+  const s = toTrim(v);
+  if (!s) return null;
+  const n = Number(s);
+  return Number.isNaN(n) ? null : n;
+}
+
 export default function AdminHotelEdit() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -42,27 +57,22 @@ export default function AdminHotelEdit() {
 
         setInitialHotel(data);
 
+        const managerRaw = data?.managerId ?? data?.manager_id ?? data?.managerID ?? "";
+        const minPriceRaw = data?.minPrice ?? data?.min_price ?? "";
+
         setForm({
           name: data?.name || "",
           address: data?.address || "",
           description: data?.description || "",
           email: data?.email || "",
           phone_number: data?.phoneNumber || data?.phone_number || "",
-          manager_id:
-            data?.managerId ?? data?.manager_id ?? data?.managerID ?? ""
-              ? String(data?.managerId ?? data?.manager_id ?? data?.managerID)
-              : "",
-          min_price:
-            data?.minPrice ?? data?.min_price ?? null
-              ? String(data?.minPrice ?? data?.min_price)
-              : "",
+          manager_id: managerRaw === null || managerRaw === undefined ? "" : String(managerRaw),
+          min_price: minPriceRaw === null || minPriceRaw === undefined ? "" : String(minPriceRaw),
         });
 
         const img = data?.mainImage || data?.main_image || "";
         if (img) {
-          setCurrentImage(
-            img.startsWith("http") ? img : `${S3_HOTEL_BASE}/${img}`
-          );
+          setCurrentImage(img.startsWith("http") ? img : `${S3_HOTEL_BASE}/${img}`);
         } else {
           setCurrentImage("");
         }
@@ -88,7 +98,7 @@ export default function AdminHotelEdit() {
   }, [file]);
 
   const canSubmit = useMemo(() => {
-    return form.name.trim() && form.address.trim();
+    return toTrim(form.name) && toTrim(form.address);
   }, [form.name, form.address]);
 
   const onChange = (key) => (e) => {
@@ -97,6 +107,8 @@ export default function AdminHotelEdit() {
 
   const onPickFile = (e) => {
     const f = e.target.files?.[0];
+    // cho phép chọn lại cùng file
+    e.target.value = "";
     if (f) setFile(f);
   };
 
@@ -113,13 +125,13 @@ export default function AdminHotelEdit() {
       setSaving(true);
 
       const payload = {
-        name: form.name.trim(),
-        address: form.address.trim(),
-        description: form.description?.trim() || null,
-        email: form.email?.trim() || null,
-        phone_number: form.phone_number?.trim() || null,
-        manager_id: form.manager_id === "" ? null : Number(form.manager_id),
-        min_price: form.min_price === "" ? null : Number(form.min_price),
+        name: toTrim(form.name),
+        address: toTrim(form.address),
+        description: toTrim(form.description) || null,
+        email: toTrim(form.email) || null,
+        phone_number: toTrim(form.phone_number) || null,
+        manager_id: toNumberOrNull(form.manager_id),
+        min_price: toNumberOrNull(form.min_price),
       };
 
       await updateHotel(id, payload, file);
@@ -131,18 +143,26 @@ export default function AdminHotelEdit() {
     }
   };
 
+  const pageTitle = `Update Hotel #${id}`;
+
   if (loading) {
     return (
-      <div className="p-6">
-        <div className="bg-white rounded-2xl shadow p-6">
-          <h2 className="text-xl font-semibold">Update Hotel #{id}</h2>
-          <p className="mt-2 text-gray-600">Đang tải dữ liệu...</p>
-          <button
-            onClick={() => navigate(-1)}
-            className="mt-4 px-4 py-2 rounded-xl bg-gray-900 text-white"
-          >
-            Back
-          </button>
+      <div className="p-4 sm:p-6">
+        <div className="bg-white rounded-2xl shadow p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <h2 className="text-lg sm:text-xl font-semibold">{pageTitle}</h2>
+            <button
+              onClick={() => navigate(-1)}
+              className="w-full sm:w-auto px-4 py-2 rounded-xl bg-gray-900 text-white"
+            >
+              Back
+            </button>
+          </div>
+
+          <div className="mt-4 flex items-center gap-3 text-gray-600">
+            <div className="w-4 h-4 rounded-full border-2 border-gray-300 border-t-transparent animate-spin" />
+            <p>Đang tải dữ liệu...</p>
+          </div>
         </div>
       </div>
     );
@@ -150,50 +170,70 @@ export default function AdminHotelEdit() {
 
   if (!initialHotel) {
     return (
-      <div className="p-6">
-        <div className="bg-white rounded-2xl shadow p-6">
-          <h2 className="text-xl font-semibold">Update Hotel #{id}</h2>
-          <p className="mt-2 text-gray-600">
-            {err || "Không có dữ liệu hotel."}
-          </p>
-          <button
-            onClick={() => navigate(-1)}
-            className="mt-4 px-4 py-2 rounded-xl bg-gray-900 text-white"
-          >
-            Back
-          </button>
+      <div className="p-4 sm:p-6">
+        <div className="bg-white rounded-2xl shadow p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <h2 className="text-lg sm:text-xl font-semibold">{pageTitle}</h2>
+            <button
+              onClick={() => navigate(-1)}
+              className="w-full sm:w-auto px-4 py-2 rounded-xl bg-gray-900 text-white"
+            >
+              Back
+            </button>
+          </div>
+
+          <p className="mt-3 text-gray-600">{err || "Không có dữ liệu hotel."}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6">
-      <div className="bg-white rounded-2xl shadow p-6">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-2xl font-semibold">Update Hotel #{id}</h2>
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50"
-          >
-            Back
-          </button>
+    <div className="p-4 sm:p-6">
+      <div className="bg-white rounded-2xl shadow p-4 sm:p-6">
+        {/* Header responsive */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-xl sm:text-2xl font-semibold truncate">{pageTitle}</h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Cập nhật thông tin khách sạn và ảnh đại diện.
+            </p>
+          </div>
+
+          <div className="flex gap-2 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="flex-1 sm:flex-none px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/admin/hotels")}
+              className="flex-1 sm:flex-none px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50"
+            >
+              List
+            </button>
+          </div>
         </div>
 
         {err && (
-          <div className="mt-4 p-3 rounded-xl bg-red-50 text-red-700">
+          <div className="mt-4 p-3 rounded-xl bg-red-50 text-red-700 text-sm">
             {err}
           </div>
         )}
 
+        {/* Layout responsive */}
         <form onSubmit={onSubmit} className="mt-6 grid grid-cols-12 gap-6">
+          {/* Left: fields */}
           <div className="col-span-12 lg:col-span-7 space-y-4">
             <Field label="Name" required>
               <input
                 value={form.name}
                 onChange={onChange("name")}
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-gray-200"
+                placeholder="Hotel name"
               />
             </Field>
 
@@ -202,6 +242,7 @@ export default function AdminHotelEdit() {
                 value={form.address}
                 onChange={onChange("address")}
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-gray-200"
+                placeholder="Hotel address"
               />
             </Field>
 
@@ -211,6 +252,7 @@ export default function AdminHotelEdit() {
                 onChange={onChange("description")}
                 rows={5}
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-gray-200"
+                placeholder="Short description..."
               />
             </Field>
 
@@ -220,6 +262,7 @@ export default function AdminHotelEdit() {
                   value={form.email}
                   onChange={onChange("email")}
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-gray-200"
+                  placeholder="email@example.com"
                 />
               </Field>
 
@@ -228,6 +271,7 @@ export default function AdminHotelEdit() {
                   value={form.phone_number}
                   onChange={onChange("phone_number")}
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-gray-200"
+                  placeholder="(optional)"
                 />
               </Field>
             </div>
@@ -254,26 +298,48 @@ export default function AdminHotelEdit() {
               </Field>
             </div>
 
-            <div className="flex items-center gap-3 pt-2">
+            {/* Actions responsive: stack mobile, inline desktop */}
+            <div className="pt-2 flex flex-col sm:flex-row gap-3">
               <button
                 disabled={saving || !canSubmit}
-                className="px-5 py-3 rounded-xl bg-gray-900 text-white disabled:opacity-50"
+                className="w-full sm:w-auto px-5 py-3 rounded-xl bg-gray-900 text-white disabled:opacity-50 inline-flex items-center justify-center gap-2"
               >
-                {saving ? "Saving..." : "Save"}
+                {saving ? (
+                  <>
+                    <span className="w-4 h-4 rounded-full border-2 border-white/60 border-t-transparent animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save"
+                )}
               </button>
+
               <button
                 type="button"
                 onClick={() => navigate("/admin/hotels")}
-                className="px-5 py-3 rounded-xl border border-gray-200 hover:bg-gray-50"
+                className="w-full sm:w-auto px-5 py-3 rounded-xl border border-gray-200 hover:bg-gray-50"
               >
                 Cancel
               </button>
             </div>
           </div>
 
+          {/* Right: image (sticky on desktop) */}
           <div className="col-span-12 lg:col-span-5">
-            <div className="rounded-2xl border border-gray-200 p-4">
-              <div className="text-sm font-semibold mb-3">Main image</div>
+            <div className="lg:sticky lg:top-6 rounded-2xl border border-gray-200 p-4">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div className="text-sm font-semibold">Main image</div>
+                {(preview || currentImage) && (
+                  <a
+                    href={preview || currentImage}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs px-3 py-1 rounded-full border border-gray-200 hover:bg-gray-50"
+                  >
+                    Open
+                  </a>
+                )}
+              </div>
 
               <div className="w-full aspect-[16/10] rounded-xl bg-gray-100 overflow-hidden">
                 {preview || currentImage ? (
@@ -281,6 +347,7 @@ export default function AdminHotelEdit() {
                     src={preview || currentImage}
                     alt="hotel"
                     className="w-full h-full object-cover"
+                    loading="lazy"
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-gray-500 text-sm">
@@ -290,27 +357,42 @@ export default function AdminHotelEdit() {
               </div>
 
               <div className="mt-4">
-                <label className="block text-sm font-medium mb-2">
+                <div className="text-sm font-medium mb-2">
                   Upload new image (optional)
+                </div>
+
+                {/* file input đẹp hơn (responsive) */}
+                <label className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer text-sm">
+                  <span className="inline-block w-2 h-2 rounded-full bg-purple-500" />
+                  <span className="truncate">
+                    {file ? file.name : "Choose an image..."}
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={onPickFile}
+                    className="hidden"
+                  />
                 </label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={onPickFile}
-                  className="w-full text-sm"
-                />
+
                 {file && (
-                  <div className="mt-2 flex items-center justify-between gap-3">
+                  <div className="mt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <span className="text-sm text-gray-600 line-clamp-1">
-                      {file.name}
+                      Selected: {file.name}
                     </span>
                     <button
                       type="button"
                       onClick={() => setFile(null)}
-                      className="text-sm px-3 py-1 rounded-lg border border-gray-200 hover:bg-gray-50"
+                      className="w-full sm:w-auto text-sm px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50"
                     >
                       Remove
                     </button>
+                  </div>
+                )}
+
+                {preview && (
+                  <div className="mt-3 text-xs text-gray-500">
+                    Preview đang hiển thị ảnh mới. Bấm Save để upload.
                   </div>
                 )}
               </div>

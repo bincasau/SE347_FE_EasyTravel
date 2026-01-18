@@ -14,6 +14,12 @@ import { adminCancelTourSideEffects } from "@/apis/Tour";
 const S3_TOUR_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/tour";
 
+function Spinner() {
+  return (
+    <span className="inline-block w-4 h-4 rounded-full border-2 border-gray-300 border-t-transparent animate-spin" />
+  );
+}
+
 function buildEmptyForm() {
   return {
     title: "",
@@ -403,8 +409,8 @@ export default function AdminTourUpsert() {
 
     try {
       const saved = await saveTourUpsert(payload, pickedFile, guideId);
-      const savedId =
-        saved?.tourId ?? saved?.id ?? (isEdit ? Number(id) : null);
+      const savedId = saved?.tourId ?? saved?.id ?? (isEdit ? Number(id) : null);
+
       if (
         isEdit &&
         payload.status === "Canceled" &&
@@ -414,9 +420,7 @@ export default function AdminTourUpsert() {
           await adminCancelTourSideEffects(savedId);
         } catch (e3) {
           console.error("Cancel side effects failed:", e3);
-          setErr(
-            "Đã lưu trạng thái Hủy tour, nhưng gửi thông báo/hoàn tiền bị lỗi."
-          );
+          setErr("Đã lưu trạng thái Hủy tour, nhưng gửi thông báo/hoàn tiền bị lỗi.");
         }
       }
 
@@ -465,15 +469,16 @@ export default function AdminTourUpsert() {
       : "Chờ duyệt";
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+      {/* Success modal responsive */}
       {openSuccess && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-black/40"
             onClick={() => setOpenSuccess(false)}
           />
           <div
-            className="relative w-[92%] max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="text-xl font-semibold">Thêm tour thành công</div>
@@ -481,10 +486,10 @@ export default function AdminTourUpsert() {
               Bạn muốn quay về danh sách tour hay tiếp tục tạo mới?
             </div>
 
-            <div className="mt-6 flex gap-3">
+            <div className="mt-6 flex flex-col sm:flex-row gap-2 sm:gap-3">
               <button
                 type="button"
-                className="flex-1 rounded-xl border border-gray-200 py-2.5 hover:bg-gray-50"
+                className="w-full sm:flex-1 rounded-xl border border-gray-200 py-2.5 hover:bg-gray-50"
                 onClick={() => {
                   setOpenSuccess(false);
                   navigate("/admin/tours");
@@ -495,7 +500,7 @@ export default function AdminTourUpsert() {
 
               <button
                 type="button"
-                className="flex-1 rounded-xl bg-black text-white py-2.5"
+                className="w-full sm:flex-1 rounded-xl bg-black text-white py-2.5"
                 onClick={() => {
                   setOpenSuccess(false);
                   resetForm();
@@ -508,9 +513,10 @@ export default function AdminTourUpsert() {
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold">
+      {/* Header responsive */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-semibold truncate">
             {isEdit ? "Cập nhật tour" : "Thêm tour mới"}
           </h1>
           <div className="text-sm text-gray-500">
@@ -518,13 +524,13 @@ export default function AdminTourUpsert() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           {isEdit ? (
             <button
               type="button"
               onClick={onCancelTour}
               disabled={canceling || saving || loading}
-              className="px-4 py-2 rounded-xl border border-red-200 text-red-700 bg-red-50 disabled:opacity-60"
+              className="w-full sm:w-auto px-4 py-2 rounded-xl border border-red-200 text-red-700 bg-red-50 disabled:opacity-60"
             >
               {canceling ? "Đang hủy..." : "Hủy tour"}
             </button>
@@ -534,7 +540,7 @@ export default function AdminTourUpsert() {
             type="button"
             onClick={() => navigate("/admin/tours")}
             disabled={saving || canceling}
-            className="px-4 py-2 rounded-xl border bg-white disabled:opacity-60"
+            className="w-full sm:w-auto px-4 py-2 rounded-xl border bg-white disabled:opacity-60"
           >
             Quay lại
           </button>
@@ -548,7 +554,8 @@ export default function AdminTourUpsert() {
       ) : null}
 
       {loading ? (
-        <div className="p-4 rounded-xl border bg-white">
+        <div className="p-4 rounded-xl border bg-white flex items-center gap-3 text-gray-600">
+          <Spinner />
           Đang tải dữ liệu...
         </div>
       ) : (
@@ -573,7 +580,8 @@ export default function AdminTourUpsert() {
             {isEdit ? <TourParticipantsCard tourId={id} /> : null}
           </div>
 
-          <div className="lg:col-span-1 space-y-6">
+          {/* Right column: sticky on desktop */}
+          <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-6 h-fit">
             <TourCurrentInfoCard
               title={form.title}
               imageUrl={currentMainImageUrl}
@@ -586,14 +594,17 @@ export default function AdminTourUpsert() {
               statusLabel={statusLabel}
             />
 
-            <TourItineraryEditor tourId={id} />
+            {/* Chỉ render editor/images khi đã có tourId (edit) */}
+            {isEdit ? <TourItineraryEditor tourId={id} /> : null}
 
-            <ExtraImagesManager
-              type="tour"
-              ownerId={id}
-              baseUrl={S3_TOUR_BASE}
-              readOnly={!isEdit}
-            />
+            {isEdit ? (
+              <ExtraImagesManager
+                type="tour"
+                ownerId={id}
+                baseUrl={S3_TOUR_BASE}
+                readOnly={!isEdit}
+              />
+            ) : null}
           </div>
         </div>
       )}

@@ -62,9 +62,6 @@ const HeroSection = () => {
         const list = await getDepartureLocations();
         if (!mounted) return;
         setDepartureOptions(Array.isArray(list) ? list : []);
-      } catch (e) {
-        if (!mounted) return;
-        setDepartureOptions(["Hà Nội", "Hồ Chí Minh", "Đà Nẵng"]);
       } finally {
         if (mounted) setLoadingDeparture(false);
       }

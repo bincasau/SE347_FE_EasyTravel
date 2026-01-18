@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AdminNotificationCard from "@/components/pages/Admin/Notification/AdminNotificationCard";
 import {
@@ -6,6 +6,12 @@ import {
   adminDeleteNotification,
   adminUpdateNotificationStatus,
 } from "@/apis/NotificationAPI";
+
+function Spinner() {
+  return (
+    <span className="inline-block w-4 h-4 rounded-full border-2 border-gray-300 border-t-transparent animate-spin" />
+  );
+}
 
 export default function NotificationManagement() {
   const navigate = useNavigate();
@@ -29,20 +35,16 @@ export default function NotificationManagement() {
     return f;
   }, [status, isBroadcast, search, targetUser]);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       setErr("");
       setLoading(true);
 
       const list = await adminGetAllNotifications(filters);
-      console.log("Fetched notifications:", list);
+
       const sorted = (Array.isArray(list) ? list : []).slice().sort((a, b) => {
-        const ida = Number(
-          a?.notificationId ?? a?.notification_id ?? a?.id ?? 0,
-        );
-        const idb = Number(
-          b?.notificationId ?? b?.notification_id ?? b?.id ?? 0,
-        );
+        const ida = Number(a?.notificationId ?? a?.notification_id ?? a?.id ?? 0);
+        const idb = Number(b?.notificationId ?? b?.notification_id ?? b?.id ?? 0);
         return idb - ida;
       });
 
@@ -53,8 +55,9 @@ export default function NotificationManagement() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
 
+  // auto load khi đổi status/isBroadcast (giữ hành vi của bạn)
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -91,31 +94,46 @@ export default function NotificationManagement() {
     }
   };
 
-  return (
-    <div className="max-w-5xl mx-auto py-10">
-      {/* HEADER – giống HotelManagement */}
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-semibold">Notification management</h1>
+  const handleResetFilters = () => {
+    setSearch("");
+    setTargetUser("");
+    setStatus("");
+    setIsBroadcast("");
+  };
 
-        <div className="flex items-center gap-3">
+  return (
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+      {/* HEADER responsive */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-semibold truncate">
+            Notification management
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Lọc, tìm kiếm và quản lý thông báo.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
           <button
             onClick={() => navigate("/admin/notifications/new")}
-            className="px-5 py-2 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition"
+            className="w-full sm:w-auto px-5 py-2 rounded-full bg-orange-500 text-white hover:bg-orange-600 transition"
           >
             + Add Notification
           </button>
 
           <button
             onClick={load}
-            className="px-5 py-2 rounded-full ring-1 ring-gray-200 hover:bg-gray-50 transition"
+            className="w-full sm:w-auto px-5 py-2 rounded-full ring-1 ring-gray-200 hover:bg-gray-50 transition disabled:opacity-60 inline-flex items-center justify-center gap-2"
             disabled={loading}
           >
+            {loading ? <Spinner /> : null}
             Refresh
           </button>
         </div>
       </div>
 
-      {/* FILTER BAR */}
+      {/* FILTER BAR responsive */}
       <form
         onSubmit={handleSearch}
         className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 p-4 mb-6"
@@ -129,6 +147,7 @@ export default function NotificationManagement() {
               value={status}
               onChange={(e) => setStatus(e.target.value)}
               className="w-full rounded-xl ring-1 ring-gray-200 px-3 py-2 outline-none focus:ring-orange-300"
+              disabled={loading}
             >
               <option value="">Tất cả</option>
               <option value="ACTIVE">Đang kích hoạt</option>
@@ -144,6 +163,7 @@ export default function NotificationManagement() {
               value={isBroadcast}
               onChange={(e) => setIsBroadcast(e.target.value)}
               className="w-full rounded-xl ring-1 ring-gray-200 px-3 py-2 outline-none focus:ring-orange-300"
+              disabled={loading}
             >
               <option value="">Tất cả</option>
               <option value="true">Broadcast</option>
@@ -160,6 +180,7 @@ export default function NotificationManagement() {
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Tìm theo message..."
               className="w-full rounded-xl ring-1 ring-gray-200 px-3 py-2 outline-none focus:ring-orange-300"
+              disabled={loading}
             />
           </div>
 
@@ -172,19 +193,16 @@ export default function NotificationManagement() {
               onChange={(e) => setTargetUser(e.target.value)}
               placeholder="Username người nhận..."
               className="w-full rounded-xl ring-1 ring-gray-200 px-3 py-2 outline-none focus:ring-orange-300"
+              disabled={loading}
             />
           </div>
 
-          <div className="md:col-span-12 flex justify-end gap-2 pt-2">
+          {/* Actions: stack mobile */}
+          <div className="md:col-span-12 flex flex-col sm:flex-row sm:justify-end gap-2 pt-2">
             <button
               type="button"
-              onClick={() => {
-                setSearch("");
-                setTargetUser("");
-                setStatus("");
-                setIsBroadcast("");
-              }}
-              className="px-5 py-2 rounded-full ring-1 ring-gray-200 hover:bg-gray-50 transition"
+              onClick={handleResetFilters}
+              className="w-full sm:w-auto px-5 py-2 rounded-full ring-1 ring-gray-200 hover:bg-gray-50 transition disabled:opacity-60"
               disabled={loading}
             >
               Xóa
@@ -192,9 +210,10 @@ export default function NotificationManagement() {
 
             <button
               type="submit"
-              className="px-5 py-2 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition"
+              className="w-full sm:w-auto px-5 py-2 rounded-full bg-orange-500 text-white hover:bg-orange-600 transition disabled:opacity-60 inline-flex items-center justify-center gap-2"
               disabled={loading}
             >
+              {loading ? <Spinner /> : null}
               Áp dụng
             </button>
           </div>
@@ -209,17 +228,20 @@ export default function NotificationManagement() {
 
       {/* LIST */}
       {loading ? (
-        <p className="text-center py-10">Loading notifications...</p>
+        <div className="py-10 flex items-center justify-center gap-3 text-gray-600">
+          <Spinner />
+          Loading notifications...
+        </div>
       ) : items.length === 0 ? (
-        <p className="text-center py-10 text-gray-500">
-          No notifications found.
-        </p>
+        <p className="text-center py-10 text-gray-500">No notifications found.</p>
       ) : (
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-4 sm:gap-5">
           {items.map((n) => {
             const id = n?.notificationId ?? n?.notification_id ?? n?.id;
+            const isBusy = busyId === id;
+
             return (
-              <div key={id} className={busyId === id ? "opacity-70" : ""}>
+              <div key={id} className={isBusy ? "opacity-70 pointer-events-none" : ""}>
                 <AdminNotificationCard
                   notif={n}
                   onToggleActive={(nid, s) => handleUpdateStatus(nid, s)}

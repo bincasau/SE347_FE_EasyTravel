@@ -9,13 +9,21 @@ import {
 
 const emptyForm = { title: "", dayNumber: 1, activities: "" };
 
+function Spinner() {
+  return (
+    <span className="inline-block w-4 h-4 rounded-full border-2 border-gray-300 border-t-transparent animate-spin" />
+  );
+}
+
+const inputCls =
+  "w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 outline-none " +
+  "focus:ring-2 focus:ring-gray-200 focus:border-gray-300 " +
+  "disabled:bg-gray-50 disabled:text-gray-500";
+
 export default function TourItineraryEditor({ tourId }) {
   const [list, setList] = useState([]);
-
-  // add form (vertical)
   const [form, setForm] = useState(emptyForm);
 
-  // inline edit (edit inside card, not 3 inputs)
   const [editId, setEditId] = useState(null);
   const [editForm, setEditForm] = useState(emptyForm);
 
@@ -30,7 +38,7 @@ export default function TourItineraryEditor({ tourId }) {
     setErr("");
     setLoading(true);
     try {
-      const arr = await getItinerariesByTourId(tourId); // API trả array
+      const arr = await getItinerariesByTourId(tourId);
       const items = Array.isArray(arr) ? arr : [];
       items.sort((a, b) => (a.dayNumber ?? 0) - (b.dayNumber ?? 0));
       setList(items);
@@ -134,40 +142,42 @@ export default function TourItineraryEditor({ tourId }) {
   }
 
   return (
-    <div className="p-5 rounded-2xl border bg-white">
-      <div className="flex items-start justify-between gap-3 mb-3">
+    <div className="p-4 sm:p-5 rounded-2xl border border-gray-200 bg-white">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-3">
         <div className="font-semibold text-lg">Lịch trình</div>
-        {!canEdit && (
+        {!canEdit ? (
           <div className="text-sm text-gray-500">
             Lưu tour trước để thêm/sửa/xóa lịch trình
           </div>
-        )}
+        ) : null}
       </div>
 
-      {err && <div className="mb-3 text-sm text-red-600">{err}</div>}
+      {err ? (
+        <div className="mb-3 text-sm text-red-700 bg-red-50 ring-1 ring-red-200 rounded-xl px-3 py-2">
+          {err}
+        </div>
+      ) : null}
 
-      {/* ADD (3 ô hàng dọc) */}
-      <div className={`${!canEdit ? "opacity-60" : ""}`}>
-        <div className="space-y-3">
-          <div>
+      {/* ADD */}
+      <div className={!canEdit || busy ? "opacity-70 pointer-events-none" : ""}>
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+          <div className="md:col-span-9">
             <div className="text-sm font-medium mb-1">Tiêu đề</div>
             <input
-              className="w-full border rounded-xl px-3 py-2"
+              className={inputCls}
               placeholder="Ngày 1 – ..."
               value={form.title}
               disabled={!canEdit || busy}
-              onChange={(e) =>
-                setForm((p) => ({ ...p, title: e.target.value }))
-              }
+              onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
             />
           </div>
 
-          <div>
+          <div className="md:col-span-3">
             <div className="text-sm font-medium mb-1">Ngày</div>
             <input
               type="number"
               min={1}
-              className="w-full border rounded-xl px-3 py-2"
+              className={inputCls}
               value={form.dayNumber}
               disabled={!canEdit || busy}
               onChange={(e) =>
@@ -179,10 +189,10 @@ export default function TourItineraryEditor({ tourId }) {
             />
           </div>
 
-          <div>
+          <div className="md:col-span-12">
             <div className="text-sm font-medium mb-1">Hoạt động</div>
             <textarea
-              className="w-full border rounded-xl px-3 py-2 min-h-[120px]"
+              className={`${inputCls} min-h-[120px] resize-none`}
               placeholder="Nhập nội dung hoạt động..."
               value={form.activities}
               disabled={!canEdit || busy}
@@ -193,14 +203,20 @@ export default function TourItineraryEditor({ tourId }) {
           </div>
         </div>
 
-        <div className="flex justify-end mt-3">
+        <div className="mt-3">
           <button
             type="button"
-            className="rounded-xl bg-black text-white px-5 py-2.5 disabled:opacity-60"
+            className="w-full sm:w-auto rounded-xl bg-black text-white px-5 py-2.5 disabled:opacity-60 inline-flex items-center justify-center gap-2"
             disabled={!canEdit || busy}
             onClick={handleAdd}
           >
-            {busy ? "Đang xử lý..." : "Thêm"}
+            {busy ? (
+              <>
+                <Spinner /> Đang xử lý...
+              </>
+            ) : (
+              "Thêm"
+            )}
           </button>
         </div>
       </div>
@@ -208,7 +224,9 @@ export default function TourItineraryEditor({ tourId }) {
       {/* LIST */}
       <div className="mt-6">
         {loading ? (
-          <div className="text-sm text-gray-500">Loading...</div>
+          <div className="text-sm text-gray-600 inline-flex items-center gap-2">
+            <Spinner /> Loading...
+          </div>
         ) : list.length === 0 ? (
           <div className="text-sm text-gray-500">Chưa có lịch trình</div>
         ) : (
@@ -219,36 +237,88 @@ export default function TourItineraryEditor({ tourId }) {
 
               const day = isEditing ? editForm.dayNumber : it.dayNumber;
               const title = isEditing ? editForm.title : it.title;
-              const activities = isEditing
-                ? editForm.activities
-                : it.activities;
+              const activities = isEditing ? editForm.activities : it.activities;
 
               return (
-                <div key={iid} className="border rounded-2xl p-4 bg-white">
-                  {/* giữ layout giống card view */}
-                  <div className="text-xs text-gray-500 mb-1">Ngày {day}</div>
+                <div
+                  key={iid}
+                  className={`border border-gray-200 rounded-2xl p-4 bg-white ${
+                    busy ? "opacity-80" : ""
+                  }`}
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-xs text-gray-500 mb-1">
+                        Ngày {day}
+                      </div>
 
-                  {/* title: khi sửa -> input nhưng vẫn giữ style "to" */}
-                  {isEditing ? (
-                    <input
-                      className="w-full text-xl font-semibold border rounded-xl px-3 py-2"
-                      value={editForm.title}
-                      disabled={busy}
-                      onChange={(e) =>
-                        setEditForm((p) => ({ ...p, title: e.target.value }))
-                      }
-                    />
-                  ) : (
-                    <div className="text-xl font-semibold break-words">
-                      {title}
+                      {isEditing ? (
+                        <input
+                          className={`w-full text-base sm:text-xl font-semibold ${inputCls}`}
+                          value={editForm.title}
+                          disabled={busy}
+                          onChange={(e) =>
+                            setEditForm((p) => ({ ...p, title: e.target.value }))
+                          }
+                        />
+                      ) : (
+                        <div className="text-base sm:text-xl font-semibold break-words">
+                          {title}
+                        </div>
+                      )}
                     </div>
-                  )}
 
-                  {/* activities: khi sửa -> textarea full width */}
+                    {canEdit ? (
+                      <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+                        {!isEditing ? (
+                          <>
+                            <button
+                              type="button"
+                              className="w-full sm:w-auto border rounded-xl px-4 py-2 bg-white hover:bg-gray-50 disabled:opacity-60"
+                              disabled={busy}
+                              onClick={() => startEdit(it)}
+                            >
+                              Sửa
+                            </button>
+
+                            <button
+                              type="button"
+                              className="w-full sm:w-auto border border-red-200 text-red-700 bg-red-50 rounded-xl px-4 py-2 hover:bg-red-100 disabled:opacity-60"
+                              disabled={busy}
+                              onClick={() => handleDelete(iid)}
+                            >
+                              Xóa
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              className="w-full sm:w-auto border rounded-xl px-4 py-2 bg-white hover:bg-gray-50 disabled:opacity-60"
+                              disabled={busy}
+                              onClick={cancelEdit}
+                            >
+                              Hủy
+                            </button>
+
+                            <button
+                              type="button"
+                              className="w-full sm:w-auto rounded-xl bg-black text-white px-4 py-2 disabled:opacity-60"
+                              disabled={busy}
+                              onClick={handleUpdate}
+                            >
+                              Cập nhật
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+
                   <div className="mt-3">
                     {isEditing ? (
                       <textarea
-                        className="w-full border rounded-xl px-3 py-2 min-h-[140px]"
+                        className={`${inputCls} min-h-[140px] resize-none`}
                         value={editForm.activities}
                         disabled={busy}
                         onChange={(e) =>
@@ -265,14 +335,13 @@ export default function TourItineraryEditor({ tourId }) {
                     )}
                   </div>
 
-                  {/* dayNumber: khi sửa -> input nhỏ nhưng đặt dưới, không làm layout bé */}
                   {isEditing ? (
                     <div className="mt-3">
                       <div className="text-sm font-medium mb-1">Ngày</div>
                       <input
                         type="number"
                         min={1}
-                        className="w-full border rounded-xl px-3 py-2"
+                        className={inputCls}
                         value={editForm.dayNumber}
                         disabled={busy}
                         onChange={(e) =>
@@ -284,53 +353,6 @@ export default function TourItineraryEditor({ tourId }) {
                       />
                     </div>
                   ) : null}
-
-                  {/* actions luôn ở dưới */}
-                  {canEdit && (
-                    <div className="mt-4 flex justify-end gap-2">
-                      {!isEditing ? (
-                        <>
-                          <button
-                            type="button"
-                            className="border rounded-xl px-4 py-2 bg-white hover:bg-gray-50 disabled:opacity-60"
-                            disabled={busy}
-                            onClick={() => startEdit(it)}
-                          >
-                            Sửa
-                          </button>
-
-                          <button
-                            type="button"
-                            className="border border-red-200 text-red-700 bg-red-50 rounded-xl px-4 py-2 hover:bg-red-100 disabled:opacity-60"
-                            disabled={busy}
-                            onClick={() => handleDelete(iid)}
-                          >
-                            Xóa
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            className="border rounded-xl px-4 py-2 bg-white hover:bg-gray-50 disabled:opacity-60"
-                            disabled={busy}
-                            onClick={cancelEdit}
-                          >
-                            Hủy
-                          </button>
-
-                          <button
-                            type="button"
-                            className="rounded-xl bg-black text-white px-4 py-2 disabled:opacity-60"
-                            disabled={busy}
-                            onClick={handleUpdate}
-                          >
-                            Cập nhật
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  )}
                 </div>
               );
             })}

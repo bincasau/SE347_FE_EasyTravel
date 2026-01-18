@@ -176,14 +176,15 @@ export default function RoomCard({ room, onDeleted }) {
   };
 
   return (
-    <div className="bg-white border rounded-xl shadow-sm hover:shadow-md transition overflow-hidden">
-      <div className="flex">
+    <div className="bg-white border rounded-2xl shadow-sm hover:shadow-md transition overflow-hidden">
+      {/* ✅ mobile: column | sm+: row */}
+      <div className="flex flex-col sm:flex-row">
         {/* IMAGE */}
-        <div className="w-[220px] bg-gray-100 shrink-0 self-stretch">
+        <div className="w-full sm:w-[220px] bg-gray-100 shrink-0">
           <img
             src={imageUrl}
             alt={showRoomNumber || "room"}
-            className="w-full h-full object-cover"
+            className="w-full h-52 sm:h-full object-cover"
             onError={(e) => {
               e.currentTarget.src = FALLBACK_IMAGE;
             }}
@@ -191,13 +192,13 @@ export default function RoomCard({ room, onDeleted }) {
         </div>
 
         {/* INFO */}
-        <div className="flex-1 px-4 py-3 flex flex-col justify-between">
+        <div className="flex-1 px-4 sm:px-5 py-4 flex flex-col justify-between min-w-0">
           {/* TOP */}
-          <div>
-            <div className="flex justify-between items-start gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-lg font-semibold text-gray-900 leading-tight">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 leading-tight break-words">
                     Room{" "}
                     <span className="text-orange-600 font-semibold">
                       {showRoomNumber || "--"}
@@ -214,7 +215,7 @@ export default function RoomCard({ room, onDeleted }) {
                   </span>
                 </div>
 
-                <div className="text-sm text-gray-600 mt-0.5">
+                <div className="text-sm text-gray-600 mt-1 break-words">
                   Type:{" "}
                   <span className="text-orange-600 font-medium">
                     {showRoomType || "--"}
@@ -222,20 +223,21 @@ export default function RoomCard({ room, onDeleted }) {
                 </div>
               </div>
 
-              {/* ✅ VND */}
-              <span className="text-orange-600 font-bold text-xl whitespace-nowrap">
+              {/* ✅ Price: không tràn, canh phải trên desktop */}
+              <span className="text-orange-600 font-bold text-lg sm:text-xl whitespace-nowrap sm:text-right">
                 {price !== null && price !== undefined && price !== ""
                   ? formatVND(safeNumber(price, NaN))
                   : "--"}
               </span>
             </div>
 
-            <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
+            {/* ✅ Info grid: mobile 2 cột vẫn ok, nhưng tự xuống 1 cột nếu quá hẹp */}
+            <div className="mt-3 grid grid-cols-2 xs:grid-cols-2 gap-x-6 gap-y-2 text-sm">
               <Info label="Guests" value={showGuests} />
               <Info label="Floor" value={floor} />
             </div>
 
-            <p className="text-sm text-gray-600 mt-2 line-clamp-2">
+            <p className="text-sm text-gray-600 mt-3 line-clamp-2 break-words">
               {showDesc || "--"}
             </p>
 
@@ -247,17 +249,17 @@ export default function RoomCard({ room, onDeleted }) {
           </div>
 
           {/* ACTIONS */}
-          <div className="mt-3 flex justify-end gap-2">
+          <div className="mt-4 flex flex-wrap sm:flex-nowrap justify-end gap-2">
             <button
               onClick={goView}
-              className="px-4 py-1.5 text-sm rounded-lg border border-gray-300 hover:bg-gray-50 transition active:scale-95"
+              className="px-4 py-2 sm:py-1.5 text-sm rounded-full sm:rounded-lg border border-gray-300 hover:bg-gray-50 transition active:scale-95 w-full sm:w-auto"
             >
               View
             </button>
 
             <button
               onClick={goEdit}
-              className="px-4 py-1.5 text-sm rounded-lg bg-orange-500 text-white hover:bg-orange-600 transition hover:-translate-y-[1px] active:scale-95"
+              className="px-4 py-2 sm:py-1.5 text-sm rounded-full sm:rounded-lg bg-orange-500 text-white hover:bg-orange-600 transition hover:-translate-y-[1px] active:scale-95 w-full sm:w-auto"
             >
               Edit
             </button>
@@ -266,7 +268,7 @@ export default function RoomCard({ room, onDeleted }) {
               onClick={doDelete}
               disabled={deleting}
               className={[
-                "px-4 py-1.5 text-sm rounded-lg border transition active:scale-95",
+                "px-4 py-2 sm:py-1.5 text-sm rounded-full sm:rounded-lg border transition active:scale-95 w-full sm:w-auto",
                 deleting
                   ? "border-gray-200 text-gray-400 cursor-not-allowed"
                   : "border-red-200 text-red-600 hover:bg-red-50",
@@ -286,7 +288,7 @@ function Info({ label, value }) {
   return (
     <div className="min-w-0">
       <span className="text-xs text-gray-500">{label}: </span>
-      <span className="text-gray-800">
+      <span className="text-gray-800 break-words">
         {value === null || value === undefined || value === "" ? "--" : value}
       </span>
     </div>

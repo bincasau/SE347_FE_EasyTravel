@@ -4,7 +4,7 @@ import { getHotels, getHotelManagerByHotelId } from "@/apis/Hotel";
 import AdminHotelCard from "@/components/pages/Admin/Hotel/AdminHotelCard";
 import Pagination from "@/utils/Pagination";
 import ExportHotelsExcelButton from "@/components/pages/Admin/Hotel/HotelsExportExcel";
-import HotelsImportExcelButton from "@/components/pages/Admin/Hotel/HotelsImportExcel"; // NEW
+import HotelsImportExcelButton from "@/components/pages/Admin/Hotel/HotelsImportExcel";
 
 export default function HotelManagement() {
   const [hotels, setHotels] = useState([]);
@@ -81,31 +81,38 @@ export default function HotelManagement() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto py-10">
-      <div className="flex justify-between items-center mb-6">
+    <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+      {/* HEADER */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <h1 className="text-2xl font-semibold">Hotel management</h1>
 
-        <div className="flex items-center gap-3">
-          {/* NEW: Import */}
-          <HotelsImportExcelButton onImported={() => loadHotels(page)} />
+        {/* ACTIONS: wrap on mobile */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
+          {/* Import */}
+          <div className="w-full sm:w-auto">
+            <HotelsImportExcelButton onImported={() => loadHotels(page)} />
+          </div>
 
-          {/* Export (đã có ManagerId) */}
-          <ExportHotelsExcelButton />
+          {/* Export */}
+          <div className="w-full sm:w-auto">
+            <ExportHotelsExcelButton />
+          </div>
 
-          <Link to="/admin/hotels/add">
-            <button className="px-5 py-2 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition">
+          <Link to="/admin/hotels/add" className="w-full sm:w-auto">
+            <button className="w-full sm:w-auto px-5 py-2 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition">
               + Add Hotel
             </button>
           </Link>
         </div>
       </div>
 
+      {/* CONTENT */}
       {loading ? (
-        <p className="text-center py-10">Loading hotels...</p>
+        <p className="text-center py-10 text-gray-600">Loading hotels...</p>
       ) : hotels.length === 0 ? (
         <p className="text-center py-10 text-gray-500">No hotels found.</p>
       ) : (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-4 sm:gap-6">
           {hotels.map((hotel) => (
             <AdminHotelCard
               key={hotel.hotelId}
@@ -119,13 +126,18 @@ export default function HotelManagement() {
         </div>
       )}
 
+      {/* PAGINATION */}
       {totalPages > 1 && (
-        <Pagination
-          totalPages={totalPages}
-          currentPage={page + 1}
-          visiblePages={null}
-          onPageChange={handlePageChange}
-        />
+        <div className="mt-8 flex justify-center px-2">
+          <div className="w-full sm:w-auto overflow-x-auto">
+            <Pagination
+              totalPages={totalPages}
+              currentPage={page + 1}
+              visiblePages={null}
+              onPageChange={handlePageChange}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

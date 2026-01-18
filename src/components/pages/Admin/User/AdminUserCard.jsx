@@ -28,103 +28,125 @@ export default function AdminUserCard({ user, onRemove }) {
       `Are you sure you want to remove user "${user?.username}"?`
     );
     if (!ok) return;
-
     onRemove?.(user.userId);
   };
 
   return (
-    <div className="flex items-center gap-8 bg-white p-6 rounded-2xl shadow-md w-full">
-      <img
-        src={avatarSrc}
-        alt={user?.name || "User"}
-        className="w-60 h-36 rounded-xl object-cover flex-shrink-0 bg-gray-100"
-        onError={(e) => {
-          e.currentTarget.src = `${S3_USER_BASE}/user_default.jpg`;
-        }}
-      />
-
-      <div className="flex-1">
-        <h2 className="text-2xl font-semibold mb-3 line-clamp-2">
-          {user?.name || "Unnamed User"}
-        </h2>
-
-        <div className="flex gap-12 text-sm text-gray-700">
-          <div className="space-y-2">
-            <Info
-              icon={<FaUserAlt />}
-              label="Username"
-              value={user?.username}
-            />
-            <Info icon={<FaEnvelope />} label="Email" value={user?.email} />
-            <Info
-              icon={<FaPhoneAlt />}
-              label="Phone"
-              value={user?.phoneNumber}
-            />
-            <Info
-              icon={<FaMapMarkerAlt />}
-              label="Address"
-              value={user?.address}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-start gap-2">
-              <FaUserShield className="w-5 h-5 text-orange-400 mt-0.5" />
-              <p>
-                <span className="font-semibold">Role:</span>{" "}
-                <RoleBadge value={user?.role} />
-              </p>
-            </div>
-
-            <div className="flex items-start gap-2">
-              <FaUserShield className="w-5 h-5 text-orange-400 mt-0.5" />
-              <p>
-                <span className="font-semibold">Status:</span>{" "}
-                <StatusBadge value={user?.status} />
-              </p>
-            </div>
-
-            <Info
-              icon={<FaPlus />}
-              label="Added on"
-              value={user?.createdAt ? formatDate(user.createdAt) : null}
-            />
-            <Info
-              icon={<FaRegClock />}
-              label="Update"
-              value={user?.updatedAt ? formatDate(user.updatedAt) : null}
+    <div className="w-full bg-white rounded-2xl shadow-md p-4 sm:p-6">
+      <div className="flex flex-col lg:flex-row lg:items-start gap-4 sm:gap-6 lg:gap-8">
+        {/* Avatar */}
+        <div className="w-full lg:w-[260px] flex-shrink-0">
+          <div className="w-full aspect-[16/10] rounded-xl overflow-hidden bg-gray-100">
+            <img
+              src={avatarSrc}
+              alt={user?.name || "User"}
+              className="w-full h-full object-cover"
+              loading="lazy"
+              onError={(e) => {
+                e.currentTarget.src = `${S3_USER_BASE}/user_default.jpg`;
+              }}
             />
           </div>
         </div>
-      </div>
 
-      <div className="flex flex-col items-end gap-4 ml-4">
-        <button
-          onClick={handleEdit}
-          className="border border-orange-500 text-orange-500 px-8 py-2 rounded-full hover:bg-orange-50 transition font-medium"
-        >
-          Edit
-        </button>
+        {/* Content */}
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg sm:text-2xl font-semibold mb-3 line-clamp-2">
+            {user?.name || "Unnamed User"}
+          </h2>
 
-        <button
-          onClick={handleRemove}
-          className="bg-orange-500 text-white px-8 py-2 rounded-full hover:bg-orange-600 transition font-medium"
-        >
-          Remove
-        </button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 text-sm text-gray-700">
+            <div className="space-y-2 min-w-0">
+              <Info icon={<FaUserAlt />} label="Username" value={user?.username} />
+              <Info
+                icon={<FaEnvelope />}
+                label="Email"
+                value={user?.email}
+                href={user?.email ? `mailto:${user.email}` : undefined}
+              />
+              <Info
+                icon={<FaPhoneAlt />}
+                label="Phone"
+                value={user?.phoneNumber}
+                href={user?.phoneNumber ? `tel:${user.phoneNumber}` : undefined}
+              />
+              <Info icon={<FaMapMarkerAlt />} label="Address" value={user?.address} />
+            </div>
+
+            <div className="space-y-2 min-w-0">
+              <div className="flex items-start gap-2">
+                <FaUserShield className="w-5 h-5 text-orange-400 mt-0.5 flex-shrink-0" />
+                <p className="min-w-0">
+                  <span className="font-semibold">Role:</span>{" "}
+                  <RoleBadge value={user?.role} />
+                </p>
+              </div>
+
+              <div className="flex items-start gap-2">
+                <FaUserShield className="w-5 h-5 text-orange-400 mt-0.5 flex-shrink-0" />
+                <p className="min-w-0">
+                  <span className="font-semibold">Status:</span>{" "}
+                  <StatusBadge value={user?.status} />
+                </p>
+              </div>
+
+              <Info
+                icon={<FaPlus />}
+                label="Added on"
+                value={user?.createdAt ? formatDate(user.createdAt) : null}
+              />
+              <Info
+                icon={<FaRegClock />}
+                label="Update"
+                value={user?.updatedAt ? formatDate(user.updatedAt) : null}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="w-full lg:w-auto flex lg:flex-col gap-3 lg:items-end">
+          <button
+            onClick={handleEdit}
+            className="flex-1 lg:flex-none border border-orange-500 text-orange-500 px-5 sm:px-8 py-2 rounded-full hover:bg-orange-50 transition font-medium"
+          >
+            Edit
+          </button>
+
+          <button
+            onClick={handleRemove}
+            className="flex-1 lg:flex-none bg-orange-500 text-white px-5 sm:px-8 py-2 rounded-full hover:bg-orange-600 transition font-medium"
+          >
+            Remove
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-function Info({ icon, label, value }) {
+function Info({ icon, label, value, href }) {
+  const content = value ?? "—";
+
   return (
-    <div className="flex items-start gap-2">
-      <span className="w-5 h-5 text-orange-400 mt-0.5">{icon}</span>
+    <div className="flex items-start gap-2 min-w-0">
+      <span className="w-5 h-5 text-orange-400 mt-0.5 flex-shrink-0">{icon}</span>
       <p className="min-w-0">
         <span className="font-semibold">{label}:</span>{" "}
-        <span className="break-words">{value ?? "—"}</span>
+        {href ? (
+          <a
+            href={href}
+            className="break-words text-orange-600 hover:underline"
+            onClick={(e) => {
+              // tránh click vào link làm trigger event cha (nếu có)
+              e.stopPropagation();
+            }}
+          >
+            {content}
+          </a>
+        ) : (
+          <span className="break-words">{content}</span>
+        )}
       </p>
     </div>
   );
@@ -147,9 +169,7 @@ function RoleBadge({ value }) {
       : "bg-gray-100 text-gray-700";
 
   return (
-    <span
-      className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${cls}`}
-    >
+    <span className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${cls}`}>
       {v}
     </span>
   );

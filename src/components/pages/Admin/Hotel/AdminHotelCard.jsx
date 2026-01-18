@@ -19,9 +19,11 @@ export default function AdminHotelCard({ hotel, onEdit, onRemove }) {
 
   const imageUrl = hotel?.mainImage?.startsWith("http")
     ? hotel.mainImage
-    : `${S3_HOTEL_BASE}/${hotel?.mainImage || ""}`;
+    : hotel?.mainImage
+    ? `${S3_HOTEL_BASE}/${hotel.mainImage}`
+    : "";
 
-  // 1) trang edit chỉ cần id (không truyền state)
+  // trang edit chỉ cần id (không truyền state)
   const handleEdit = () => {
     navigate(`/admin/hotels/update/${hotel.hotelId}`);
     if (typeof onEdit === "function") onEdit(hotel);
@@ -50,112 +52,131 @@ export default function AdminHotelCard({ hotel, onEdit, onRemove }) {
   const minPrice = hotel?.minPrice ?? hotel?.min_price ?? null;
 
   return (
-    <div className="flex items-center gap-8 bg-white p-6 rounded-2xl shadow-md w-full">
-      {/* IMAGE */}
-      <img
-        src={imageUrl}
-        alt={hotel?.name}
-        className="w-60 h-36 rounded-xl object-cover flex-shrink-0 bg-gray-100"
-      />
+    <div className="w-full bg-white rounded-2xl shadow-md overflow-hidden border border-gray-100">
+      <div className="flex flex-col sm:flex-row sm:items-stretch gap-4 sm:gap-6 p-4 sm:p-6">
+        {/* IMAGE */}
+        <div className="w-full sm:w-60 shrink-0">
+          <img
+            src={imageUrl}
+            alt={hotel?.name || "hotel"}
+            className="w-full h-48 sm:h-36 rounded-xl object-cover bg-gray-100"
+            loading="lazy"
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
+        </div>
 
-      {/* MAIN CONTENT */}
-      <div className="flex-1">
-        <h2 className="text-2xl font-semibold mb-3 line-clamp-2">
-          {hotel?.name}
-        </h2>
+        {/* MAIN CONTENT */}
+        <div className="flex-1 min-w-0">
+          <h2 className="text-lg sm:text-2xl font-semibold mb-3 line-clamp-2 break-words">
+            {hotel?.name || "—"}
+          </h2>
 
-        <div className="flex gap-12 text-sm text-gray-700">
-          {/* LEFT COLUMN */}
-          <div className="space-y-2">
-            <div className="flex items-start gap-2">
-              <BuildingOffice2Icon className="w-5 h-5 text-orange-400 mt-0.5" />
-              <p>
-                <span className="font-semibold">Hotel ID:</span>{" "}
-                {hotel?.hotelId}
-              </p>
-            </div>
+          {/* INFO GRID: 1 col on mobile, 2 cols from md */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6 text-sm text-gray-700">
+            <InfoRow
+              icon={<BuildingOffice2Icon className="w-5 h-5 text-orange-400" />}
+              label="Hotel ID"
+              value={hotel?.hotelId ?? "—"}
+            />
 
-            <div className="flex items-start gap-2">
-              <MapPinIcon className="w-5 h-5 text-orange-400 mt-0.5" />
-              <p className="break-words">
-                <span className="font-semibold">Address:</span>{" "}
-                {hotel?.address || "—"}
-              </p>
-            </div>
+            <InfoRow
+              icon={<UserIcon className="w-5 h-5 text-orange-400" />}
+              label="Manager ID"
+              value={managerId}
+            />
 
-            <div className="flex items-start gap-2">
-              <EnvelopeIcon className="w-5 h-5 text-orange-400 mt-0.5" />
-              <p className="break-words">
-                <span className="font-semibold">Email:</span>{" "}
-                {hotel?.email || "—"}
-              </p>
-            </div>
+            <InfoRow
+              icon={<MapPinIcon className="w-5 h-5 text-orange-400" />}
+              label="Address"
+              value={hotel?.address || "—"}
+              breakWords
+            />
 
-            <div className="flex items-start gap-2">
-              <PhoneIcon className="w-5 h-5 text-orange-400 mt-0.5" />
-              <p>
-                <span className="font-semibold">Hotline:</span>{" "}
-                {hotel?.phoneNumber || hotel?.phone_number || "—"}
-              </p>
-            </div>
+            <InfoRow
+              icon={<CurrencyDollarIcon className="w-5 h-5 text-orange-400" />}
+              label="Min price"
+              value={
+                minPrice === null || minPrice === undefined
+                  ? "—"
+                  : `${Number(minPrice).toLocaleString("vi-VN")} đ`
+              }
+            />
+
+            <InfoRow
+              icon={<EnvelopeIcon className="w-5 h-5 text-orange-400" />}
+              label="Email"
+              value={hotel?.email || "—"}
+              breakWords
+            />
+
+            <InfoRow
+              icon={<CalendarDaysIcon className="w-5 h-5 text-orange-400" />}
+              label="Added on"
+              value={formatDate(hotel?.createdAt || hotel?.created_at)}
+            />
+
+            <InfoRow
+              icon={<PhoneIcon className="w-5 h-5 text-orange-400" />}
+              label="Hotline"
+              value={hotel?.phoneNumber || hotel?.phone_number || "—"}
+            />
+
+            <InfoRow
+              icon={<ClockIcon className="w-5 h-5 text-orange-400" />}
+              label="Update"
+              value={formatDate(hotel?.updatedAt || hotel?.updated_at)}
+            />
           </div>
 
-          {/* RIGHT COLUMN */}
-          <div className="space-y-2">
-            {/* 2) xóa rate ảo -> thay bằng managerId + minPrice */}
-            <div className="flex items-start gap-2">
-              <UserIcon className="w-5 h-5 text-orange-400 mt-0.5" />
-              <p>
-                <span className="font-semibold">Manager ID:</span> {managerId}
-              </p>
-            </div>
+          {/* ACTIONS (mobile) */}
+          <div className="mt-4 flex flex-col gap-2 sm:hidden">
+            <button
+              onClick={handleEdit}
+              className="w-full border border-orange-500 text-orange-500 px-6 py-2 rounded-full hover:bg-orange-50 transition font-medium"
+            >
+              Edit
+            </button>
 
-            <div className="flex items-start gap-2">
-              <CurrencyDollarIcon className="w-5 h-5 text-orange-400 mt-0.5" />
-              <p>
-                <span className="font-semibold">Min price:</span>{" "}
-                {minPrice === null || minPrice === undefined
-                  ? "—"
-                  : Number(minPrice).toLocaleString()}{" "}
-                đ
-              </p>
-            </div>
-
-            <div className="flex items-start gap-2">
-              <CalendarDaysIcon className="w-5 h-5 text-orange-400 mt-0.5" />
-              <p>
-                <span className="font-semibold">Added on:</span>{" "}
-                {formatDate(hotel?.createdAt || hotel?.created_at)}
-              </p>
-            </div>
-
-            <div className="flex items-start gap-2">
-              <ClockIcon className="w-5 h-5 text-orange-400 mt-0.5" />
-              <p>
-                <span className="font-semibold">Update:</span>{" "}
-                {formatDate(hotel?.updatedAt || hotel?.updated_at)}
-              </p>
-            </div>
+            <button
+              onClick={handleRemove}
+              className="w-full bg-orange-500 text-white px-6 py-2 rounded-full hover:bg-orange-600 transition font-medium"
+            >
+              Remove
+            </button>
           </div>
         </div>
-      </div>
 
-      {/* ACTIONS */}
-      <div className="flex flex-col items-end gap-4 ml-4">
-        <button
-          onClick={handleEdit}
-          className="border border-orange-500 text-orange-500 px-8 py-2 rounded-full hover:bg-orange-50 transition font-medium"
-        >
-          Edit
-        </button>
+        {/* ACTIONS (desktop) */}
+        <div className="hidden sm:flex flex-col items-end gap-3 ml-2">
+          <button
+            onClick={handleEdit}
+            className="border border-orange-500 text-orange-500 px-8 py-2 rounded-full hover:bg-orange-50 transition font-medium whitespace-nowrap"
+          >
+            Edit
+          </button>
 
-        <button
-          onClick={handleRemove}
-          className="bg-orange-500 text-white px-8 py-2 rounded-full hover:bg-orange-600 transition font-medium"
-        >
-          Remove
-        </button>
+          <button
+            onClick={handleRemove}
+            className="bg-orange-500 text-white px-8 py-2 rounded-full hover:bg-orange-600 transition font-medium whitespace-nowrap"
+          >
+            Remove
+          </button>
+        </div>
       </div>
+    </div>
+  );
+}
+
+function InfoRow({ icon, label, value, breakWords = false }) {
+  return (
+    <div className="flex items-start gap-2 min-w-0">
+      <div className="mt-0.5 shrink-0">{icon}</div>
+      <p className={["min-w-0", breakWords ? "break-words" : ""].join(" ")}>
+        <span className="font-semibold">{label}:</span>{" "}
+        <span className="text-gray-800">{value}</span>
+      </p>
     </div>
   );
 }

@@ -29,7 +29,7 @@ export default function AddHotel() {
   // popup success
   const [openSuccess, setOpenSuccess] = useState(false);
 
-  // Load danh sách user role HOTEL_MANAGER 
+  // Load danh sách user role HOTEL_MANAGER
   useEffect(() => {
     (async () => {
       try {
@@ -141,13 +141,13 @@ export default function AddHotel() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-6">
-      <div className="bg-white rounded-2xl shadow-md p-6">
+    <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-6">
+      <div className="bg-white rounded-2xl shadow-md p-4 sm:p-6">
         <h1 className="text-2xl font-bold mb-6">Thêm khách sạn</h1>
 
         {/* chỉ show msg khi lỗi/validation */}
         {msg && (
-          <div className="mb-4 p-3 rounded-xl bg-gray-50 border text-sm">
+          <div className="mb-4 p-3 rounded-xl bg-gray-50 border text-sm break-words">
             {msg}
           </div>
         )}
@@ -157,7 +157,7 @@ export default function AddHotel() {
           className="grid grid-cols-1 lg:grid-cols-2 gap-6"
         >
           {/* LEFT */}
-          <div className="space-y-4">
+          <div className="space-y-4 min-w-0">
             <Field
               label="Tên khách sạn"
               name="name"
@@ -179,6 +179,7 @@ export default function AddHotel() {
               name="phoneNumber"
               value={form.phoneNumber}
               onChange={onChange}
+              inputMode="tel"
             />
 
             <Field
@@ -195,6 +196,7 @@ export default function AddHotel() {
               value={form.minPrice}
               onChange={onChange}
               type="number"
+              inputMode="numeric"
             />
 
             <div>
@@ -247,33 +249,48 @@ export default function AddHotel() {
           </div>
 
           {/* RIGHT */}
-          <div className="space-y-4">
+          <div className="space-y-4 min-w-0">
             <div className="border rounded-2xl p-4">
               <label className="block text-sm font-medium mb-2">
                 Ảnh khách sạn
               </label>
 
-              <input type="file" accept="image/*" onChange={onPickImage} />
+              {/* input file nhìn gọn hơn */}
+              <label className="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-xl border hover:bg-gray-50 cursor-pointer">
+                <span>Chọn ảnh</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={onPickImage}
+                  className="hidden"
+                />
+              </label>
 
               <div className="mt-4">
                 {preview ? (
                   <img
                     src={preview}
                     alt="preview"
-                    className="w-full h-64 object-cover rounded-2xl bg-gray-100"
+                    className="w-full h-56 sm:h-64 object-cover rounded-2xl bg-gray-100"
                   />
                 ) : (
-                  <div className="w-full h-64 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-500">
+                  <div className="w-full h-56 sm:h-64 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-500">
                     Chưa chọn ảnh
                   </div>
                 )}
               </div>
+
+              {imageFile && (
+                <div className="mt-2 text-xs text-gray-600 break-words">
+                  File: <span className="font-medium">{imageFile.name}</span>
+                </div>
+              )}
             </div>
 
             <button
               disabled={loading}
               type="submit"
-              className="w-full rounded-2xl bg-black text-white py-3 font-semibold disabled:opacity-60"
+              className="w-full rounded-2xl bg-black text-white py-3 font-semibold disabled:opacity-60 active:scale-[0.99]"
             >
               {loading ? "Đang thêm..." : "Tạo khách sạn"}
             </button>
@@ -281,8 +298,9 @@ export default function AddHotel() {
         </form>
       </div>
 
+      {/* SUCCESS MODAL */}
       {openSuccess && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           {/* overlay */}
           <div
             className="absolute inset-0 bg-black/40"
@@ -291,20 +309,18 @@ export default function AddHotel() {
 
           {/* modal */}
           <div
-            className="relative w-[92%] max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="text-xl font-semibold">
-              Thêm khách sạn thành công
-            </div>
+            <div className="text-xl font-semibold">Thêm khách sạn thành công</div>
             <div className="mt-2 text-sm text-gray-600">
               Bạn muốn quay về danh sách khách sạn hay tiếp tục tạo mới?
             </div>
 
-            <div className="mt-6 flex gap-3">
+            <div className="mt-6 flex flex-col sm:flex-row gap-3">
               <button
                 type="button"
-                className="flex-1 rounded-xl border border-gray-200 py-2.5 hover:bg-gray-50"
+                className="w-full sm:flex-1 rounded-xl border border-gray-200 py-2.5 hover:bg-gray-50"
                 onClick={() => {
                   setOpenSuccess(false);
                   navigate("/admin/hotels");
@@ -315,7 +331,7 @@ export default function AddHotel() {
 
               <button
                 type="button"
-                className="flex-1 rounded-xl bg-black text-white py-2.5"
+                className="w-full sm:flex-1 rounded-xl bg-black text-white py-2.5"
                 onClick={() => {
                   setOpenSuccess(false);
                   resetForm();
@@ -331,9 +347,17 @@ export default function AddHotel() {
   );
 }
 
-function Field({ label, name, value, onChange, type = "text", required }) {
+function Field({
+  label,
+  name,
+  value,
+  onChange,
+  type = "text",
+  required,
+  inputMode,
+}) {
   return (
-    <div>
+    <div className="min-w-0">
       <label className="block text-sm font-medium mb-1">
         {label} {required ? <span className="text-red-500">*</span> : null}
       </label>
@@ -342,6 +366,7 @@ function Field({ label, name, value, onChange, type = "text", required }) {
         value={value}
         onChange={onChange}
         type={type}
+        inputMode={inputMode}
         className="w-full rounded-xl border px-3 py-2 outline-none focus:ring-2 focus:ring-black/10"
       />
     </div>

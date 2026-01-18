@@ -5,6 +5,17 @@ function FieldError({ msg, show }) {
   return <div className="mt-1 text-sm text-red-600">{msg}</div>;
 }
 
+function Spinner() {
+  return (
+    <span className="inline-block w-4 h-4 rounded-full border-2 border-white/60 border-t-transparent animate-spin" />
+  );
+}
+
+const inputCls =
+  "w-full rounded-xl border border-gray-200 bg-white px-3 py-3 outline-none " +
+  "focus:ring-2 focus:ring-gray-200 focus:border-gray-300 " +
+  "disabled:bg-gray-50 disabled:text-gray-500";
+
 export default function AdminTourForm({
   form,
   fieldErrors,
@@ -23,7 +34,7 @@ export default function AdminTourForm({
   return (
     <form
       onSubmit={onSubmit}
-      className="lg:col-span-2 p-5 rounded-2xl border bg-white space-y-5"
+      className="lg:col-span-2 p-4 sm:p-5 rounded-2xl border border-gray-200 bg-white space-y-5"
     >
       <div>
         <div className="text-sm font-medium mb-1">Tiêu đề tour</div>
@@ -32,7 +43,7 @@ export default function AdminTourForm({
           value={form.title}
           onChange={onChange}
           onBlur={onBlur}
-          className="w-full border rounded-xl p-3"
+          className={inputCls}
           placeholder="Nhập tiêu đề tour"
         />
         <FieldError msg={fieldErrors.title} show={submitted || touched.title} />
@@ -45,7 +56,7 @@ export default function AdminTourForm({
           value={form.linkVideo}
           onChange={onChange}
           onBlur={onBlur}
-          className="w-full border rounded-xl p-3"
+          className={inputCls}
           placeholder="Dán link video"
         />
         <FieldError
@@ -61,7 +72,7 @@ export default function AdminTourForm({
           value={form.description}
           onChange={onChange}
           onBlur={onBlur}
-          className="w-full border rounded-xl p-3"
+          className={`${inputCls} resize-none`}
           rows={7}
           placeholder="Nhập mô tả tour"
         />
@@ -76,7 +87,7 @@ export default function AdminTourForm({
             value={form.priceAdult}
             onChange={onChange}
             onBlur={onBlur}
-            className="w-full border rounded-xl p-3"
+            className={inputCls}
             min={0}
           />
           <FieldError
@@ -93,7 +104,7 @@ export default function AdminTourForm({
             value={form.priceChild}
             onChange={onChange}
             onBlur={onBlur}
-            className="w-full border rounded-xl p-3"
+            className={inputCls}
             min={0}
           />
           <FieldError
@@ -110,7 +121,7 @@ export default function AdminTourForm({
             value={form.percentDiscount}
             onChange={onChange}
             onBlur={onBlur}
-            className="w-full border rounded-xl p-3"
+            className={inputCls}
             min={0}
             max={100}
           />
@@ -128,7 +139,7 @@ export default function AdminTourForm({
           type="number"
           value={form.durationDays}
           readOnly
-          className="w-full border rounded-xl p-3 bg-gray-50"
+          className={`${inputCls} bg-gray-50`}
         />
         <FieldError
           msg={fieldErrors.durationDays}
@@ -145,7 +156,7 @@ export default function AdminTourForm({
             value={form.startDate}
             onChange={onChange}
             onBlur={onBlur}
-            className="w-full border rounded-xl p-3"
+            className={inputCls}
             max={form.endDate || undefined}
           />
           <FieldError
@@ -162,7 +173,7 @@ export default function AdminTourForm({
             value={form.endDate}
             onChange={onChange}
             onBlur={onBlur}
-            className="w-full border rounded-xl p-3"
+            className={inputCls}
             min={form.startDate || undefined}
           />
           <FieldError
@@ -180,7 +191,7 @@ export default function AdminTourForm({
             value={form.departureLocation}
             onChange={onChange}
             onBlur={onBlur}
-            className="w-full border rounded-xl p-3"
+            className={inputCls}
             placeholder="Ví dụ: Hà Nội"
           />
           <FieldError
@@ -196,7 +207,7 @@ export default function AdminTourForm({
             value={form.destination}
             onChange={onChange}
             onBlur={onBlur}
-            className="w-full border rounded-xl p-3"
+            className={inputCls}
             placeholder="Ví dụ: Hạ Long"
           />
           <FieldError
@@ -217,12 +228,10 @@ export default function AdminTourForm({
           onChange={onChange}
           onBlur={onBlur}
           disabled={loadingGuides}
-          className="w-full border rounded-xl p-3 bg-white"
+          className={inputCls}
         >
           <option value="">
-            {loadingGuides
-              ? "Đang tải danh sách..."
-              : "— Chọn hướng dẫn viên —"}
+            {loadingGuides ? "Đang tải danh sách..." : "— Chọn hướng dẫn viên —"}
           </option>
 
           {guides.map((u) => {
@@ -253,7 +262,7 @@ export default function AdminTourForm({
             value={form.availableSeats}
             onChange={onChange}
             onBlur={onBlur}
-            className="w-full border rounded-xl p-3"
+            className={inputCls}
             min={0}
             max={form.limitSeats === "" ? undefined : form.limitSeats}
           />
@@ -271,7 +280,7 @@ export default function AdminTourForm({
             value={form.limitSeats}
             onChange={onChange}
             onBlur={onBlur}
-            className="w-full border rounded-xl p-3"
+            className={inputCls}
             min={0}
           />
           <FieldError
@@ -288,7 +297,7 @@ export default function AdminTourForm({
           value={form.status}
           onChange={onChange}
           onBlur={onBlur}
-          className="w-full border rounded-xl p-3 bg-white"
+          className={inputCls}
         >
           <option value="Canceled">Đã hủy</option>
           <option value="Passed">Đã hoạt động</option>
@@ -302,28 +311,47 @@ export default function AdminTourForm({
 
       <div>
         <div className="text-sm font-medium mb-2">Ảnh đại diện</div>
-        <input type="file" accept="image/*" onChange={onPickMainImage} />
+
+        {/* File input đẹp hơn */}
+        <label className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer text-sm">
+          <span className="inline-block w-2 h-2 rounded-full bg-orange-500" />
+          <span>Chọn ảnh đại diện...</span>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={onPickMainImage}
+            className="hidden"
+          />
+        </label>
 
         {currentMainImageUrl ? (
           <img
             src={currentMainImageUrl}
             alt="Ảnh đại diện"
-            className="mt-3 w-full h-56 object-cover rounded-2xl bg-gray-100 border"
+            className="mt-3 w-full h-56 sm:h-64 object-cover rounded-2xl bg-gray-100 border border-gray-200"
+            loading="lazy"
           />
         ) : (
-          <div className="mt-3 w-full h-56 rounded-2xl bg-gray-50 border flex items-center justify-center text-gray-400">
+          <div className="mt-3 w-full h-56 sm:h-64 rounded-2xl bg-gray-50 border border-gray-200 flex items-center justify-center text-gray-400">
             Chưa có ảnh đại diện
           </div>
         )}
       </div>
 
-      <div className="flex items-center justify-end gap-2 pt-2">
+      {/* Actions: mobile full width */}
+      <div className="pt-2">
         <button
           type="submit"
-          disabled={!canSubmit}
-          className="px-5 py-3 rounded-xl bg-black text-white disabled:opacity-60"
+          disabled={!canSubmit || saving}
+          className="w-full sm:w-auto px-5 py-3 rounded-xl bg-black text-white disabled:opacity-60 inline-flex items-center justify-center gap-2"
         >
-          {saving ? "Đang lưu..." : "Lưu thay đổi"}
+          {saving ? (
+            <>
+              <Spinner /> Đang lưu...
+            </>
+          ) : (
+            "Lưu thay đổi"
+          )}
         </button>
       </div>
     </form>

@@ -24,17 +24,21 @@ function normalizeStatus(s) {
 
 function badgeClass(type) {
   if (type === "broadcast") return "bg-blue-50 text-blue-700 ring-blue-200";
-  if (type === "specific")
-    return "bg-purple-50 text-purple-700 ring-purple-200";
+  if (type === "specific") return "bg-purple-50 text-purple-700 ring-purple-200";
 
-  if (type === "active")
-    return "bg-emerald-50 text-emerald-700 ring-emerald-200";
+  if (type === "active") return "bg-emerald-50 text-emerald-700 ring-emerald-200";
   if (type === "not_active") return "bg-gray-50 text-gray-700 ring-gray-200";
 
   if (type === "read") return "bg-emerald-50 text-emerald-700 ring-emerald-200";
   if (type === "unread") return "bg-amber-50 text-amber-800 ring-amber-200";
 
   return "bg-gray-50 text-gray-700 ring-gray-200";
+}
+
+function Spinner() {
+  return (
+    <span className="inline-block w-4 h-4 rounded-full border-2 border-current/40 border-t-transparent animate-spin" />
+  );
 }
 
 export default function AdminNotificationCard({
@@ -48,20 +52,18 @@ export default function AdminNotificationCard({
   const id = notif?.notificationId ?? notif?.notification_id ?? notif?.id;
 
   const isBroadcast = toBool(
-    notif?.broadCast ?? notif?.isBroadcast ?? notif?.is_broadcast,
+    notif?.broadCast ?? notif?.isBroadcast ?? notif?.is_broadcast
   );
   const isRead = toBool(notif?.read ?? notif?.isRead ?? notif?.is_read);
 
   const createdAtText = useMemo(
     () => formatDateTime(notif?.createdAt ?? notif?.created_at),
-    [notif?.createdAt, notif?.created_at],
+    [notif?.createdAt, notif?.created_at]
   );
 
   const status = useMemo(() => normalizeStatus(notif?.status), [notif?.status]);
 
-  const typeLabel = isBroadcast
-    ? "Broadcast (gửi tất cả)"
-    : "Gửi theo người dùng";
+  const typeLabel = isBroadcast ? "Broadcast (gửi tất cả)" : "Gửi theo người dùng";
   const typeBadge = isBroadcast ? "broadcast" : "specific";
 
   const readLabel = isRead ? "Đã đọc" : "Chưa đọc";
@@ -104,18 +106,18 @@ export default function AdminNotificationCard({
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 p-5 w-full">
-      <div className="flex items-start justify-between gap-4">
+    <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 p-4 sm:p-5 w-full">
+      {/* Header responsive */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <div className="text-sm text-gray-500">
-              Mã:{" "}
-              <span className="text-gray-900 font-semibold">{id ?? "-"}</span>
+              Mã: <span className="text-gray-900 font-semibold">{id ?? "-"}</span>
             </div>
 
             <span
               className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ring-1 ${badgeClass(
-                typeBadge,
+                typeBadge
               )}`}
             >
               {typeLabel}
@@ -123,7 +125,7 @@ export default function AdminNotificationCard({
 
             <span
               className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ring-1 ${badgeClass(
-                readBadge,
+                readBadge
               )}`}
             >
               {readLabel}
@@ -131,7 +133,7 @@ export default function AdminNotificationCard({
 
             <span
               className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ring-1 ${badgeClass(
-                activeBadge,
+                activeBadge
               )}`}
             >
               {activeLabel}
@@ -143,25 +145,29 @@ export default function AdminNotificationCard({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Actions: mobile full width */}
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <button
-            disabled={busy || !onToggleActive}
+            disabled={busy || typeof onToggleActive !== "function"}
             onClick={handleToggleActive}
-            className="px-4 py-2 rounded-xl text-sm font-semibold ring-1 ring-gray-200 hover:bg-gray-50 disabled:opacity-60"
+            className="w-full sm:w-auto px-4 py-2 rounded-xl text-sm font-semibold ring-1 ring-gray-200 hover:bg-gray-50 disabled:opacity-60 inline-flex items-center justify-center gap-2"
           >
+            {busy ? <Spinner /> : null}
             {isActive ? "Tắt kích hoạt" : "Kích hoạt"}
           </button>
 
           <button
-            disabled={busy || !onDelete}
+            disabled={busy || typeof onDelete !== "function"}
             onClick={handleDelete}
-            className="px-4 py-2 rounded-xl text-sm font-semibold ring-1 ring-red-200 text-red-700 hover:bg-red-50 disabled:opacity-60"
+            className="w-full sm:w-auto px-4 py-2 rounded-xl text-sm font-semibold ring-1 ring-red-200 text-red-700 hover:bg-red-50 disabled:opacity-60 inline-flex items-center justify-center gap-2"
           >
+            {busy ? <Spinner /> : null}
             Xóa
           </button>
         </div>
       </div>
 
+      {/* Content */}
       <div className="mt-4">
         <div className="text-sm font-semibold text-gray-900 mb-1">Nội dung</div>
         <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap break-words">

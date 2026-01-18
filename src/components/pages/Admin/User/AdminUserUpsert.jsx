@@ -11,10 +11,6 @@ function normalizeDate(d) {
   return "";
 }
 
-function todayYMD() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 function buildEmptyForm() {
   return {
     name: "",
@@ -34,6 +30,7 @@ function buildEmptyForm() {
 function genderLabel(v) {
   if (v === "M") return "Nam";
   if (v === "F") return "Nữ";
+  return "Khác";
 }
 
 export default function AdminUserUpsert() {
@@ -51,6 +48,17 @@ export default function AdminUserUpsert() {
   const [preview, setPreview] = useState("");
   const [currentAvatar, setCurrentAvatar] = useState("");
 
+  // tạo preview + revoke để không leak
+  useEffect(() => {
+    if (!file) {
+      setPreview("");
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
   const avatarSrc = useMemo(() => {
     if (preview) return preview;
     const v = currentAvatar || form.avatar;
@@ -60,6 +68,7 @@ export default function AdminUserUpsert() {
 
   useEffect(() => {
     if (!isEdit) return;
+    let mounted = true;
 
     (async () => {
       try {
@@ -67,6 +76,7 @@ export default function AdminUserUpsert() {
         setErr("");
 
         const data = await getUserById(id);
+        if (!mounted) return;
 
         setForm((prev) => ({
           ...prev,
@@ -85,11 +95,17 @@ export default function AdminUserUpsert() {
 
         setCurrentAvatar(data?.avatar ?? "");
       } catch (e) {
+        if (!mounted) return;
         setErr(e?.message || "Không thể tải thông tin người dùng");
       } finally {
+        if (!mounted) return;
         setLoading(false);
       }
     })();
+
+    return () => {
+      mounted = false;
+    };
   }, [id, isEdit]);
 
   function setField(key, value) {
@@ -98,8 +114,12 @@ export default function AdminUserUpsert() {
 
   function onPickFile(e) {
     const f = e.target.files?.[0];
+    e.target.value = ""; // cho phép chọn lại cùng file
     setFile(f || null);
-    setPreview(f ? URL.createObjectURL(f) : "");
+  }
+
+  function clearPickedFile() {
+    setFile(null);
   }
 
   async function onSubmit(e) {
@@ -115,8 +135,6 @@ export default function AdminUserUpsert() {
       };
 
       if (!payload.avatar) payload.avatar = "user_default.jpg";
-
-      // nếu có chọn file thì set avatar theo tên file (để object có avatar như yêu cầu)
       if (file?.name) payload.avatar = file.name;
 
       if (isEdit) {
@@ -136,22 +154,28 @@ export default function AdminUserUpsert() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto py-10">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold">
-          {isEdit ? "Cập nhật người dùng" : "Thêm người dùng"}
-        </h1>
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+      {/* Header responsive */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-semibold truncate">
+            {isEdit ? "Cập nhật người dùng" : "Thêm người dùng"}
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            {isEdit ? `User ID: ${id}` : "Tạo user mới và gán quyền truy cập"}
+          </p>
+        </div>
 
         <button
           type="button"
           onClick={() => navigate("/admin/users")}
-          className="px-4 py-2 rounded-xl border hover:bg-gray-50"
+          className="w-full sm:w-auto px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50"
         >
           Quay lại
         </button>
       </div>
 
-      <form onSubmit={onSubmit} className="bg-white rounded-2xl shadow-md p-6">
+      <form onSubmit={onSubmit} className="bg-white rounded-2xl shadow-md p-4 sm:p-6">
         {err ? (
           <div className="mb-4 p-3 rounded-xl bg-red-50 text-red-700 text-sm">
             {err}
@@ -159,9 +183,13 @@ export default function AdminUserUpsert() {
         ) : null}
 
         {loading ? (
-          <div className="p-6 text-gray-600">Đang tải...</div>
+          <div className="p-6 text-gray-600 flex items-center gap-3">
+            <span className="w-4 h-4 rounded-full border-2 border-gray-300 border-t-transparent animate-spin" />
+            Đang tải...
+          </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left */}
             <div className="lg:col-span-2 space-y-5">
               <Section title="Thông tin cơ bản">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -179,7 +207,7 @@ export default function AdminUserUpsert() {
                     <input
                       value={form.username}
                       onChange={(e) => setField("username", e.target.value)}
-                      className="w-full input"
+                      className="w-full input disabled:bg-gray-50 disabled:text-gray-500"
                       required
                       disabled={isEdit}
                       placeholder="Nhập tên đăng nhập"
@@ -275,39 +303,37 @@ export default function AdminUserUpsert() {
               </Section>
 
               <Section title="Bảo mật">
-                <Field
-                  label={isEdit ? "Mật khẩu mới (không bắt buộc)" : "Mật khẩu"}
-                >
+                <Field label={isEdit ? "Mật khẩu mới (không bắt buộc)" : "Mật khẩu"}>
                   <input
                     type="password"
                     value={form.password}
                     onChange={(e) => setField("password", e.target.value)}
                     className="w-full input"
                     placeholder={
-                      isEdit
-                        ? "Để trống nếu không đổi mật khẩu"
-                        : "Nhập mật khẩu"
+                      isEdit ? "Để trống nếu không đổi mật khẩu" : "Nhập mật khẩu"
                     }
                     required={!isEdit}
                   />
                 </Field>
               </Section>
-
-              {/* <Section title="Mã người dùng">
-                <Field label="Code">
-                  <input
-                    value={form.code}
-                    onChange={(e) => setField("code", e.target.value)}
-                    className="w-full input"
-                    placeholder="VD: AD001"
-                  />
-                </Field>
-              </Section> */}
             </div>
 
-            <div className="space-y-4">
-              <div className="border rounded-2xl p-4">
-                <div className="text-sm font-medium mb-2">Ảnh đại diện</div>
+            {/* Right: Avatar + submit (sticky desktop) */}
+            <div className="space-y-4 lg:sticky lg:top-6 h-fit">
+              <div className="border border-gray-200 rounded-2xl p-4">
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <div className="text-sm font-medium">Ảnh đại diện</div>
+                  {avatarSrc ? (
+                    <a
+                      href={avatarSrc}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs px-3 py-1 rounded-full border border-gray-200 hover:bg-gray-50"
+                    >
+                      Open
+                    </a>
+                  ) : null}
+                </div>
 
                 <div className="w-full aspect-square rounded-2xl bg-gray-100 overflow-hidden flex items-center justify-center">
                   {avatarSrc ? (
@@ -315,28 +341,72 @@ export default function AdminUserUpsert() {
                       src={avatarSrc}
                       alt="avatar"
                       className="w-full h-full object-cover"
+                      loading="lazy"
+                      onError={(e) => {
+                        e.currentTarget.src = `${S3_USER_BASE}/user_default.jpg`;
+                      }}
                     />
                   ) : (
                     <div className="text-gray-500 text-sm">Chưa có ảnh</div>
                   )}
                 </div>
 
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={onPickFile}
-                  className="mt-3 w-full text-sm"
-                />
+                {/* File input đẹp hơn */}
+                <div className="mt-3 space-y-2">
+                  <label className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer text-sm">
+                    <span className="inline-block w-2 h-2 rounded-full bg-orange-500" />
+                    <span className="truncate">
+                      {file ? file.name : "Chọn ảnh mới..."}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={onPickFile}
+                      className="hidden"
+                    />
+                  </label>
+
+                  {file ? (
+                    <button
+                      type="button"
+                      onClick={clearPickedFile}
+                      className="w-full px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 text-sm"
+                    >
+                      Bỏ ảnh đã chọn
+                    </button>
+                  ) : null}
+
+                  {file ? (
+                    <div className="text-xs text-gray-500">
+                      Preview đang hiển thị ảnh mới. Bấm {isEdit ? "Cập nhật" : "Tạo mới"} để lưu.
+                    </div>
+                  ) : null}
+                </div>
               </div>
 
               <button
                 disabled={saving}
-                className="w-full px-4 py-3 rounded-2xl bg-black text-white hover:opacity-90 disabled:opacity-60"
+                className="w-full px-4 py-3 rounded-2xl bg-black text-white hover:opacity-90 disabled:opacity-60 inline-flex items-center justify-center gap-2"
               >
-                {saving ? "Đang lưu..." : isEdit ? "Cập nhật" : "Tạo mới"}
+                {saving ? (
+                  <>
+                    <span className="w-4 h-4 rounded-full border-2 border-white/60 border-t-transparent animate-spin" />
+                    Đang lưu...
+                  </>
+                ) : isEdit ? (
+                  "Cập nhật"
+                ) : (
+                  "Tạo mới"
+                )}
               </button>
 
-              
+              <button
+                type="button"
+                onClick={() => navigate("/admin/users")}
+                className="w-full px-4 py-3 rounded-2xl border border-gray-200 hover:bg-gray-50"
+              >
+                Hủy
+              </button>
             </div>
           </div>
         )}
@@ -346,8 +416,9 @@ export default function AdminUserUpsert() {
         .input{
           border:1px solid rgb(229 231 235);
           border-radius: 0.75rem;
-          padding: 0.6rem 0.75rem;
+          padding: 0.65rem 0.8rem;
           outline: none;
+          background: white;
         }
         .input:focus{
           border-color: rgb(156 163 175);
