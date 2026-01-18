@@ -27,8 +27,9 @@ export async function searchByTitle(keyword) {
  * ========================================================
  */
 export async function searchByLocation(location) {
+  const safe = String(location ?? "").trim();
   const url = `${API_BASE}/tours/search/findByDepartureLocation?departureLocation=${encodeURIComponent(
-    location
+    safe
   )}`;
 
   const res = await fetch(url);
@@ -50,12 +51,6 @@ export async function searchByDuration(days) {
 
 /**
  * ========================================================
- * 📅 4. Tìm tour có startDate >= ngày chọn
- * API: /tours/search/findByStartDateGreaterThanEqual
- * ========================================================
- */
-/**
- * ========================================================
  * 📅 4. Tìm tour có startDate >= ngày chọn (có phân trang + sort)
  * API:
  * /tours/search/findByStartDateGreaterThanEqual{?startDate,page,size,sort*}
@@ -68,11 +63,9 @@ export async function searchByStartDate(
   sort = "startDate,asc"
 ) {
   const params = new URLSearchParams();
-  params.set("startDate", date);
+  params.set("startDate", String(date ?? "").trim());
   params.set("page", String(page));
   params.set("size", String(size));
-
-  // sort có thể là: "startDate,asc" | "priceAdult,desc" | "percentDiscount,desc" ...
   if (sort) params.set("sort", sort);
 
   const url = `${API_BASE}/tours/search/findByStartDateGreaterThanEqual?${params.toString()}`;
@@ -90,18 +83,22 @@ export async function searchByStartDate(
  */
 export async function getTours(page, size, sort) {
   const url = `${API_BASE}/tours?page=${page}&size=${size}&sort=${sort}`;
-
   const res = await fetch(url);
   return res.json();
 }
 
 export async function getDepartureLocations() {
   try {
-    const res = await fetch("http://localhost:8080/tours/departure-locations");
-    if (!res.ok) {
-      throw new Error("Failed to fetch departure locations");
-    }
-    return await res.json();
+    const res = await fetch(`${API_BASE}/tours/departure-locations`);
+    if (!res.ok) throw new Error("Failed to fetch departure locations");
+
+    const data = await res.json();
+
+    // ✅ TRIM để tránh "Hà Nội " / null / undefined
+    if (!Array.isArray(data)) return [];
+    return data
+      .map((x) => String(x ?? "").trim())
+      .filter((x) => x.length > 0);
   } catch (error) {
     console.error("API getDepartureLocations error:", error);
     return [];
@@ -110,8 +107,6 @@ export async function getDepartureLocations() {
 
 // =====================================
 // 6. Lấy toàn bộ tour (dùng cho admin list)
-// API gốc: /tours (Spring Data REST, có phân trang)
-// Hàm này sẽ tự động đi qua các trang và gom tất cả tour
 // =====================================
 export async function getAllTours() {
   let allTours = [];
@@ -120,9 +115,7 @@ export async function getAllTours() {
   try {
     while (url) {
       const res = await fetch(url);
-      if (!res.ok) {
-        throw new Error("Failed to fetch tours");
-      }
+      if (!res.ok) throw new Error("Failed to fetch tours");
 
       const data = await res.json();
 
@@ -131,7 +124,6 @@ export async function getAllTours() {
 
       const nextLink = data._links?.next?.href;
       if (nextLink) {
-        // Nếu backend trả relative link thì thêm API_BASE
         url = nextLink.startsWith("http") ? nextLink : `${API_BASE}${nextLink}`;
       } else {
         url = null;
@@ -222,9 +214,7 @@ export async function getTourParticipants(tourId) {
     },
   });
 
-  if (!res.ok) {
-    throw new Error(await res.text());
-  }
+  if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
@@ -239,9 +229,7 @@ export async function getMonthlyTourStats(month, year) {
       },
     }
   );
-  if (!res.ok) {
-    throw new Error(await res.text());
-  }
+  if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
@@ -255,36 +243,41 @@ export async function getMonthlyTourStats(month, year) {
 export async function filterTours({
   keyword = "",
   startDate = "",
-  durationDay = "", // lưu ý: backend key là durationDay (không phải durationDays)
+  durationDay = "", // backend key durationDay
   departureLocation = "",
-  status = "Activated", // ✅ bạn yêu cầu status mặc định Activated
+  status = "Activated",
   page = 0,
   size = 8,
   sort = "startDate,asc",
 } = {}) {
   const params = new URLSearchParams();
 
-  // backend nhận đúng key: keyword, startDate, durationDay, departureLocation, status
-  if (keyword && String(keyword).trim())
-    params.set("keyword", String(keyword).trim());
-  if (startDate) params.set("startDate", startDate);
+  const k = String(keyword ?? "").trim();
+  const sd = String(startDate ?? "").trim();
+  const dur = String(durationDay ?? "").trim();
+  const dep = String(departureLocation ?? "").trim();
+  const st = String(status ?? "").trim();
+
+  if (k) params.set("keyword", k);
+  if (sd) params.set("startDate", sd);
 
   // durationDay có thể là "" hoặc số
-  if (durationDay !== "" && durationDay != null) {
-    params.set("durationDay", String(durationDay));
-  }
+  if (dur !== "") params.set("durationDay", dur);
 
-  if (departureLocation) params.set("departureLocation", departureLocation);
+  // ✅ TRIM departureLocation (fix case "Hà Nội ")
+  if (dep) params.set("departureLocation", dep);
 
-  // ✅ luôn gửi status (Activated) để backend lọc đúng
-  if (status) params.set("status", status);
+  // ✅ luôn gửi status nếu có
+  if (st) params.set("status", st);
 
-  // pagination + sort
   params.set("page", String(page));
   params.set("size", String(size));
   if (sort) params.set("sort", sort);
 
   const url = `${API_BASE}/tours/search/filterTours?${params.toString()}`;
+
+  // ✅ debug nhanh (bạn mở console sẽ thấy url gọi gì)
+  console.log("[filterTours] URL =", url);
 
   const res = await fetch(url);
   if (!res.ok) throw new Error(await res.text());

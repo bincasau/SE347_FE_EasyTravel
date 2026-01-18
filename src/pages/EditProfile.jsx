@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAccountDetail, changePasswordApi } from "@/apis/AccountAPI";
 import { updateMyProfileApi, deleteMineApi } from "@/apis/ProfileAPI";
@@ -53,18 +53,34 @@ export default function EditProfile() {
 
   const [file, setFile] = useState(null);
 
-  const previewUrl = useMemo(() => {
-    if (file) return URL.createObjectURL(file);
-    return form.avatar
-      ? `${S3_USER_BASE}/${form.avatar}`
-      : `${S3_USER_BASE}/user_default.jpg`;
-  }, [file, form.avatar]);
+  // ✅ cache-busting version cho avatar (để đổi xong thấy liền, không cần reload)
+  const [avatarVersion, setAvatarVersion] = useState(() => Date.now());
 
+  // ✅ giữ objectURL để revoke đúng (tránh leak)
+  const objectUrlRef = useRef(null);
+
+  const previewUrl = useMemo(() => {
+    // nếu có file mới chọn -> dùng objectURL preview ngay
+    if (file) {
+      const url = URL.createObjectURL(file);
+      objectUrlRef.current = url;
+      return url;
+    }
+
+    // nếu dùng avatar từ S3 -> thêm ?v=... để bust cache
+    return form.avatar
+      ? `${S3_USER_BASE}/${form.avatar}?v=${avatarVersion}`
+      : `${S3_USER_BASE}/user_default.jpg`;
+  }, [file, form.avatar, avatarVersion]);
+
+  // ✅ revoke objectURL khi file đổi / unmount
   useEffect(() => {
     return () => {
-      if (file) URL.revokeObjectURL(previewUrl);
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [file]);
 
   useEffect(() => {
@@ -83,6 +99,9 @@ export default function EditProfile() {
           dob: data.birth ? String(data.birth).slice(0, 10) : "", // ✅ birth -> dob
           avatar: data.avatar || "",
         });
+
+        // ✅ set version để chắc chắn load ảnh mới nhất lần đầu vào
+        setAvatarVersion(Date.now());
       } catch (e) {
         console.error(e);
         navigate("/");
@@ -100,7 +119,6 @@ export default function EditProfile() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // ✅ payload gửi theo entity User (đúng tên field BE)
     const payloadUser = {
       username: form.username,
       email: form.email,
@@ -113,7 +131,36 @@ export default function EditProfile() {
 
     setSaving(true);
     try {
+      // ✅ update profile (có thể upload avatar)
       await updateMyProfileApi({ user: payloadUser, file });
+
+      // ✅ bust cache ngay lập tức để khi quay lại vẫn thấy avatar mới
+      setAvatarVersion(Date.now());
+
+      // ✅ nếu bạn muốn chắc chắn lấy avatar filename mới (nếu BE đổi tên file)
+      // thì refetch lại account detail để sync form.avatar
+      try {
+        const fresh = await getAccountDetail();
+        setForm((p) => ({
+          ...p,
+          avatar: fresh.avatar || p.avatar,
+          name: fresh.name || p.name,
+          phoneNumber: fresh.phone || p.phoneNumber,
+          address: fresh.address || p.address,
+          gender: fresh.gender || p.gender,
+          dob: fresh.birth ? String(fresh.birth).slice(0, 10) : p.dob,
+        }));
+        setAvatarVersion(Date.now());
+      } catch (e2) {
+        // không sao, chỉ là không refetch được
+        console.warn("Refetch account detail failed:", e2);
+      }
+
+      // ✅ báo Header/app biết profile đã update để fetch lại (nếu Header đang nghe jwt-changed)
+      window.dispatchEvent(new Event("jwt-changed"));
+
+      // ✅ reset file để không còn dùng objectURL nữa
+      setFile(null);
 
       await popup.success("Cập nhật profile thành công!");
       navigate("/profile");
@@ -126,7 +173,6 @@ export default function EditProfile() {
   };
 
   const handleDelete = async () => {
-    // ✅ popup confirm đẹp
     const ok = await popup.confirmDanger(
       "Bạn chắc chắn muốn xoá tài khoản? Hành động này không thể hoàn tác.",
       "Xoá tài khoản"
@@ -136,7 +182,6 @@ export default function EditProfile() {
     try {
       await deleteMineApi();
       logout();
-
       await popup.success("Đã xoá tài khoản.");
       navigate("/");
     } catch (err) {
@@ -163,6 +208,7 @@ export default function EditProfile() {
         <form onSubmit={handleSubmit} className="space-y-7">
           <div className="flex items-center gap-6">
             <img
+              key={previewUrl} // ✅ ép remount để chắc chắn đổi ảnh ngay
               src={previewUrl}
               className="w-24 h-24 rounded-full border object-cover"
               alt="avatar"
@@ -378,7 +424,6 @@ function ChangePasswordModal({ onClose }) {
         {err && <p className="text-sm text-red-600 mb-3">{err}</p>}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* CURRENT */}
           <div className="space-y-1">
             <label className="text-sm font-medium text-gray-800">
               Current Password
@@ -392,7 +437,6 @@ function ChangePasswordModal({ onClose }) {
             />
           </div>
 
-          {/* NEW */}
           <div className="space-y-1">
             <label className="text-sm font-medium text-gray-800">
               New Password
@@ -406,7 +450,6 @@ function ChangePasswordModal({ onClose }) {
             />
           </div>
 
-          {/* CONFIRM */}
           <div className="space-y-1">
             <label className="text-sm font-medium text-gray-800">
               Confirm New Password
@@ -424,7 +467,6 @@ function ChangePasswordModal({ onClose }) {
             )}
           </div>
 
-          {/* ✅ RULES ĐƯA XUỐNG DƯỚI CONFIRM */}
           <div className="text-xs text-gray-500 space-y-1 mt-2">
             <p className="font-medium text-gray-600">Yêu cầu mật khẩu:</p>
             <ul className="list-disc ml-5">

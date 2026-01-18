@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useState, useCallback, useRef } from "react";
+import { useMemo, useEffect, useState, useCallback, useRef, useReducer } from "react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
@@ -28,11 +28,36 @@ function normalizeStats(raw) {
   };
 }
 
+/** ✅ reducer để update month+year atomically (không bị StrictMode double call) */
+function ymReducer(state, action) {
+  switch (action.type) {
+    case "PREV": {
+      if (state.month === 1) return { month: 12, year: state.year - 1 };
+      return { month: state.month - 1, year: state.year };
+    }
+    case "NEXT": {
+      if (state.month === 12) return { month: 1, year: state.year + 1 };
+      return { month: state.month + 1, year: state.year };
+    }
+    case "SET_MONTH": {
+      const m = clampInt(action.month, 1, 12, state.month);
+      return { month: m, year: state.year };
+    }
+    case "SET_YEAR": {
+      const y = clampInt(action.year, 1970, 2100, state.year);
+      return { month: state.month, year: y };
+    }
+    default:
+      return state;
+  }
+}
+
 export default function RevenueReport() {
   /** ===== State ===== */
-  const [month, setMonth] = useState(12);
-  // ✅ cho phép year tạm thời là "" khi user đang xóa để nhập lại
-  const [year, setYear] = useState(2025);
+  const [{ month, year }, dispatch] = useReducer(ymReducer, { month: 12, year: 2025 });
+
+  // ✅ draft year (string để nhập không bị giật)
+  const [draftYear, setDraftYear] = useState(String(2025));
 
   const [stats, setStats] = useState(null);
   const [prevStats, setPrevStats] = useState(null);
@@ -55,6 +80,28 @@ export default function RevenueReport() {
   const safeMonth = useMemo(() => clampInt(month, 1, 12, 1), [month]);
   const safeYear = useMemo(() => clampInt(year, 1970, 2100, 2025), [year]);
 
+  // ✅ commit draftYear -> year
+  const commitDraftYear = useCallback(() => {
+    const trimmed = String(draftYear ?? "").trim();
+    if (trimmed === "") {
+      setDraftYear(String(safeYear));
+      return;
+    }
+    const n = Number(trimmed);
+    if (!Number.isFinite(n)) {
+      setDraftYear(String(safeYear));
+      return;
+    }
+    const clamped = clampInt(n, 1970, 2100, safeYear);
+    dispatch({ type: "SET_YEAR", year: clamped });
+    setDraftYear(String(clamped));
+  }, [draftYear, safeYear]);
+
+  // ✅ sync draftYear khi year change (do prev/next month)
+  useEffect(() => {
+    setDraftYear(String(safeYear));
+  }, [safeYear]);
+
   const monthLabel = useMemo(() => {
     return new Date(safeYear, safeMonth - 1).toLocaleString("en-US", {
       month: "long",
@@ -72,27 +119,13 @@ export default function RevenueReport() {
     return { pm, py };
   }, [safeMonth, safeYear]);
 
-  /** ✅ đổi tháng ổn định: chỉ +/- year đúng 1 khi qua ranh giới 1↔12 */
+  /** ✅ Prev/Next month: dispatch reducer (no side-effect inside updater) */
   const goPrevMonth = useCallback(() => {
-    setMonth((m) => {
-      const mm = clampInt(m, 1, 12, 1);
-      if (mm === 1) {
-        setYear((y) => clampInt(y, 1970, 2100, 2025) - 1);
-        return 12;
-      }
-      return mm - 1;
-    });
+    dispatch({ type: "PREV" });
   }, []);
 
   const goNextMonth = useCallback(() => {
-    setMonth((m) => {
-      const mm = clampInt(m, 1, 12, 1);
-      if (mm === 12) {
-        setYear((y) => clampInt(y, 1970, 2100, 2025) + 1);
-        return 1;
-      }
-      return mm + 1;
-    });
+    dispatch({ type: "NEXT" });
   }, []);
 
   /** ✅ fetch stats by month/year */
@@ -192,10 +225,7 @@ export default function RevenueReport() {
     if (loading) return popup.error("Đang tải dữ liệu, thử lại sau nhé!");
     if (!stats) return popup.error("Không có dữ liệu để export.");
 
-    const ok = await popup.confirm(
-      `Xuất báo cáo tháng ${monthLabel} ra CSV?`,
-      "Xác nhận"
-    );
+    const ok = await popup.confirm(`Xuất báo cáo tháng ${monthLabel} ra CSV?`, "Xác nhận");
     if (!ok) return;
 
     const curRevenue = safeNumber(stats?.allTypeRevenue, 0);
@@ -233,10 +263,7 @@ export default function RevenueReport() {
       if (!stats) return popup.error("Không có dữ liệu để export.");
       if (!exportRef.current) return popup.error("Không tìm thấy vùng để export!");
 
-      const ok = await popup.confirm(
-        `Xuất báo cáo tháng ${monthLabel} ra PDF?`,
-        "Xác nhận"
-      );
+      const ok = await popup.confirm(`Xuất báo cáo tháng ${monthLabel} ra PDF?`, "Xác nhận");
       if (!ok) return;
 
       setPdfMode(true);
@@ -291,13 +318,10 @@ export default function RevenueReport() {
         {/* ✅ HEADER cho PDF */}
         {pdfMode && (
           <div className="px-6 pt-8 pb-4 text-center">
-            <h1 className="text-2xl font-semibold text-gray-900">
-              REVENUE REPORT
-            </h1>
+            <h1 className="text-2xl font-semibold text-gray-900">REVENUE REPORT</h1>
             <div className="text-sm text-gray-600 mt-1">{monthLabel}</div>
             <div className="text-xs text-gray-500 mt-1">
-              Total Revenue: {revenueText} · Bookings: {bookings} · Avg/Booking:{" "}
-              {avgRevenueText}
+              Total Revenue: {revenueText} · Bookings: {bookings} · Avg/Booking: {avgRevenueText}
             </div>
             <div className="mt-4 h-px bg-gray-200" />
           </div>
@@ -307,28 +331,20 @@ export default function RevenueReport() {
         {!pdfMode && (
           <div className="bg-white border-b">
             <div className="max-w-6xl mx-auto px-6 py-6">
-              <h1 className="text-2xl font-semibold text-gray-900 text-center">
-                Revenue Report
-              </h1>
+              <h1 className="text-2xl font-semibold text-gray-900 text-center">Revenue Report</h1>
               <p className="text-sm text-gray-500 text-center mt-1">
                 Room distribution & monthly comparison
               </p>
 
               <div className="mt-6 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
                 <div className="flex items-center gap-4">
-                  <button
-                    onClick={goPrevMonth}
-                    className="px-3 py-1 border rounded"
-                  >
+                  <button onClick={goPrevMonth} className="px-3 py-1 border rounded">
                     ← Prev
                   </button>
 
                   <span className="font-medium">{monthLabel}</span>
 
-                  <button
-                    onClick={goNextMonth}
-                    className="px-3 py-1 border rounded"
-                  >
+                  <button onClick={goNextMonth} className="px-3 py-1 border rounded">
                     Next →
                   </button>
                 </div>
@@ -337,7 +353,9 @@ export default function RevenueReport() {
                   <select
                     className="border rounded px-2 py-1"
                     value={safeMonth}
-                    onChange={(e) => setMonth(Number(e.target.value))}
+                    onChange={(e) =>
+                      dispatch({ type: "SET_MONTH", month: Number(e.target.value) })
+                    }
                   >
                     {Array.from({ length: 12 }).map((_, i) => {
                       const m = i + 1;
@@ -349,30 +367,24 @@ export default function RevenueReport() {
                     })}
                   </select>
 
+                  {/* ✅ Year input stable */}
                   <input
                     className="border rounded px-2 py-1 w-28"
-                    type="number"
+                    type="text"
                     inputMode="numeric"
-                    min={1970}
-                    max={2100}
-                    value={year}
+                    value={draftYear}
                     onChange={(e) => {
                       const v = e.target.value;
-
-                      // cho phép xóa để nhập lại, tránh giật
-                      if (v === "") {
-                        setYear("");
-                        return;
+                      if (/^\d*$/.test(v)) setDraftYear(v);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.currentTarget.blur();
+                        commitDraftYear();
                       }
-
-                      const n = Number(v);
-                      if (!Number.isFinite(n)) return;
-
-                      setYear(n);
                     }}
-                    onBlur={() => {
-                      setYear((y) => clampInt(y, 1970, 2100, 2025));
-                    }}
+                    onBlur={commitDraftYear}
+                    placeholder="Year"
                   />
 
                   <button
@@ -401,9 +413,7 @@ export default function RevenueReport() {
           className={[
             "max-w-6xl mx-auto px-6",
             pdfMode ? "py-6" : "py-10",
-            pdfMode
-              ? "grid grid-cols-1 gap-6"
-              : "grid grid-cols-1 md:grid-cols-2 gap-8",
+            pdfMode ? "grid grid-cols-1 gap-6" : "grid grid-cols-1 md:grid-cols-2 gap-8",
           ].join(" ")}
         >
           {loading ? (
@@ -421,9 +431,7 @@ export default function RevenueReport() {
           ) : error ? (
             <div className="bg-white border rounded-2xl p-6 shadow-sm">
               <div className="text-lg font-semibold text-gray-900">Lỗi</div>
-              <div className="text-sm text-gray-600 mt-2 break-words">
-                {error}
-              </div>
+              <div className="text-sm text-gray-600 mt-2 break-words">{error}</div>
             </div>
           ) : (
             <ComparisonText

@@ -59,9 +59,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
       return (tb || 0) - (ta || 0);
     });
 
-  const unreadCount = notifications.filter(
-    (n) => !normalizeNoti(n).read
-  ).length;
+  const unreadCount = notifications.filter((n) => !normalizeNoti(n).read).length;
 
   // ✅ NEW: chưa login => luôn hiện chấm đỏ
   const showBadge = !user ? true : unreadCount > 0;
@@ -117,23 +115,57 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     setLoadingUser(false);
   };
 
+  /**
+   * ✅ IMPORTANT FIX:
+   * - Luôn load PUBLIC (broadcast) notifications
+   * - Nếu có user => load thêm MY notifications
+   * - Merge theo id, giữ read state (nếu đã read ở UI thì giữ)
+   */
   const loadNotifications = async () => {
     setLoadingNoti(true);
     try {
-      const data = user
-        ? await getMyNotifications("ACTIVE")
-        : await getPublicNotifications();
+      const [publicList, myList] = await Promise.all([
+        getPublicNotifications().catch(() => []),
+        user ? getMyNotifications("ACTIVE").catch(() => []) : Promise.resolve([]),
+      ]);
 
-      const incoming = Array.isArray(data) ? data.map(normalizeNoti) : [];
+      const incoming = [
+        ...(Array.isArray(publicList) ? publicList : []),
+        ...(Array.isArray(myList) ? myList : []),
+      ].map(normalizeNoti);
 
+      // merge by id + keep read state
       setNotifications((prev) => {
         const prevMap = new Map(prev.map((x) => [x.id, normalizeNoti(x)]));
-        const merged = incoming.map((n) => {
-          const old = prevMap.get(n.id);
-          if (!old) return n;
-          return { ...n, read: Boolean(old.read) || Boolean(n.read) };
-        });
-        return sortNoti(merged);
+        const mergedMap = new Map();
+
+        const put = (n) => {
+          if (!n?.id) return;
+          const old = mergedMap.get(n.id);
+          const oldPrev = prevMap.get(n.id);
+
+          if (!old) {
+            mergedMap.set(n.id, {
+              ...n,
+              read: Boolean(oldPrev?.read) || Boolean(n.read),
+            });
+            return;
+          }
+
+          // nếu trùng id (có thể public/my) => merge lại
+          mergedMap.set(n.id, {
+            ...old,
+            ...n,
+            read:
+              Boolean(old.read) ||
+              Boolean(n.read) ||
+              Boolean(oldPrev?.read),
+          });
+        };
+
+        incoming.forEach(put);
+
+        return sortNoti(Array.from(mergedMap.values()));
       });
     } catch (e) {
       console.error("Load notifications failed:", e);
@@ -252,7 +284,6 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
       const scrollbarWidth = window.innerWidth - root.clientWidth;
       body.style.overflow = "hidden";
       body.style.paddingRight = scrollbarWidth > 0 ? `${scrollbarWidth}px` : "";
-      // chống tràn ngang do vài dropdown cố định
       root.style.overflowX = "hidden";
     } else {
       body.style.overflow = "";
@@ -268,15 +299,21 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
   }, [openMobile]);
 
   const handleLogout = async () => {
+    // ✅ đóng mobile menu + dropdown trước để không che popup
+    setOpenMobile(false);
+    setOpenUserMenu(false);
+    setOpenNoti(false);
+    setOpenLang(false);
+
+    // ✅ đợi 1 tick để menu translate-x chạy xong (tránh vẫn che)
+    await new Promise((r) => setTimeout(r, 50));
+
     const ok = await popup.confirm("Bạn có chắc muốn đăng xuất?", "Đăng xuất");
     if (!ok) return;
 
     logout();
     setUser(null);
     didRedirectRef.current = false;
-    setOpenUserMenu(false);
-    setOpenNoti(false);
-    setOpenMobile(false);
     navigate("/");
   };
 
@@ -424,6 +461,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
   const handleClickNoti = async (n) => {
     const nn = normalizeNoti(n);
 
+    // chưa login: chỉ mark local
     if (!user) {
       setNotifications((prev) =>
         prev.map((x) => (x.id === nn.id ? { ...x, read: true } : x))
@@ -431,6 +469,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
       return;
     }
 
+    // login: gọi API mark read
     if (!nn.read) {
       try {
         await markNotificationRead(nn.id);
@@ -686,9 +725,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
 
                   <div className="max-h-[360px] overflow-auto">
                     {loadingNoti ? (
-                      <div className="p-6 text-gray-500 text-sm">
-                        Loading...
-                      </div>
+                      <div className="p-6 text-gray-500 text-sm">Loading...</div>
                     ) : notifications.length === 0 ? (
                       <div className="p-6 text-gray-500 text-sm">
                         No notifications.

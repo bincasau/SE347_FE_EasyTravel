@@ -70,10 +70,7 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
       }
 
       // ✅ CASH
-      if (payment === "cash") {
-        await popup.success("Booking successfully! Please pay at departure.");
-        return;
-      }
+      
 
       // ✅ VNPAY
       if (payment === "vnpay") {
@@ -145,15 +142,7 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
       <div className="border rounded-lg p-4 space-y-3">
         <h3 className="font-semibold text-gray-800 mb-2">Payment Method</h3>
 
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="radio"
-            name="payment"
-            checked={payment === "cash"}
-            onChange={() => setPayment("cash")}
-          />
-          Cash (Pay at departure)
-        </label>
+        
 
         <label className="flex items-center gap-2 cursor-pointer">
           <input

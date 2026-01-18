@@ -49,11 +49,11 @@ const fetchPublic = async (url, options = {}) => {
 
 // map backend -> UI
 const mapNoti = (n) => ({
-  id: n.notificationId,
-  title: "Notification",
+  // an toàn hơn: ưu tiên notificationId, fallback id
+  id: n.notificationId ?? n.id,
+  title: n.title ?? "Notification",
   message: n.message,
-  time: n.createdAt,
-  // backend chưa có read/isRead thì mặc định false
+  time: n.createdAt ?? n.time,
   read: n.read === true || n.isRead === true,
   raw: n,
 });
@@ -74,6 +74,55 @@ export const markNotificationRead = async (id) => {
   return fetchWithJWT(`${BASE_URL}/notifications/${id}/read`, {
     method: "PATCH",
   });
+};
+
+/**
+ * ✅ NEW: Dùng cho cái chuông
+ * - Luôn lấy broadcast/public
+ * - Nếu có JWT thì lấy thêm my/private
+ * - Merge theo id, ưu tiên read=true nếu 1 trong 2 bên read
+ * - Sort mới nhất trước
+ */
+export const getBellNotifications = async (status = "ACTIVE") => {
+  const token = getJWT();
+
+  const [publicList, myList] = await Promise.all([
+    getPublicNotifications().catch(() => []),
+    token ? getMyNotifications(status).catch(() => []) : Promise.resolve([]),
+  ]);
+
+  // merge theo id
+  const map = new Map();
+
+  const put = (n) => {
+    if (!n?.id) return;
+    const old = map.get(n.id);
+    if (!old) {
+      map.set(n.id, n);
+      return;
+    }
+    // merge read + giữ time/title/message mới nhất (ưu tiên data có raw đầy đủ)
+    map.set(n.id, {
+      ...old,
+      ...n,
+      read: Boolean(old.read) || Boolean(n.read),
+      raw: n.raw ?? old.raw,
+    });
+  };
+
+  publicList.forEach(put);
+  myList.forEach(put);
+
+  const merged = Array.from(map.values());
+
+  // sort desc theo time
+  merged.sort((a, b) => {
+    const ta = new Date(a.time || a.raw?.createdAt || 0).getTime();
+    const tb = new Date(b.time || b.raw?.createdAt || 0).getTime();
+    return (tb || 0) - (ta || 0);
+  });
+
+  return merged;
 };
 
 function getAuthHeaders() {
