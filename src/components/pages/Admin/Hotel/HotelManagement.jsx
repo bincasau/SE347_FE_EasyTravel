@@ -32,8 +32,7 @@ export default function HotelManagement() {
 
       try {
         const manager = await getHotelManagerByHotelId(hid);
-        console.log("Fetched manager for hotelId", hid, manager);
-        const managerId = manager?.userId ??  "";
+        const managerId = manager?.userId ?? "";
         const extra = { managerId, manager };
         managerCacheRef.current.set(hid, extra);
         return { ...h, ...extra };

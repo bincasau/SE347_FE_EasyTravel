@@ -10,9 +10,7 @@ export const getRoomBookedDates = async (hotelId, roomId) => {
 
     const bookings = data?._embedded?.hotelBookings || [];
 
-    const validStatuses = ["Confirmed", "Pending", "Completed"];
-
-    const valid = bookings.filter((b) => validStatuses.includes(b.status));
+    const valid = bookings.filter((b) => b.status === "Success");
 
     let disabled = [];
 

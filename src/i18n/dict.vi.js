@@ -19,15 +19,15 @@ export const vi = {
 
   // ===== FOOTER =====
   footer: {
-    services: "Dịch vụ",
+    navigation: "Điều hướng",
     help: "Hỗ trợ",
     contacts: "Liên hệ",
     social_media: "Mạng xã hội",
     contact_us: "Liên hệ",
     about_us: "Về chúng tôi",
-    tour_packages: "Gói tour du lịch",
-    book_tour: "Đặt tour",
-    book_hotel: "Đặt khách sạn",
+    tours: "Tour du lịch",
+    hotels: "Khách sạn",
+    blogs: "Bài viết",
     terms_of_use: "Điều khoản sử dụng",
     privacy_policy: "Chính sách bảo mật",
     address: "Địa chỉ",
@@ -125,6 +125,6 @@ export const vi = {
     sortBy: "Sắp xếp theo",
     defaultSort: "Mặc định",
     sortAsc: "Giá: Thấp đến Cao",
-    sortDesc: "Giá: Cao đến Thấp"
+    sortDesc: "Giá: Cao đến Thấp",
   },
 };

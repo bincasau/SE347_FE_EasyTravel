@@ -19,15 +19,15 @@ export const en = {
 
   // ===== FOOTER =====
   footer: {
-    services: "Services",
+    navigation: "Navigation",
     help: "Help",
     contacts: "Contacts",
     social_media: "Social Media",
     contact_us: "Contact Us",
     about_us: "About Us",
-    tour_packages: "Tour Packages",
-    book_tour: "Book Tour",
-    book_hotel: "Book Hotel",
+    tours: "Tours",
+    hotels: "Hotels",
+    blogs: "Blogs",
     terms_of_use: "Terms of Use",
     privacy_policy: "Privacy Policy",
     address: "Address",
@@ -124,6 +124,6 @@ export const en = {
     sortBy: "Sort by",
     defaultSort: "Default",
     sortAsc: "Price: Low to High",
-    sortDesc: "Price: High to Low"
+    sortDesc: "Price: High to Low",
   },
 };
