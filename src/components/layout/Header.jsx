@@ -59,7 +59,9 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
       return (tb || 0) - (ta || 0);
     });
 
-  const unreadCount = notifications.filter((n) => !normalizeNoti(n).read).length;
+  const unreadCount = notifications.filter(
+    (n) => !normalizeNoti(n).read
+  ).length;
 
   // ✅ NEW: chưa login => luôn hiện chấm đỏ
   const showBadge = !user ? true : unreadCount > 0;
@@ -81,10 +83,10 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
 
   const adminMenu = [
     { to: "/admin/dashboard", key: "dashboard" },
-    { to: "/admin/notifications", key: "notifications" },
     { to: "/admin/tours", key: "tours" },
     { to: "/admin/users", key: "users" },
     { to: "/admin/hotels", key: "hotel" },
+    { to: "/admin/notifications", key: "notifications" },
     { to: "/admin/blogs", key: "blog" },
   ];
 
@@ -599,7 +601,10 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     <header className="sticky top-0 z-[9998] bg-white border-b border-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="h-16 flex items-center justify-between gap-3">
-          <Link to={getHomeByRole()} className="flex items-center gap-2 shrink-0">
+          <Link
+            to={getHomeByRole()}
+            className="flex items-center gap-2 shrink-0"
+          >
             <img src={Logo} className="h-9 w-auto" alt="logo" />
             <span className="text-xl sm:text-2xl font-semibold text-orange-500">
               Easy
@@ -681,7 +686,9 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
 
                   <div className="max-h-[360px] overflow-auto">
                     {loadingNoti ? (
-                      <div className="p-6 text-gray-500 text-sm">Loading...</div>
+                      <div className="p-6 text-gray-500 text-sm">
+                        Loading...
+                      </div>
                     ) : notifications.length === 0 ? (
                       <div className="p-6 text-gray-500 text-sm">
                         No notifications.
@@ -705,7 +712,9 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
                               />
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between gap-3">
-                                  <div className="font-medium truncate">{nn.title}</div>
+                                  <div className="font-medium truncate">
+                                    {nn.title}
+                                  </div>
                                   <div className="text-xs text-gray-400 shrink-0">
                                     {nn.time}
                                   </div>
@@ -774,7 +783,9 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
           </nav>
 
           <div className="space-y-3">
-            <div className="text-xs font-semibold text-gray-500">PREFERENCES</div>
+            <div className="text-xs font-semibold text-gray-500">
+              PREFERENCES
+            </div>
 
             {/* Language (mobile) */}
             <div className="relative" ref={langMobileRef}>
@@ -870,7 +881,9 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
                             />
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between gap-2">
-                                <div className="font-medium truncate">{nn.title}</div>
+                                <div className="font-medium truncate">
+                                  {nn.title}
+                                </div>
                                 <div className="text-[11px] text-gray-400 shrink-0">
                                   {nn.time}
                                 </div>

@@ -43,7 +43,7 @@ export default function NotificationManagement() {
         const idb = Number(
           b?.notificationId ?? b?.notification_id ?? b?.id ?? 0
         );
-        return idb - ida; 
+        return idb - ida;
       });
 
       setItems(sorted);
@@ -57,6 +57,7 @@ export default function NotificationManagement() {
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, isBroadcast]);
 
   const handleSearch = (e) => {
@@ -91,21 +92,22 @@ export default function NotificationManagement() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto py-10">
-      <div className="flex items-center justify-between gap-4 mb-6">
-        <h1 className="text-3xl font-semibold">Notification management</h1>
+    <div className="max-w-5xl mx-auto py-10">
+      {/* HEADER – giống HotelManagement */}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-semibold">Notification management</h1>
 
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate("/admin/notifications/new")}
-            className="px-5 py-2.5 rounded-full font-semibold bg-orange-500 text-white hover:bg-orange-600"
+            className="px-5 py-2 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition"
           >
             + Add Notification
           </button>
 
           <button
             onClick={load}
-            className="px-5 py-2.5 rounded-full font-semibold ring-1 ring-gray-200 hover:bg-gray-50"
+            className="px-5 py-2 rounded-full ring-1 ring-gray-200 hover:bg-gray-50 transition"
             disabled={loading}
           >
             Refresh
@@ -163,7 +165,7 @@ export default function NotificationManagement() {
 
           <div className="md:col-span-3">
             <label className="block text-sm font-semibold text-gray-700 mb-1">
-              Tìm kiếm người nhận
+              Tìm người nhận
             </label>
             <input
               value={targetUser}
@@ -182,7 +184,7 @@ export default function NotificationManagement() {
                 setStatus("");
                 setIsBroadcast("");
               }}
-              className="px-5 py-2.5 rounded-full font-semibold ring-1 ring-gray-200 hover:bg-gray-50"
+              className="px-5 py-2 rounded-full ring-1 ring-gray-200 hover:bg-gray-50 transition"
               disabled={loading}
             >
               Xóa
@@ -190,7 +192,7 @@ export default function NotificationManagement() {
 
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-full font-semibold bg-orange-500 text-white hover:bg-orange-600"
+              className="px-5 py-2 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition"
               disabled={loading}
             >
               Áp dụng
@@ -198,20 +200,20 @@ export default function NotificationManagement() {
           </div>
         </div>
 
-        {err ? (
+        {err && (
           <div className="mt-3 text-sm text-red-700 bg-red-50 ring-1 ring-red-200 rounded-xl px-3 py-2">
             {err}
           </div>
-        ) : null}
+        )}
       </form>
 
       {/* LIST */}
       {loading ? (
-        <div className="text-gray-600">Đang tải...</div>
+        <p className="text-center py-10">Loading notifications...</p>
       ) : items.length === 0 ? (
-        <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 p-6 text-gray-700">
-          Không có thông báo nào.
-        </div>
+        <p className="text-center py-10 text-gray-500">
+          No notifications found.
+        </p>
       ) : (
         <div className="flex flex-col gap-5">
           {items.map((n) => {

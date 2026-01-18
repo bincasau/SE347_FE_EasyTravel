@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faChevronLeft, faChevronRight } from "@fortawesome/free-solid-svg-icons";
+import {
+  faChevronLeft,
+  faChevronRight,
+} from "@fortawesome/free-solid-svg-icons";
 import { useLang } from "@/contexts/LangContext";
 
 import dest1 from "@/assets/images/home/eiffel.png";
@@ -15,24 +18,24 @@ import dest9 from "@/assets/images/home/angkor.png";
 import dest10 from "@/assets/images/home/marina.png";
 
 const destinations = [
-  { id: 1, name: "Eiffel Tower", tours: 356, image: dest1 },
-  { id: 2, name: "Machu Picchu", tours: 356, image: dest2 },
-  { id: 3, name: "Great Wall", tours: 356, image: dest3 },
-  { id: 4, name: "Statue of Liberty", tours: 356, image: dest4 },
-  { id: 5, name: "Taj Mahal", tours: 356, image: dest5 },
-  { id: 6, name: "Opera House", tours: 356, image: dest6 },
-  { id: 7, name: "Colosseum", tours: 356, image: dest7 },
-  { id: 8, name: "Grand Canyon", tours: 356, image: dest8 },
-  { id: 9, name: "Angkor Wat", tours: 356, image: dest9 },
-  { id: 10, name: "Marina Bay", tours: 356, image: dest10 },
+  { id: 1, name: "Eiffel Tower", tours: 36, image: dest1 },
+  { id: 2, name: "Machu Picchu", tours: 12, image: dest2 },
+  { id: 3, name: "Great Wall", tours: 23, image: dest3 },
+  { id: 4, name: "Statue of Liberty", tours: 5, image: dest4 },
+  { id: 5, name: "Taj Mahal", tours: 3, image: dest5 },
+  { id: 6, name: "Opera House", tours: 6, image: dest6 },
+  { id: 7, name: "Colosseum", tours: 5, image: dest7 },
+  { id: 8, name: "Grand Canyon", tours: 25, image: dest8 },
+  { id: 9, name: "Angkor Wat", tours: 31, image: dest9 },
+  { id: 10, name: "Marina Bay", tours: 19, image: dest10 },
 ];
 
 const getItemsPerPage = () => {
   if (typeof window === "undefined") return 8;
   const w = window.innerWidth;
-  if (w < 640) return 3;     // mobile
-  if (w < 1024) return 5;    // tablet
-  return 8;                  // desktop
+  if (w < 640) return 3; // mobile
+  if (w < 1024) return 5; // tablet
+  return 8; // desktop
 };
 
 const PopularDestinationCarousel = () => {

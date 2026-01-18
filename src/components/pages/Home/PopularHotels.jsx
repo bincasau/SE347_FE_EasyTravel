@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from "react";
 import HotelCard from "@/components/pages/Hotel/HotelCard";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faChevronLeft, faChevronRight } from "@fortawesome/free-solid-svg-icons";
+import {
+  faChevronLeft,
+  faChevronRight,
+} from "@fortawesome/free-solid-svg-icons";
 import { getPopularHotels } from "@/apis/home";
 import { useLang } from "@/contexts/LangContext";
 
@@ -49,7 +52,8 @@ const PopularHotels = () => {
   });
 
   if (loading) return <div className="text-center py-10">Đang tải...</div>;
-  if (error) return <div className="text-center text-red-500 py-10">{error}</div>;
+  if (error)
+    return <div className="text-center text-red-500 py-10">{error}</div>;
 
   return (
     <section className="py-12 md:py-20 px-4 sm:px-6 md:px-12 lg:px-20 bg-white font-poppins">
@@ -69,8 +73,7 @@ const PopularHotels = () => {
 
           <button
             onClick={handleNext}
-            className="p-2 rounded-full border bg-orange-500 text-white hover:bg-orange-600 transition"
-            aria-label="Next hotels"
+            className="p-2 rounded-full border bg-orange-100 text-orange-500 hover:bg-orange-200 transition"
           >
             <FontAwesomeIcon icon={faChevronRight} />
           </button>

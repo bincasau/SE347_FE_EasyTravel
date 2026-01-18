@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from "react";
 import BlogCard from "../Blog/BlogCard";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faChevronLeft, faChevronRight } from "@fortawesome/free-solid-svg-icons";
+import {
+  faChevronLeft,
+  faChevronRight,
+} from "@fortawesome/free-solid-svg-icons";
 import { getPopularBlogs } from "@/apis/Home";
 import { useLang } from "@/contexts/LangContext";
 
@@ -48,11 +51,13 @@ const PopularTopics = () => {
     (_, i) => {
       const index = (currentIndex + i) % blogs.length;
       return blogs[index];
-    }
+    },
   );
 
-  if (loading) return <div className="text-center py-10">Đang tải bài viết...</div>;
-  if (error) return <div className="text-center text-red-500 py-10">{error}</div>;
+  if (loading)
+    return <div className="text-center py-10">Đang tải bài viết...</div>;
+  if (error)
+    return <div className="text-center text-red-500 py-10">{error}</div>;
 
   return (
     <section className="py-12 md:py-20 px-4 sm:px-6 md:px-12 lg:px-20 bg-white font-poppins">
@@ -72,7 +77,7 @@ const PopularTopics = () => {
 
           <button
             onClick={handleNext}
-            className="p-2 rounded-full border bg-orange-500 text-white hover:bg-orange-600 transition"
+            className="p-2 rounded-full border  bg-orange-100 text-orange-500 hover:bg-orange-200 transition"
             aria-label="Next blogs"
           >
             <FontAwesomeIcon icon={faChevronRight} />

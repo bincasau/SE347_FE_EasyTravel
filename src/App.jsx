@@ -27,6 +27,7 @@ import GuideProfile from "./pages/TourGuide/GuideProfile";
 import TourScheduleDetail from "./pages/TourGuide/TourScheduleDetail";
 
 //  ADMIN
+import AdminDashboardPage from "./pages/Admin/AdminDashboardPage";
 import AdminUserManagementPage from "./pages/Admin/UserManagementPage";
 import AdminUserUpsertPage from "./pages/Admin/AdminUserUpsertPage";
 import AdminTourManagementPage from "./pages/Admin/TourManagementPage";
@@ -97,7 +98,10 @@ export default function App() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/profile/edit" element={<EditProfile />} />
-          <Route path="/booking-history/tours" element={<BookingHistoryTours />} />
+          <Route
+            path="/booking-history/tours"
+            element={<BookingHistoryTours />}
+          />
           <Route
             path="/booking-history/hotels"
             element={<BookingHistoryHotels />}
@@ -221,6 +225,14 @@ export default function App() {
           />
 
           {/* Admin */}
+          <Route
+            path="/Admin/Dashboard"
+            element={
+              <RequireRole role="ADMIN">
+                <AdminDashboardPage />
+              </RequireRole>
+            }
+          />
           <Route
             path="/Admin/Tours"
             element={
