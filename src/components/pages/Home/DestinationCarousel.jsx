@@ -6,28 +6,28 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { useLang } from "@/contexts/LangContext";
 
-import dest1 from "@/assets/images/home/eiffel.png";
-import dest2 from "@/assets/images/home/machu.png";
-import dest3 from "@/assets/images/home/greatwall.png";
-import dest4 from "@/assets/images/home/statue.png";
-import dest5 from "@/assets/images/home/tajmahal.png";
-import dest6 from "@/assets/images/home/opera.png";
-import dest7 from "@/assets/images/home/colosseum.png";
-import dest8 from "@/assets/images/home/grandcanyon.png";
-import dest9 from "@/assets/images/home/angkor.png";
-import dest10 from "@/assets/images/home/marina.png";
+import dest1 from "@/assets/images/home/cantho.jpg";
+import dest2 from "@/assets/images/home/dalat.jpg";
+import dest3 from "@/assets/images/home/halong.jpg";
+import dest4 from "@/assets/images/home/hoian.jpg";
+import dest5 from "@/assets/images/home/hue.jpg";
+import dest6 from "@/assets/images/home/muine.jpg";
+import dest7 from "@/assets/images/home/nguhanhson.jpg";
+import dest8 from "@/assets/images/home/phuquoc.jpg";
+import dest9 from "@/assets/images/home/quynhon.jpg";
+import dest10 from "@/assets/images/home/sapa.jpg";
 
 const destinations = [
-  { id: 1, name: "Eiffel Tower", tours: 36, image: dest1 },
-  { id: 2, name: "Machu Picchu", tours: 12, image: dest2 },
-  { id: 3, name: "Great Wall", tours: 23, image: dest3 },
-  { id: 4, name: "Statue of Liberty", tours: 5, image: dest4 },
-  { id: 5, name: "Taj Mahal", tours: 3, image: dest5 },
-  { id: 6, name: "Opera House", tours: 6, image: dest6 },
-  { id: 7, name: "Colosseum", tours: 5, image: dest7 },
-  { id: 8, name: "Grand Canyon", tours: 25, image: dest8 },
-  { id: 9, name: "Angkor Wat", tours: 31, image: dest9 },
-  { id: 10, name: "Marina Bay", tours: 19, image: dest10 },
+  { id: 1, name: "Cần Thơ", tours: 36, image: dest1 },
+  { id: 2, name: "Đà Lạt", tours: 12, image: dest2 },
+  { id: 3, name: "Hạ Long", tours: 23, image: dest3 },
+  { id: 4, name: "Hội An", tours: 5, image: dest4 },
+  { id: 5, name: "Huế", tours: 3, image: dest5 },
+  { id: 6, name: "Mũi Né", tours: 6, image: dest6 },
+  { id: 7, name: "Ngũ Hành Sơn", tours: 5, image: dest7 },
+  { id: 8, name: "Phú Quốc", tours: 25, image: dest8 },
+  { id: 9, name: "Quy Nhơn", tours: 31, image: dest9 },
+  { id: 10, name: "Sapa", tours: 19, image: dest10 },
 ];
 
 const getItemsPerPage = () => {
