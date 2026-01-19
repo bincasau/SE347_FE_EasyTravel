@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getBlogById, saveBlog } from "@/apis/Blog";
 import { getUserFromToken } from "@/utils/auth";
+import ExtraImagesManager from "@/components/pages/admin/Common/ExtraImagesManager";
 
 const S3_BLOG_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/blog";
@@ -15,7 +16,6 @@ export default function AdminBlogUpsert() {
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
 
-  // lấy user hiện tại từ JWT
   const me = useMemo(() => getUserFromToken?.(), []);
   const myUserId = useMemo(() => (me?.sub ? Number(me.sub) : ""), [me]);
 
@@ -23,7 +23,7 @@ export default function AdminBlogUpsert() {
     title: "",
     content: "",
     tag: "",
-    userId: myUserId, // luôn dùng user hiện tại
+    userId: myUserId,
     createdAt: "",
     thumbnail: "",
   });
@@ -32,12 +32,16 @@ export default function AdminBlogUpsert() {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState("");
 
-  // đảm bảo userId luôn sync theo JWT (phòng trường hợp me load trễ)
+  const pageTitle = isEdit ? `Sửa bài viết #${id}` : "Thêm bài viết";
+  const pageDesc = isEdit
+    ? "Cập nhật nội dung bài viết và hình ảnh."
+    : "Tạo bài viết mới và upload thumbnail.";
+  const saveText = saving ? "Đang lưu..." : isEdit ? "Cập nhật" : "Tạo mới";
+
   useEffect(() => {
     setForm((p) => ({ ...p, userId: myUserId }));
   }, [myUserId]);
 
-  // Fetch blog detail when editing
   useEffect(() => {
     if (!isEdit) return;
 
@@ -62,8 +66,10 @@ export default function AdminBlogUpsert() {
           setCurrentThumb(
             data.thumbnail.startsWith("http")
               ? data.thumbnail
-              : `${S3_BLOG_BASE}/${data.thumbnail}`
+              : `${S3_BLOG_BASE}/${data.thumbnail}`,
           );
+        } else {
+          setCurrentThumb("");
         }
       } catch (e) {
         setErr(e?.message || "Không lấy được chi tiết bài viết");
@@ -73,7 +79,6 @@ export default function AdminBlogUpsert() {
     })();
   }, [isEdit, id, myUserId]);
 
-  // Preview uploaded thumbnail
   useEffect(() => {
     if (!file) {
       setPreview("");
@@ -93,6 +98,7 @@ export default function AdminBlogUpsert() {
 
   const onPickFile = (e) => {
     const f = e.target.files?.[0];
+    e.target.value = "";
     if (f) setFile(f);
   };
 
@@ -101,9 +107,7 @@ export default function AdminBlogUpsert() {
     setErr("");
 
     if (!myUserId) {
-      setErr(
-        "Không xác định được người dùng hiện tại (JWT). Vui lòng đăng nhập lại."
-      );
+      setErr("Không xác định được người dùng hiện tại.");
       return;
     }
 
@@ -145,28 +149,51 @@ export default function AdminBlogUpsert() {
 
   if (loading) {
     return (
-      <div className="px-4 sm:px-6 py-6">
-        <div className="bg-white rounded-2xl shadow p-6">Đang tải...</div>
+      <div className="p-4 sm:p-6 w-full max-w-none">
+        <div className="bg-white rounded-2xl shadow p-4 sm:p-6 w-full max-w-none">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-lg sm:text-xl font-semibold">{pageTitle}</h2>
+              <p className="mt-1 text-sm text-gray-500">{pageDesc}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="w-full sm:w-auto px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50"
+            >
+              Quay lại
+            </button>
+          </div>
+
+          <div className="mt-4 flex items-center gap-3 text-gray-600">
+            <div className="w-4 h-4 rounded-full border-2 border-gray-300 border-t-transparent animate-spin" />
+            <p>{isEdit ? "Đang tải bài viết..." : "Đang chuẩn bị..."}</p>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="px-4 sm:px-6 py-6">
-      <div className="bg-white rounded-2xl shadow p-4 sm:p-6">
-        {/* HEADER */}
+    <div className="p-4 sm:p-6 w-full max-w-none">
+      <div className="bg-white rounded-2xl shadow p-4 sm:p-6 w-full max-w-none">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <h2 className="text-xl sm:text-2xl font-semibold break-words">
-            {isEdit ? `Sửa bài viết #${id}` : "Thêm bài viết"}
-          </h2>
+          <div className="min-w-0">
+            <h2 className="text-xl sm:text-2xl font-semibold break-words">
+              {pageTitle}
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">{pageDesc}</p>
+          </div>
 
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="w-full sm:w-auto px-4 py-2 rounded-xl border hover:bg-gray-50"
-          >
-            Quay lại
-          </button>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="flex-1 sm:flex-none px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50"
+            >
+              Quay lại
+            </button>
+          </div>
         </div>
 
         {err && (
@@ -175,17 +202,13 @@ export default function AdminBlogUpsert() {
           </div>
         )}
 
-        <form
-          onSubmit={onSubmit}
-          className="mt-6 grid grid-cols-12 gap-6"
-        >
-          {/* LEFT */}
+        <form onSubmit={onSubmit} className="mt-6 grid grid-cols-12 gap-6">
           <div className="col-span-12 lg:col-span-7 space-y-4 min-w-0">
             <Field label="Tiêu đề" required>
               <input
                 value={form.title}
                 onChange={onChange("title")}
-                className="w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-orange-200"
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-orange-200"
               />
             </Field>
 
@@ -193,7 +216,7 @@ export default function AdminBlogUpsert() {
               <input
                 value={form.tag}
                 onChange={onChange("tag")}
-                className="w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-orange-200"
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-orange-200"
               />
             </Field>
 
@@ -202,69 +225,80 @@ export default function AdminBlogUpsert() {
                 value={form.content}
                 onChange={onChange("content")}
                 rows={10}
-                className="w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-orange-200"
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-orange-200"
               />
             </Field>
 
-            {/* ACTIONS */}
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col sm:flex-row gap-3 pt-1">
               <button
                 disabled={saving || !canSubmit}
                 className="w-full sm:w-auto px-5 py-3 rounded-xl bg-gray-900 text-white disabled:opacity-50 active:scale-[0.99]"
               >
-                {saving ? "Đang lưu..." : "Lưu"}
+                {saveText}
               </button>
 
               <button
                 type="button"
                 onClick={() => navigate("/admin/blogs")}
-                className="w-full sm:w-auto px-5 py-3 rounded-xl border hover:bg-gray-50"
+                className="w-full sm:w-auto px-5 py-3 rounded-xl border border-gray-200 hover:bg-gray-50"
               >
                 Huỷ
               </button>
             </div>
           </div>
 
-          {/* RIGHT */}
           <div className="col-span-12 lg:col-span-5">
-            <div className="border rounded-2xl p-4">
-              <div className="text-sm font-semibold mb-3">
-                Ảnh đại diện (Thumbnail)
-              </div>
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-gray-200 p-4">
+                <div className="text-sm font-semibold mb-3">
+                  Ảnh đại diện (Thumbnail)
+                </div>
 
-              <div className="aspect-[16/10] bg-gray-100 rounded-xl overflow-hidden">
-                {preview || currentThumb ? (
-                  <img
-                    src={preview || currentThumb}
-                    className="w-full h-full object-cover"
-                    alt="thumbnail"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-500">
-                    Chưa có ảnh
+                <div className="aspect-[16/10] bg-gray-100 rounded-xl overflow-hidden">
+                  {preview || currentThumb ? (
+                    <img
+                      src={preview || currentThumb}
+                      className="w-full h-full object-cover"
+                      alt="thumbnail"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-500">
+                      {isEdit ? "Chưa có thumbnail" : "Vui lòng chọn thumbnail"}
+                    </div>
+                  )}
+                </div>
+
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={onPickFile}
+                  className="mt-4 text-sm w-full"
+                />
+
+                {file && (
+                  <div className="mt-3 flex items-start justify-between gap-3">
+                    <span className="text-sm text-gray-600 break-words min-w-0">
+                      {file.name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setFile(null)}
+                      className="text-sm border border-gray-200 px-3 py-1 rounded-lg hover:bg-gray-50 whitespace-nowrap"
+                    >
+                      Xoá
+                    </button>
                   </div>
                 )}
               </div>
 
-              <input
-                type="file"
-                accept="image/*"
-                onChange={onPickFile}
-                className="mt-4 text-sm w-full"
-              />
-
-              {file && (
-                <div className="mt-3 flex items-start justify-between gap-3">
-                  <span className="text-sm text-gray-600 break-words min-w-0">
-                    {file.name}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setFile(null)}
-                    className="text-sm border px-3 py-1 rounded-lg hover:bg-gray-50 whitespace-nowrap"
-                  >
-                    Xoá
-                  </button>
+              {isEdit && (
+                <div className="rounded-2xl border border-gray-200 p-3 sm:p-4">
+                  <ExtraImagesManager
+                    type="blog"
+                    ownerId={Number(id)}
+                    readOnly={false}
+                  />
                 </div>
               )}
             </div>
@@ -278,7 +312,7 @@ export default function AdminBlogUpsert() {
 function Field({ label, required, children }) {
   return (
     <div className="min-w-0">
-      <div className="text-sm font-medium mb-2">
+      <div className="text-sm font-medium mb-2 text-gray-700">
         {label} {required && <span className="text-red-500">*</span>}
       </div>
       {children}
