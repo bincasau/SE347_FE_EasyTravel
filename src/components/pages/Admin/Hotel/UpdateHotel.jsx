@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { updateHotel, getHotelById } from "@/apis/Hotel";
+import ExtraImagesManager from "@/components/pages/admin/Common/ExtraImagesManager";
 
 const S3_HOTEL_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/hotel";
@@ -57,7 +58,8 @@ export default function AdminHotelEdit() {
 
         setInitialHotel(data);
 
-        const managerRaw = data?.managerId ?? data?.manager_id ?? data?.managerID ?? "";
+        const managerRaw =
+          data?.managerId ?? data?.manager_id ?? data?.managerID ?? "";
         const minPriceRaw = data?.minPrice ?? data?.min_price ?? "";
 
         setForm({
@@ -66,13 +68,21 @@ export default function AdminHotelEdit() {
           description: data?.description || "",
           email: data?.email || "",
           phone_number: data?.phoneNumber || data?.phone_number || "",
-          manager_id: managerRaw === null || managerRaw === undefined ? "" : String(managerRaw),
-          min_price: minPriceRaw === null || minPriceRaw === undefined ? "" : String(minPriceRaw),
+          manager_id:
+            managerRaw === null || managerRaw === undefined
+              ? ""
+              : String(managerRaw),
+          min_price:
+            minPriceRaw === null || minPriceRaw === undefined
+              ? ""
+              : String(minPriceRaw),
         });
 
         const img = data?.mainImage || data?.main_image || "";
         if (img) {
-          setCurrentImage(img.startsWith("http") ? img : `${S3_HOTEL_BASE}/${img}`);
+          setCurrentImage(
+            img.startsWith("http") ? img : `${S3_HOTEL_BASE}/${img}`,
+          );
         } else {
           setCurrentImage("");
         }
@@ -182,7 +192,9 @@ export default function AdminHotelEdit() {
             </button>
           </div>
 
-          <p className="mt-3 text-gray-600">{err || "Không có dữ liệu hotel."}</p>
+          <p className="mt-3 text-gray-600">
+            {err || "Không có dữ liệu hotel."}
+          </p>
         </div>
       </div>
     );
@@ -194,7 +206,9 @@ export default function AdminHotelEdit() {
         {/* Header responsive */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="text-xl sm:text-2xl font-semibold truncate">{pageTitle}</h2>
+            <h2 className="text-xl sm:text-2xl font-semibold truncate">
+              {pageTitle}
+            </h2>
             <p className="mt-1 text-sm text-gray-500">
               Cập nhật thông tin khách sạn và ảnh đại diện.
             </p>
@@ -326,75 +340,86 @@ export default function AdminHotelEdit() {
 
           {/* Right: image (sticky on desktop) */}
           <div className="col-span-12 lg:col-span-5">
-            <div className="lg:sticky lg:top-6 rounded-2xl border border-gray-200 p-4">
-              <div className="flex items-center justify-between gap-3 mb-3">
-                <div className="text-sm font-semibold">Main image</div>
-                {(preview || currentImage) && (
-                  <a
-                    href={preview || currentImage}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs px-3 py-1 rounded-full border border-gray-200 hover:bg-gray-50"
-                  >
-                    Open
-                  </a>
-                )}
-              </div>
-
-              <div className="w-full aspect-[16/10] rounded-xl bg-gray-100 overflow-hidden">
-                {preview || currentImage ? (
-                  <img
-                    src={preview || currentImage}
-                    alt="hotel"
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-500 text-sm">
-                    No image
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-4">
-                <div className="text-sm font-medium mb-2">
-                  Upload new image (optional)
+            <div className="lg:sticky lg:top-6 space-y-4">
+              {/* Main image card */}
+              <div className="rounded-2xl border border-gray-200 p-4">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="text-sm font-semibold">Main image</div>
+                  {(preview || currentImage) && (
+                    <a
+                      href={preview || currentImage}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs px-3 py-1 rounded-full border border-gray-200 hover:bg-gray-50"
+                    >
+                      Open
+                    </a>
+                  )}
                 </div>
 
-                {/* file input đẹp hơn (responsive) */}
-                <label className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer text-sm">
-                  <span className="inline-block w-2 h-2 rounded-full bg-purple-500" />
-                  <span className="truncate">
-                    {file ? file.name : "Choose an image..."}
-                  </span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={onPickFile}
-                    className="hidden"
-                  />
-                </label>
+                <div className="w-full aspect-[16/10] rounded-xl bg-gray-100 overflow-hidden">
+                  {preview || currentImage ? (
+                    <img
+                      src={preview || currentImage}
+                      alt="hotel"
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-500 text-sm">
+                      No image
+                    </div>
+                  )}
+                </div>
 
-                {file && (
-                  <div className="mt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                    <span className="text-sm text-gray-600 line-clamp-1">
-                      Selected: {file.name}
+                <div className="mt-4">
+                  <div className="text-sm font-medium mb-2">
+                    Upload new image (optional)
+                  </div>
+
+                  <label className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer text-sm">
+                    <span className="inline-block w-2 h-2 rounded-full bg-purple-500" />
+                    <span className="truncate">
+                      {file ? file.name : "Choose an image..."}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => setFile(null)}
-                      className="w-full sm:w-auto text-sm px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={onPickFile}
+                      className="hidden"
+                    />
+                  </label>
 
-                {preview && (
-                  <div className="mt-3 text-xs text-gray-500">
-                    Preview đang hiển thị ảnh mới. Bấm Save để upload.
-                  </div>
-                )}
+                  {file && (
+                    <div className="mt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                      <span className="text-sm text-gray-600 line-clamp-1">
+                        Selected: {file.name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setFile(null)}
+                        className="w-full sm:w-auto text-sm px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+
+                  {preview && (
+                    <div className="mt-3 text-xs text-gray-500">
+                      Preview đang hiển thị ảnh mới. Bấm Save để upload.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Extra images card (responsive) */}
+              <div className="rounded-2xl border border-gray-200 p-3 sm:p-4">
+                <ExtraImagesManager
+                  type="hotel"
+                  ownerId={Number(id)}
+                  readOnly={false}
+                />
               </div>
             </div>
           </div>
