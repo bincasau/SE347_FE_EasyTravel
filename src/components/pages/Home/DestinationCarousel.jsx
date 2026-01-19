@@ -18,16 +18,16 @@ import dest9 from "@/assets/images/home/quynhon.jpg";
 import dest10 from "@/assets/images/home/sapa.jpg";
 
 const destinations = [
-  { id: 1, name: "Cần Thơ", tours: 36, image: dest1 },
-  { id: 2, name: "Đà Lạt", tours: 12, image: dest2 },
-  { id: 3, name: "Hạ Long", tours: 23, image: dest3 },
-  { id: 4, name: "Hội An", tours: 5, image: dest4 },
-  { id: 5, name: "Huế", tours: 3, image: dest5 },
-  { id: 6, name: "Mũi Né", tours: 6, image: dest6 },
-  { id: 7, name: "Ngũ Hành Sơn", tours: 5, image: dest7 },
-  { id: 8, name: "Phú Quốc", tours: 25, image: dest8 },
-  { id: 9, name: "Quy Nhơn", tours: 31, image: dest9 },
-  { id: 10, name: "Sapa", tours: 19, image: dest10 },
+  { id: 1, name: "Cần Thơ", image: dest1 },
+  { id: 2, name: "Đà Lạt", image: dest2 },
+  { id: 3, name: "Hạ Long", image: dest3 },
+  { id: 4, name: "Hội An", image: dest4 },
+  { id: 5, name: "Huế", image: dest5 },
+  { id: 6, name: "Mũi Né", image: dest6 },
+  { id: 7, name: "Ngũ Hành Sơn", image: dest7 },
+  { id: 8, name: "Phú Quốc", image: dest8 },
+  { id: 9, name: "Quy Nhơn", image: dest9 },
+  { id: 10, name: "Sapa", image: dest10 },
 ];
 
 const getItemsPerPage = () => {
@@ -99,9 +99,6 @@ const PopularDestinationCarousel = () => {
         <h2 className="text-2xl md:text-3xl font-semibold text-gray-900">
           {t("home.popularDestinations.title")}
         </h2>
-        <p className="text-gray-500 mt-2 text-sm sm:text-base">
-          {t("home.popularDestinations.subtitle")}
-        </p>
       </div>
 
       <div className="relative flex items-center justify-center">
@@ -134,9 +131,6 @@ const PopularDestinationCarousel = () => {
                 <h3 className="mt-3 sm:mt-4 font-medium text-gray-800 text-sm sm:text-base">
                   {dest.name}
                 </h3>
-                <p className="text-gray-500 text-xs sm:text-sm">
-                  {dest.tours} Tours
-                </p>
               </div>
             ))}
           </div>

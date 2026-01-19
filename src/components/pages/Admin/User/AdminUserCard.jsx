@@ -25,7 +25,7 @@ export default function AdminUserCard({ user, onRemove }) {
 
   const handleRemove = () => {
     const ok = window.confirm(
-      `Are you sure you want to remove user "${user?.username}"?`
+      `Are you sure you want to remove user "${user?.username}"?`,
     );
     if (!ok) return;
     onRemove?.(user.userId);
@@ -57,7 +57,11 @@ export default function AdminUserCard({ user, onRemove }) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 text-sm text-gray-700">
             <div className="space-y-2 min-w-0">
-              <Info icon={<FaUserAlt />} label="Username" value={user?.username} />
+              <Info
+                icon={<FaUserAlt />}
+                label="Username"
+                value={user?.username}
+              />
               <Info
                 icon={<FaEnvelope />}
                 label="Email"
@@ -70,7 +74,11 @@ export default function AdminUserCard({ user, onRemove }) {
                 value={user?.phoneNumber}
                 href={user?.phoneNumber ? `tel:${user.phoneNumber}` : undefined}
               />
-              <Info icon={<FaMapMarkerAlt />} label="Address" value={user?.address} />
+              <Info
+                icon={<FaMapMarkerAlt />}
+                label="Address"
+                value={user?.address}
+              />
             </div>
 
             <div className="space-y-2 min-w-0">
@@ -130,7 +138,9 @@ function Info({ icon, label, value, href }) {
 
   return (
     <div className="flex items-start gap-2 min-w-0">
-      <span className="w-5 h-5 text-orange-400 mt-0.5 flex-shrink-0">{icon}</span>
+      <span className="w-5 h-5 text-orange-400 mt-0.5 flex-shrink-0">
+        {icon}
+      </span>
       <p className="min-w-0">
         <span className="font-semibold">{label}:</span>{" "}
         {href ? (
@@ -138,7 +148,6 @@ function Info({ icon, label, value, href }) {
             href={href}
             className="break-words text-orange-600 hover:underline"
             onClick={(e) => {
-              // tránh click vào link làm trigger event cha (nếu có)
               e.stopPropagation();
             }}
           >
@@ -163,13 +172,15 @@ function RoleBadge({ value }) {
     v === "ADMIN"
       ? "bg-red-100 text-red-700"
       : v === "TOUR_GUIDE"
-      ? "bg-blue-100 text-blue-700"
-      : v === "HOTEL_MANAGER"
-      ? "bg-orange-100 text-orange-700"
-      : "bg-gray-100 text-gray-700";
+        ? "bg-blue-100 text-blue-700"
+        : v === "HOTEL_MANAGER"
+          ? "bg-orange-100 text-orange-700"
+          : "bg-gray-100 text-gray-700";
 
   return (
-    <span className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${cls}`}>
+    <span
+      className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${cls}`}
+    >
       {v}
     </span>
   );

@@ -27,7 +27,6 @@ const Footer = () => {
 
         <hr className="border-t border-white/10 mt-6 mb-8" />
 
-        {/* Grid: 4 cột đều nhau => hết lệch */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-16">
           {/* Navigation */}
           <div>
@@ -96,7 +95,7 @@ const Footer = () => {
               <li className="flex items-start gap-3">
                 <FaMapMarkerAlt className="text-orange-400 mt-0.5 text-lg shrink-0" />
                 <span className="leading-relaxed">
-                  Piazza Napoleone, Lucca, Tuscany
+                  Tầng 8, 123 Nguyễn Huệ, Quận 1, TP.HCM, Việt Nam
                 </span>
               </li>
 
@@ -106,7 +105,7 @@ const Footer = () => {
                   href="tel:+393463685708"
                   className="hover:text-orange-400 transition"
                 >
-                  +39 346 368 5708
+                  +84 28 1234 5678
                 </a>
               </li>
 
@@ -116,7 +115,7 @@ const Footer = () => {
                   href="mailto:italiainlimo@gmail.com"
                   className="hover:text-orange-400 transition break-all"
                 >
-                  italiainlimo@gmail.com
+                  easytravel818@gmail.com
                 </a>
               </li>
             </ul>

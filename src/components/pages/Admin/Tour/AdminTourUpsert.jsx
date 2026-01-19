@@ -52,7 +52,7 @@ function mapTourToForm(tour, tourGuides) {
 
   const firstGuideId =
     Array.isArray(tourGuides) && tourGuides.length > 0
-      ? tourGuides[0]?.userId ?? tourGuides[0]?.id ?? ""
+      ? (tourGuides[0]?.userId ?? tourGuides[0]?.id ?? "")
       : "";
 
   return {
@@ -130,9 +130,9 @@ function validateForm(next) {
     e.percentDiscount = "Giảm giá không được quá 100%.";
   if (durationDays < 1) e.durationDays = "Số ngày phải >= 1.";
   if (availableSeats < 0) e.availableSeats = "Ghế còn không được âm.";
-  if (limitSeats < 0) e.limitSeats = "Tổng ghế không được âm.";
-  if (availableSeats > limitSeats)
-    e.availableSeats = "Ghế còn không được lớn hơn tổng ghế.";
+  if (limitSeats < 1) e.limitSeats = "Số ghế tối thiểu phải >= 1.";
+  if (availableSeats < limitSeats)
+    e.availableSeats = "Ghế còn phải >= số ghế tối thiểu để tour chạy.";
 
   if (!next.startDate) e.startDate = "Vui lòng chọn ngày bắt đầu.";
   if (!next.endDate) e.endDate = "Vui lòng chọn ngày kết thúc.";
@@ -163,7 +163,7 @@ export default function AdminTourUpsert() {
 
   const [form, setForm] = useState(buildEmptyForm());
   const [fieldErrors, setFieldErrors] = useState(() =>
-    validateForm(buildEmptyForm())
+    validateForm(buildEmptyForm()),
   );
   const [touched, setTouched] = useState({});
   const [submitted, setSubmitted] = useState(false);
@@ -305,14 +305,6 @@ export default function AdminTourUpsert() {
       const nextVal = value === "" ? "" : value;
       const next = { ...form, [name]: nextVal };
 
-      if (name === "limitSeats") {
-        const lim = nextVal === "" ? 0 : Number(nextVal);
-        const av = next.availableSeats === "" ? 0 : Number(next.availableSeats);
-        if (!Number.isNaN(lim) && !Number.isNaN(av) && av > lim) {
-          next.availableSeats = lim;
-        }
-      }
-
       applyForm(next);
       return;
     }
@@ -409,7 +401,8 @@ export default function AdminTourUpsert() {
 
     try {
       const saved = await saveTourUpsert(payload, pickedFile, guideId);
-      const savedId = saved?.tourId ?? saved?.id ?? (isEdit ? Number(id) : null);
+      const savedId =
+        saved?.tourId ?? saved?.id ?? (isEdit ? Number(id) : null);
 
       if (
         isEdit &&
@@ -420,7 +413,9 @@ export default function AdminTourUpsert() {
           await adminCancelTourSideEffects(savedId);
         } catch (e3) {
           console.error("Cancel side effects failed:", e3);
-          setErr("Đã lưu trạng thái Hủy tour, nhưng gửi thông báo/hoàn tiền bị lỗi.");
+          setErr(
+            "Đã lưu trạng thái Hủy tour, nhưng gửi thông báo/hoàn tiền bị lỗi.",
+          );
         }
       }
 
@@ -463,10 +458,10 @@ export default function AdminTourUpsert() {
     form.status === "Passed"
       ? "Đã duyệt"
       : form.status === "Activated"
-      ? "Đã kích hoạt"
-      : form.status === "Canceled"
-      ? "Đã hủy"
-      : "Chờ duyệt";
+        ? "Đã kích hoạt"
+        : form.status === "Canceled"
+          ? "Đã hủy"
+          : "Chờ duyệt";
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">

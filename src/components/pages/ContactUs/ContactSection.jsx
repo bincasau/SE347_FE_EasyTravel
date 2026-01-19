@@ -6,7 +6,7 @@ const BRANCHES = {
     label: "Hồ Chí Minh",
     address: "Tầng 8, 123 Nguyễn Huệ, Quận 1, TP.HCM",
     phone: "+84 28 1234 5678",
-    email: "hcm@yourcompany.com",
+    email: "hcm@easytravel.com",
     mapUrl:
       "https://www.google.com/maps/search/?api=1&query=Nguyen+Hue+District+1+Ho+Chi+Minh",
     zaloUrl: "https://zalo.me/0123456789",
@@ -16,7 +16,7 @@ const BRANCHES = {
     label: "Hà Nội",
     address: "Tầng 12, 88 Trần Duy Hưng, Cầu Giấy, Hà Nội",
     phone: "+84 24 1234 5678",
-    email: "hn@yourcompany.com",
+    email: "hn@easytravel.com",
     mapUrl:
       "https://www.google.com/maps/search/?api=1&query=Tran+Duy+Hung+Cau+Giay+Ha+Noi",
     zaloUrl: "https://zalo.me/0123456789",
@@ -154,7 +154,7 @@ export default function ContactSectionNoForm() {
                   <p className="text-xs text-gray-700">
                     Cần báo giá nhanh? Nhấn{" "}
                     <span className="font-semibold">“Yêu cầu báo giá”</span> để
-                    mở Google Form/Typeform (không cần backend).
+                    mở Google Form.
                   </p>
                 </div>
               </div>
@@ -203,7 +203,7 @@ export default function ContactSectionNoForm() {
                   href="https://forms.gle/your-google-form"
                   icon="fa-solid fa-file-signature"
                   label="Yêu cầu báo giá"
-                  sub="Mở form báo giá (Google Form/Typeform)"
+                  sub="Mở form báo giá "
                 />
               </div>
             </div>

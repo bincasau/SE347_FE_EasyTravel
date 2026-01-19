@@ -33,7 +33,7 @@ export const vi = {
     address: "Địa chỉ",
     phone: "Số điện thoại",
     email: "Email",
-    copyright: "© 2025 EasyTravel. Bảo lưu mọi quyền.",
+    copyright: "© 2026 EasyTravel. Bảo lưu mọi quyền.",
   },
 
   // ===== HOME PAGE =====
@@ -57,7 +57,6 @@ export const vi = {
     },
     popularDestinations: {
       title: "Điểm đến phổ biến",
-      subtitle: "Khám phá thế giới với sự tự tin",
     },
     aboutCompany: {
       subtitle: "Chào mừng bạn đến với trang của chúng tôi!",
@@ -111,6 +110,7 @@ export const vi = {
       position: "Giám đốc Marketing, Oliver’s LAB llc.",
     },
   },
+  // ===== HOTEL PAGE =====
   hotelPage: {
     title: "Danh sách khách sạn",
     searchPlaceholder: "Tìm khách sạn...",

@@ -33,7 +33,7 @@ export const en = {
     address: "Address",
     phone: "Phone",
     email: "Email",
-    copyright: "© 2025 EasyTravel. All rights reserved.",
+    copyright: "© 2026 EasyTravel. All rights reserved.",
   },
 
   // ===== HOME PAGE =====
@@ -57,7 +57,6 @@ export const en = {
     },
     popularDestinations: {
       title: "Popular Destinations",
-      subtitle: "Navigate the Globe with Confidence",
     },
     aboutCompany: {
       subtitle: "Welcome to our site!",
@@ -111,15 +110,17 @@ export const en = {
       position: "Marketing Director, Oliver’s LAB llc.",
     },
   },
+  // ===== HOTEL PAGE =====
   hotelPage: {
     title: "Hotels",
     searchPlaceholder: "Search hotels...",
     noResult: "No hotels found.",
     only: "Only",
-    hotline: "HotLine",
+    hotline: "Hotline",
     bookNow: "Book Now",
     night: "night",
     loading: "Loading...",
+    allProvinces: "All provinces",
     filterByProvince: "Filter by province",
     sortBy: "Sort by",
     defaultSort: "Default",

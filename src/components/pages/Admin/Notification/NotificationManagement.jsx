@@ -41,10 +41,15 @@ export default function NotificationManagement() {
       setLoading(true);
 
       const list = await adminGetAllNotifications(filters);
+      console.log("Fetched notifications:", list);
 
       const sorted = (Array.isArray(list) ? list : []).slice().sort((a, b) => {
-        const ida = Number(a?.notificationId ?? a?.notification_id ?? a?.id ?? 0);
-        const idb = Number(b?.notificationId ?? b?.notification_id ?? b?.id ?? 0);
+        const ida = Number(
+          a?.notificationId ?? a?.notification_id ?? a?.id ?? 0,
+        );
+        const idb = Number(
+          b?.notificationId ?? b?.notification_id ?? b?.id ?? 0,
+        );
         return idb - ida;
       });
 
@@ -233,7 +238,9 @@ export default function NotificationManagement() {
           Loading notifications...
         </div>
       ) : items.length === 0 ? (
-        <p className="text-center py-10 text-gray-500">No notifications found.</p>
+        <p className="text-center py-10 text-gray-500">
+          No notifications found.
+        </p>
       ) : (
         <div className="flex flex-col gap-4 sm:gap-5">
           {items.map((n) => {
@@ -241,7 +248,10 @@ export default function NotificationManagement() {
             const isBusy = busyId === id;
 
             return (
-              <div key={id} className={isBusy ? "opacity-70 pointer-events-none" : ""}>
+              <div
+                key={id}
+                className={isBusy ? "opacity-70 pointer-events-none" : ""}
+              >
                 <AdminNotificationCard
                   notif={n}
                   onToggleActive={(nid, s) => handleUpdateStatus(nid, s)}
