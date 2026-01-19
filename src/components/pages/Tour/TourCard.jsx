@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaMapMarkerAlt } from "react-icons/fa";
 import { buildTourSlug } from "@/utils/slug";
@@ -6,16 +6,35 @@ import { buildTourSlug } from "@/utils/slug";
 export default function TourCard({ tour }) {
   const navigate = useNavigate();
 
-  const id = tour.id ?? tour.tourId;
-  const title = tour.title;
-  const price = tour.priceAdult ?? 0;
-  const percentDiscount = tour.percentDiscount ?? 0;
-  const startDate = tour.startDate ?? "";
-  const destination = tour.destination;
-  const description = tour.description ?? "";
+  const id = tour?.tourId ?? tour?.id ?? tour?.tourID ?? null;
+  const title = tour?.title ?? "";
+  const price = tour?.priceAdult ?? 0;
+  const percentDiscount = tour?.percentDiscount ?? 0;
+  const startDate = tour?.startDate ?? "";
+  const destination = tour?.destination ?? "";
+  const description = tour?.description ?? "";
 
   const S3_BASE = "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/tour";
-  const s3ImageUrl = id != null ? `${S3_BASE}/tour_${id}.jpg` : "";
+
+  // backend trả tên ảnh: "tour_1.jpg"
+  const imageName = (tour?.mainImage ?? "").trim();
+
+  // Nếu mainImage có full url thì dùng luôn, còn không thì ghép với S3_BASE
+  const primarySrc = imageName
+    ? imageName.startsWith("http")
+      ? imageName
+      : `${S3_BASE}/${imageName}`
+    : "";
+
+  // fallback local (đặt file này trong public/fallback.jpg)
+  const fallbackSrc = "/fallback.jpg";
+
+  const [imgSrc, setImgSrc] = useState(primarySrc || fallbackSrc);
+
+  // Khi tour đổi -> reset src
+  useEffect(() => {
+    setImgSrc(primarySrc || fallbackSrc);
+  }, [primarySrc]);
 
   const formatCurrency = (val) =>
     Number(val ?? 0).toLocaleString("vi-VN", {
@@ -24,7 +43,7 @@ export default function TourCard({ tour }) {
     });
 
   const discountedPrice =
-    percentDiscount && Number(percentDiscount) > 0
+    Number(percentDiscount) > 0
       ? Number(price) - (Number(price) * Number(percentDiscount)) / 100
       : null;
 
@@ -37,24 +56,19 @@ export default function TourCard({ tour }) {
   return (
     <div
       onClick={handleClick}
-      className="bg-white rounded-2xl overflow-hidden w-full  hover:shadow-lg transition cursor-pointer group"
+      className="bg-white rounded-2xl overflow-hidden w-full hover:shadow-lg transition cursor-pointer group"
     >
       {/* Image */}
       <div className="relative bg-gray-100">
         <img
-          src={s3ImageUrl}
+          src={imgSrc}
           alt={title}
-          className="
-            w-full
-            
-            h-56
-            sm:h-56
-            object-cover
-            group-hover:scale-[1.03]
-            transition-transform
-          "
-          onError={(e) => {
-            e.currentTarget.style.display = "none";
+          className="w-full h-56 sm:h-56 object-cover group-hover:scale-[1.03] transition-transform"
+          loading="lazy"
+          onError={() => {
+            // chặn loop: nếu đã fallback rồi thì thôi
+            if (imgSrc === fallbackSrc) return;
+            setImgSrc(fallbackSrc);
           }}
         />
 

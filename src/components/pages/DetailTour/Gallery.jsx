@@ -15,7 +15,7 @@ export default function TourGallery({ tourId }) {
     setLoading(true);
 
     // ✅ build 5 ảnh theo tourId
-    const list = Array.from({ length: 5 }, (_, idx) => {
+    const list = Array.from({ length: 3 }, (_, idx) => {
       const n = idx + 1;
       return `${S3_BASE}/tour_${tourId}_img_${n}.jpg`;
     });

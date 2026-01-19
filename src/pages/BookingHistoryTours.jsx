@@ -5,7 +5,7 @@ import { buildTourSlug } from "@/utils/slug";
 
 // ✅ Popup: chọn 1 kiểu import đúng với popup.js của bạn
 // (1) Nếu popup.js export default:
-import {popup}  from "@/utils/popup";
+import { popup } from "@/utils/popup";
 // (2) Nếu popup.js export named:
 // import { popup } from "@/utils/popup";
 
@@ -17,7 +17,6 @@ const getToken = () =>
   localStorage.getItem("accessToken") ||
   "";
 
-// ✅ parse + throw error chuẩn
 async function fetchJSON(url, options = {}) {
   const res = await fetch(url, options);
   const text = await res.text();
@@ -26,15 +25,11 @@ async function fetchJSON(url, options = {}) {
     throw new Error(text || `HTTP ${res.status}`);
   }
 
-  // backend của bạn trả JSON: {status,message}
   return text ? JSON.parse(text) : null;
 }
 
-// ✅ Refund API theo bookingId, type = TOUR/HOTEL
 async function refundByBooking(bookingType, bookingId) {
   const token = getToken();
-
-  // Nếu token rỗng -> sẽ bị redirect OAuth, nên chặn từ FE cho rõ
   if (!token) throw new Error("Bạn chưa đăng nhập (thiếu JWT token).");
 
   return fetchJSON(`${BASE_URL}/payment/refund/${bookingType}/${bookingId}`, {
@@ -73,7 +68,12 @@ export default function BookingHistoryTours() {
     number: 0,
   });
 
-  const rows = data.content || [];
+  // ✅ sort: booking gần nhất lên đầu
+  const rows = [...(data.content || [])].sort((a, b) => {
+    const da = new Date(a?.bookingDate || a?.createdAt || 0).getTime();
+    const db = new Date(b?.bookingDate || b?.createdAt || 0).getTime();
+    return db - da;
+  });
 
   const notifySuccess = (msg) => {
     if (popup && typeof popup.success === "function") popup.success(msg);
@@ -138,8 +138,6 @@ export default function BookingHistoryTours() {
     setRefundingId(bookingId);
     try {
       const res = await refundByBooking("TOUR", bookingId);
-
-      // backend trả {status:"success", message:"Hoàn tiền TOUR thành công!"}
       notifySuccess(res?.message || "Refund thành công!");
       load();
     } catch (e) {
@@ -154,7 +152,7 @@ export default function BookingHistoryTours() {
   const canNext = page + 1 < (data.totalPages || 0);
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <h1 className="text-2xl font-semibold">Tour booking history</h1>
 
@@ -230,7 +228,8 @@ export default function BookingHistoryTours() {
             No tour bookings yet.
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          // ✅ 1 hàng 1 card
+          <div className="grid grid-cols-1 gap-4">
             {rows.map((r, idx) => {
               const tour = r?.tour;
 
@@ -253,7 +252,7 @@ export default function BookingHistoryTours() {
               return (
                 <div
                   key={bookingId ?? `${tourId || "tour"}-${idx}`}
-                  className="bg-white border rounded-2xl p-5 shadow-sm"
+                  className="bg-white border rounded-2xl p-4 sm:p-5 shadow-sm"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="text-lg font-semibold text-gray-800">

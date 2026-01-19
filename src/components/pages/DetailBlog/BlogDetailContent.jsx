@@ -22,6 +22,9 @@ export default function BlogDetailContent() {
   const [allBlogs, setAllBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // ✅ NEW: list ảnh extra hợp lệ (tồn tại)
+  const [validExtraImgs, setValidExtraImgs] = useState([]);
+
   const S3_BLOG_MAIN =
     "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/blog";
   const S3_BLOG_IMAGE =
@@ -30,6 +33,15 @@ export default function BlogDetailContent() {
   const blogMainImg = (blogId) => `${S3_BLOG_MAIN}/blog_${blogId}.jpg`;
   const blogExtraImg = (blogId, idx) =>
     `${S3_BLOG_IMAGE}/blog_${blogId}_img_${idx}.jpg`;
+
+  // ✅ helper: check image exists
+  const checkImage = (url) =>
+    new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(true);
+      img.onerror = () => resolve(false);
+      img.src = url;
+    });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -67,10 +79,17 @@ export default function BlogDetailContent() {
         if (slugId !== correctSlugId) {
           navigate(`/detailblog/${correctSlugId}`, { replace: true });
         }
+
+        // ✅ NEW: kiểm tra ảnh extra tồn tại thì mới render
+        const candidates = [1, 2].map((idx) => blogExtraImg(current.id, idx));
+        const okList = await Promise.all(candidates.map(checkImage));
+        const valid = candidates.filter((_, i) => okList[i]);
+        setValidExtraImgs(valid);
       } catch (err) {
         console.error("❌ Lỗi fetch blog:", err);
         setBlog(null);
         setAllBlogs([]);
+        setValidExtraImgs([]);
       } finally {
         setLoading(false);
       }
@@ -153,27 +172,30 @@ export default function BlogDetailContent() {
         />
       </div>
 
-      <div className="mt-10">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {[1, 2].map((idx) => (
-            <div
-              key={idx}
-              className="rounded-2xl overflow-hidden bg-white shadow-sm hover:shadow-md transition"
-            >
-              <img
-                src={blogExtraImg(blog.id, idx)}
-                alt={`blog-${blog.id}-img-${idx}`}
-                className="w-full h-72 object-cover hover:scale-[1.03] transition-transform duration-300"
-                loading="lazy"
-                onError={(e) => {
-                  e.currentTarget.src =
-                    "https://via.placeholder.com/900x600?text=No+Image";
-                }}
-              />
-            </div>
-          ))}
+      {/* ✅ EXTRA IMAGES: chỉ render khi có ảnh thật */}
+      {validExtraImgs.length > 0 && (
+        <div className="mt-10">
+          <div
+            className={`grid grid-cols-1 md:grid-cols-${
+              validExtraImgs.length >= 2 ? "2" : "1"
+            } gap-6`}
+          >
+            {validExtraImgs.map((src, i) => (
+              <div
+                key={`${blog.id}-extra-${i}`}
+                className="rounded-2xl overflow-hidden bg-white shadow-sm hover:shadow-md transition"
+              >
+                <img
+                  src={src}
+                  alt={`blog-${blog.id}-img-${i + 1}`}
+                  className="w-full h-72 object-cover hover:scale-[1.03] transition-transform duration-300"
+                  loading="lazy"
+                />
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="flex flex-wrap items-center justify-between mt-10 border-b border-gray-100 pb-6">
         <div className="flex gap-2 flex-wrap">
@@ -215,8 +237,6 @@ export default function BlogDetailContent() {
           </div>
         </div>
       </div>
-
-      
 
       <div className="mt-14 border-t border-gray-100 pt-8">
         <h3 className="text-xl font-semibold text-gray-800 mb-5">
@@ -313,9 +333,7 @@ export default function BlogDetailContent() {
               disabled={!prevBlog}
               onClick={() => prevBlog && goToBlog(prevBlog)}
               className={`flex items-center gap-2 transition ${
-                !prevBlog
-                  ? "opacity-50 cursor-not-allowed"
-                  : "hover:text-orange-500"
+                !prevBlog ? "opacity-50 cursor-not-allowed" : "hover:text-orange-500"
               }`}
             >
               <span className="text-lg">←</span> Prev
@@ -325,9 +343,7 @@ export default function BlogDetailContent() {
               disabled={!nextBlog}
               onClick={() => nextBlog && goToBlog(nextBlog)}
               className={`flex items-center gap-2 transition ${
-                !nextBlog
-                  ? "opacity-50 cursor-not-allowed"
-                  : "hover:text-orange-500"
+                !nextBlog ? "opacity-50 cursor-not-allowed" : "hover:text-orange-500"
               }`}
             >
               Next <span className="text-lg">→</span>

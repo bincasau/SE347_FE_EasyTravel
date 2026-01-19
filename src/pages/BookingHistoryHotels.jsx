@@ -58,7 +58,6 @@ export default function BookingHistoryHotels() {
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
 
-  // ✅ trạng thái refund theo bookingId
   const [refundingId, setRefundingId] = useState(null);
 
   const [data, setData] = useState({
@@ -68,7 +67,13 @@ export default function BookingHistoryHotels() {
     number: 0,
   });
 
-  const rows = data.content || [];
+  // ✅ sort: booking gần nhất lên đầu
+  const rows = [...(data.content || [])].sort((a, b) => {
+    // ưu tiên createdAt/bookingDate nếu backend có
+    const da = new Date(a?.createdAt || a?.bookingDate || a?.checkInDate || 0).getTime();
+    const db = new Date(b?.createdAt || b?.bookingDate || b?.checkInDate || 0).getTime();
+    return db - da;
+  });
 
   const notifySuccess = (msg) => {
     if (popup && typeof popup.success === "function") popup.success(msg);
@@ -122,7 +127,6 @@ export default function BookingHistoryHotels() {
     setTimeout(() => load(0), 0);
   };
 
-  // ✅ click refund HOTEL
   const onRefund = async (bookingId) => {
     if (!bookingId) return;
 
@@ -135,7 +139,7 @@ export default function BookingHistoryHotels() {
     try {
       const res = await refundByBooking("HOTEL", bookingId);
       notifySuccess(res?.message || "Refund khách sạn thành công!");
-      load(); // refresh list để status cập nhật => nút refund sẽ biến mất
+      load();
     } catch (e) {
       console.error(e);
       notifyError(e?.message || "Refund thất bại!");
@@ -147,14 +151,13 @@ export default function BookingHistoryHotels() {
   const canPrev = page > 0;
   const canNext = page + 1 < (data.totalPages || 0);
 
-  // ✅ helper: status nào thì ẩn Refund
   const isRefundDone = (status) => {
     const s = String(status || "").toLowerCase();
     return s === "refunded" || s === "cancelled" || s === "canceled";
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <h1 className="text-2xl font-semibold">Hotel booking history</h1>
 
@@ -230,7 +233,8 @@ export default function BookingHistoryHotels() {
             No hotel bookings yet.
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          // ✅ 1 hàng 1 card
+          <div className="grid grid-cols-1 gap-4">
             {rows.map((r, idx) => {
               const hotel = r?.hotel;
               const room = r?.room;
@@ -255,7 +259,7 @@ export default function BookingHistoryHotels() {
               return (
                 <div
                   key={bookingId ?? `${hotelId || "hotel"}-${idx}`}
-                  className="bg-white border rounded-2xl p-5 shadow-sm"
+                  className="bg-white border rounded-2xl p-4 sm:p-5 shadow-sm"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="text-lg font-semibold text-gray-800">
@@ -298,7 +302,6 @@ export default function BookingHistoryHotels() {
                       <span />
                     )}
 
-                    {/* ✅ Refund button: refund xong thì mất nút */}
                     {!hideRefund && (
                       <button
                         disabled={!bookingId || isRefunding || loading}

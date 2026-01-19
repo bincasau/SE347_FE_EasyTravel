@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLang } from "@/contexts/LangContext";
 import bgImage from "@/assets/images/home/herosection_bg.png";
@@ -14,6 +14,15 @@ import {
 import { getDepartureLocations } from "@/apis/Tour";
 import { getPublicNotifications } from "@/apis/NotificationAPI";
 
+const hasValidJwt = () => {
+  const raw = localStorage.getItem("jwt");
+  if (!raw) return false;
+  const v = String(raw).trim();
+  if (!v) return false;
+  if (v === "null" || v === "undefined") return false;
+  return true;
+};
+
 const HeroSection = () => {
   const { t } = useLang();
   const navigate = useNavigate();
@@ -24,10 +33,13 @@ const HeroSection = () => {
   const [departure, setDeparture] = useState("");
   const [departureOptions, setDepartureOptions] = useState([]);
   const [loadingDeparture, setLoadingDeparture] = useState(false);
+
   const [broadcastText, setBroadcastText] = useState("");
   const [showBroadcast, setShowBroadcast] = useState(true);
+  const [loadingBroadcast, setLoadingBroadcast] = useState(false);
 
-  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem("jwt"));
+  // ✅ FIX: dùng hasValidJwt thay vì !!getItem
+  const [isLoggedIn, setIsLoggedIn] = useState(() => hasValidJwt());
 
   const minStartDate = useMemo(() => {
     const d = new Date();
@@ -79,49 +91,75 @@ const HeroSection = () => {
       return (tb || 0) - (ta || 0);
     });
 
-  const loadBroadcast = async () => {
+  const loadBroadcast = useCallback(async () => {
+    setLoadingBroadcast(true);
     try {
       const publicList = await getPublicNotifications().catch(() => []);
       const sorted = sortByTimeDesc(Array.isArray(publicList) ? publicList : []);
       const messages = sorted
         .map((x) => (x?.message != null ? String(x.message).trim() : ""))
         .filter(Boolean);
-      const joined = messages.join("  •  ");
-      setBroadcastText(joined);
-      setShowBroadcast(true);
+
+      setBroadcastText(messages.join("  •  "));
     } catch (e) {
       setBroadcastText("");
+    } finally {
+      setLoadingBroadcast(false);
     }
-  };
+  }, []);
 
+  // ✅ BẮT BUỘC: vào trang là load liền (kể cả trước khi syncLogin)
+  useEffect(() => {
+    // ép render 1 frame rồi fetch để tránh race với render đầu
+    const id = requestAnimationFrame(() => {
+      loadBroadcast();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [loadBroadcast]);
+
+  // ✅ Sync login (FIX: dùng hasValidJwt)
   useEffect(() => {
     let alive = true;
     const timers = [];
 
     const syncLogin = () => {
       if (!alive) return;
-      setIsLoggedIn(!!localStorage.getItem("jwt"));
+      setIsLoggedIn(hasValidJwt());
     };
 
-    [0, 200, 600, 1200, 2000].forEach((ms) => {
+    // check nhiều mốc để bắt kịp lúc app set/remove jwt
+    [0, 100, 300, 600, 1200].forEach((ms) => {
       timers.push(setTimeout(syncLogin, ms));
     });
 
     const interval = setInterval(syncLogin, 1000);
 
+    // nếu có tab khác login/logout
+    const onStorage = (e) => {
+      if (e.key === "jwt") syncLogin();
+    };
+    window.addEventListener("storage", onStorage);
+
     return () => {
       alive = false;
       timers.forEach(clearTimeout);
       clearInterval(interval);
+      window.removeEventListener("storage", onStorage);
     };
   }, []);
 
+  // ✅ Khi logout thì refresh broadcast để chắc chắn có text
   useEffect(() => {
-    if (isLoggedIn) return;
+    if (isLoggedIn) {
+      setShowBroadcast(false);
+      return;
+    }
+    setShowBroadcast(true);
     loadBroadcast();
-  }, [isLoggedIn]);
+  }, [isLoggedIn, loadBroadcast]);
 
-  const shouldShowTicker = !isLoggedIn && showBroadcast && !!broadcastText?.trim();
+  // ✅ Hiện khung broadcast ngay cả khi chưa có text (đang loading) để user thấy “nó có tồn tại”
+  const shouldShowTicker = !isLoggedIn && showBroadcast;
 
   const handleSearch = () => {
     const payload = {
@@ -185,11 +223,15 @@ const HeroSection = () => {
                   <div
                     className="whitespace-nowrap text-sm sm:text-base text-white/95 font-medium inline-block"
                     style={{
-                      animation: "heroMarquee 18s linear infinite",
+                      animation: broadcastText?.trim() ? "heroMarquee 18s linear infinite" : "none",
                       willChange: "transform",
                     }}
                   >
-                    {broadcastText}
+                    {loadingBroadcast
+                      ? "Đang tải thông báo..."
+                      : broadcastText?.trim()
+                      ? broadcastText
+                      : "Chưa có thông báo công khai"}
                   </div>
                 </div>
               </div>

@@ -22,6 +22,9 @@ import Pagination from "../utils/Pagination";
 import BookingVideo from "../components/pages/Tour/Video";
 import Tour from "../models/Tour";
 
+// ✅ ScrollToTop component (bạn đã có)
+import ScrollToTop from "../utils/ScrollToTop";
+
 const pad2 = (n) => String(n).padStart(2, "0");
 
 const toYMDFromDateObj = (d) => {
@@ -59,7 +62,10 @@ const dmyToYMD = (dmy) => {
   )
     return "";
 
-  return `${String(yyyy).padStart(4, "0")}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
+  return `${String(yyyy).padStart(4, "0")}-${String(mm).padStart(
+    2,
+    "0",
+  )}-${String(dd).padStart(2, "0")}`;
 };
 
 const formatDMYInput = (value) => {
@@ -222,6 +228,11 @@ export default function TourPage() {
   const location = useLocation();
   const nav = useNavigate();
 
+  // ✅ state change scroll (pagination/filter/sort/search/date là state)
+  const scrollTop = useCallback(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+  }, []);
+
   const minDate = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() + 2);
@@ -292,21 +303,14 @@ export default function TourPage() {
         ? String(heroDurRaw)
         : "";
 
-    const heroKey = JSON.stringify({
-      heroStart,
-      heroEnd,
-      heroLoc,
-      heroDur,
-    });
-
+    const heroKey = JSON.stringify({ heroStart, heroEnd, heroLoc, heroDur });
     if (lastHeroKeyRef.current === heroKey) return;
     lastHeroKeyRef.current = heroKey;
 
     setCurrentPage(1);
 
     if (heroStart) {
-      const finalStart =
-        compareYMD(heroStart, minDate) < 0 ? minDate : heroStart;
+      const finalStart = compareYMD(heroStart, minDate) < 0 ? minDate : heroStart;
       setSelectedDate(finalStart);
       setDraftDate(ymdToDMY(finalStart));
       const dt = new Date(finalStart);
@@ -335,7 +339,9 @@ export default function TourPage() {
     setSearchTerm("");
     setDebouncedSearchTerm("");
     setDraftSearch("");
-  }, [location.state, minDate]);
+
+    scrollTop();
+  }, [location.state, minDate, scrollTop]);
 
   useEffect(() => {
     const loadLocations = async () => {
@@ -372,7 +378,8 @@ export default function TourPage() {
   const applySearchDraft = useCallback(() => {
     setSearchTerm(draftSearch);
     setCurrentPage(1);
-  }, [draftSearch]);
+    scrollTop();
+  }, [draftSearch, scrollTop]);
 
   const closeDesktopPop = () => {
     setShowFilter(false);
@@ -386,7 +393,8 @@ export default function TourPage() {
     setCurrentPage(1);
     setShowFilter(false);
     setMobilePanel(null);
-  }, [draftLocation, draftDuration]);
+    scrollTop();
+  }, [draftLocation, draftDuration, scrollTop]);
 
   const clearFilterDraft = useCallback(() => {
     setDraftLocation("");
@@ -400,7 +408,8 @@ export default function TourPage() {
     setDraftEndDate("");
     setDateError("");
     setCurrentPage(1);
-  }, []);
+    scrollTop();
+  }, [scrollTop]);
 
   const commitDateRange = useCallback(
     (startDMY, endDMY) => {
@@ -416,6 +425,7 @@ export default function TourPage() {
         setCurrentPage(1);
         closeDesktopPop();
         setMobilePanel(null);
+        scrollTop();
         return;
       }
 
@@ -458,8 +468,9 @@ export default function TourPage() {
       setCurrentPage(1);
       closeDesktopPop();
       setMobilePanel(null);
+      scrollTop();
     },
-    [minDate],
+    [minDate, scrollTop],
   );
 
   const onCalendarPick = useCallback(
@@ -467,9 +478,7 @@ export default function TourPage() {
       const finalStart =
         startYMD && compareYMD(startYMD, minDate) < 0 ? minDate : startYMD;
       const finalEnd =
-        endYMD && finalStart && compareYMD(endYMD, finalStart) < 0
-          ? ""
-          : endYMD;
+        endYMD && finalStart && compareYMD(endYMD, finalStart) < 0 ? "" : endYMD;
 
       setDraftDate(finalStart ? ymdToDMY(finalStart) : "");
       setDraftEndDate(finalEnd ? ymdToDMY(finalEnd) : "");
@@ -618,6 +627,7 @@ export default function TourPage() {
     setMobilePanel(null);
 
     nav("/tours", { replace: true, state: null });
+    scrollTop();
   };
 
   const filterCount =
@@ -635,6 +645,9 @@ export default function TourPage() {
 
   return (
     <div className="bg-gray-50 py-10 sm:py-12 flex flex-col items-center min-h-screen">
+      {/* ✅ route change scroll */}
+      <ScrollToTop />
+
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 relative z-30">
         <div className="flex items-center justify-between gap-3 mb-6">
           <h2 className="text-3xl sm:text-4xl font-semibold text-gray-800">
@@ -674,9 +687,7 @@ export default function TourPage() {
               type="button"
               onClick={() => {
                 setDraftDate(selectedDate ? ymdToDMY(selectedDate) : "");
-                setDraftEndDate(
-                  selectedEndDate ? ymdToDMY(selectedEndDate) : "",
-                );
+                setDraftEndDate(selectedEndDate ? ymdToDMY(selectedEndDate) : "");
                 setDateError("");
                 const base = selectedDate || minDate;
                 const dt = new Date(base);
@@ -712,24 +723,19 @@ export default function TourPage() {
               onClick={() => setMobilePanel("sort")}
               className="bg-white border border-gray-300 rounded-xl py-2 flex items-center justify-center gap-2"
             >
-              {sortOrder === "asc" ? (
-                <FaSortAmountUpAlt />
-              ) : (
-                <FaSortAmountDownAlt />
-              )}
+              {sortOrder === "asc" ? <FaSortAmountUpAlt /> : <FaSortAmountDownAlt />}
               <span className="text-sm">Sort</span>
             </button>
           </div>
 
           <div className="hidden sm:flex items-center justify-end gap-2">
+            {/* Date picker */}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => {
                   setDraftDate(selectedDate ? ymdToDMY(selectedDate) : "");
-                  setDraftEndDate(
-                    selectedEndDate ? ymdToDMY(selectedEndDate) : "",
-                  );
+                  setDraftEndDate(selectedEndDate ? ymdToDMY(selectedEndDate) : "");
                   setDateError("");
                   const base = selectedDate || minDate;
                   const dt = new Date(base);
@@ -785,11 +791,6 @@ export default function TourPage() {
                     </div>
                   </div>
 
-                  <div className="text-xs text-gray-500 mt-2">
-                    Min start:{" "}
-                    <span className="font-semibold">{ymdToDMY(minDate)}</span>
-                  </div>
-
                   {dateError && (
                     <div className="text-sm text-red-600 mt-2">{dateError}</div>
                   )}
@@ -828,6 +829,7 @@ export default function TourPage() {
               )}
             </div>
 
+            {/* Filter */}
             <div className="relative">
               <button
                 type="button"
@@ -918,6 +920,7 @@ export default function TourPage() {
               )}
             </div>
 
+            {/* Sort */}
             <div className="relative">
               <button
                 type="button"
@@ -954,6 +957,7 @@ export default function TourPage() {
                         setSortOrder(k);
                         setCurrentPage(1);
                         setShowSort(false);
+                        scrollTop();
                       }}
                     >
                       {label}
@@ -998,7 +1002,10 @@ export default function TourPage() {
           <Pagination
             totalPages={totalPages}
             currentPage={currentPage}
-            onPageChange={setCurrentPage}
+            onPageChange={(p) => {
+              setCurrentPage(p);
+              scrollTop();
+            }}
             visiblePages={getVisiblePages()}
           />
         )}
@@ -1067,11 +1074,6 @@ export default function TourPage() {
                         className="w-full border rounded-2xl px-4 py-3 text-sm"
                       />
                     </div>
-                  </div>
-
-                  <div className="text-xs text-gray-500">
-                    Min start:{" "}
-                    <span className="font-semibold">{ymdToDMY(minDate)}</span>
                   </div>
 
                   {dateError && (
@@ -1156,7 +1158,9 @@ export default function TourPage() {
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      onClick={applyFilterDraft}
+                      onClick={() => {
+                        applyFilterDraft();
+                      }}
                       className="py-3 rounded-2xl bg-orange-500 text-white font-semibold"
                     >
                       Apply
@@ -1198,6 +1202,7 @@ export default function TourPage() {
                         setSortOrder(k);
                         setCurrentPage(1);
                         setMobilePanel(null);
+                        scrollTop();
                       }}
                       className={`w-full text-left px-4 py-4 rounded-2xl border ${
                         sortOrder === k

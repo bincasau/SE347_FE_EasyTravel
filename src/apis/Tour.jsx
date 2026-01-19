@@ -75,12 +75,7 @@ export async function searchByStartDate(
   return res.json();
 }
 
-/**
- * ========================================================
- * 📄 5. Lấy tour mặc định (có phân trang + sort)
- * API: /tours?page=0&size=8&sort=recent
- * ========================================================
- */
+
 export async function getTours(page, size, sort) {
   const url = `${API_BASE}/tours?page=${page}&size=${size}&sort=${sort}`;
   const res = await fetch(url);
@@ -94,7 +89,7 @@ export async function getDepartureLocations() {
 
     const data = await res.json();
 
-    // ✅ TRIM để tránh "Hà Nội " / null / undefined
+
     if (!Array.isArray(data)) return [];
     return data
       .map((x) => String(x ?? "").trim())
@@ -105,9 +100,7 @@ export async function getDepartureLocations() {
   }
 }
 
-// =====================================
-// 6. Lấy toàn bộ tour (dùng cho admin list)
-// =====================================
+
 export async function getAllTours() {
   let allTours = [];
   let url = `${API_BASE}/tours`;
@@ -160,7 +153,7 @@ async function fetchJsonAuth(url, options = {}) {
   return res.json();
 }
 
-/* GET public */
+
 export async function getTourFullById(id) {
   const [tour, itRes, imgRes, tgRes] = await Promise.all([
     fetchJsonPublic(`${API_BASE}/tours/${id}`),
@@ -177,7 +170,7 @@ export async function getTourFullById(id) {
   };
 }
 
-/* POST auth (upsert) */
+
 export async function saveTourUpsert(tour, file, guideIds) {
   const formData = new FormData();
 
@@ -194,7 +187,7 @@ export async function saveTourUpsert(tour, file, guideIds) {
   });
 }
 
-/* DELETE auth */
+
 export async function deleteTour(tourId) {
   const res = await fetch(`${API_BASE}/admin/tour/${tourId}`, {
     method: "DELETE",
@@ -233,13 +226,7 @@ export async function getMonthlyTourStats(month, year) {
   return res.json();
 }
 
-/**
- * ========================================================
- * ✅ FILTER TOURS (GỘP 1 ENDPOINT)
- * API:
- * /tours/search/filterTours{?keyword,startDate,durationDay,departureLocation,status,page,size,sort*}
- * ========================================================
- */
+
 export async function filterTours({
   keyword = "",
   startDate = "",

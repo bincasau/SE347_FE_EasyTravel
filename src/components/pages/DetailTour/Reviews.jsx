@@ -290,7 +290,7 @@ export default function Reviews({ tourId }) {
   return (
     <section className="max-w-6xl mx-auto px-6 py-10">
       <h2 className="text-5xl font-semibold text-gray-800 mb-6">
-        Reviews ({reviews.length})
+        Reviews 
       </h2>
 
       {/* LIST */}
