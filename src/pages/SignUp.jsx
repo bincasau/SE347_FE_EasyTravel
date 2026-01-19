@@ -60,148 +60,200 @@ export default function SignupModal({ onClose, onOpenLogin }) {
   }
 
   return (
-    <div className="w-[92%] max-w-2xl rounded-2xl bg-white p-6 sm:p-8 shadow-2xl relative animate-fadeIn">
-      {/* Close */}
-      <button
-        onClick={onClose}
-        className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+    <div className="w-full max-w-2xl">
+      {/* ✅ LỚP NGOÀI: bo góc chuẩn + không bị vuông khi có scrollbar */}
+      <div
+        className="
+          relative w-full
+          rounded-2xl overflow-hidden
+          bg-white shadow-2xl
+          animate-fadeIn
+        "
       >
-        ✕
-      </button>
-
-      <h3 className="text-2xl sm:text-3xl font-semibold text-gray-900 mb-2 text-center">
-        Create your account
-      </h3>
-      <p className="text-sm text-gray-500 mb-4 text-center">
-        Sign up to start your journey with EasyTravel.
-      </p>
-
-      {/* Error */}
-      {err && (
-        <p className="text-sm text-red-600 bg-red-50 p-2 rounded-lg mb-3 text-center">
-          {err}
-        </p>
-      )}
-
-      {/* Success */}
-      {success && (
-        <p className="text-sm text-green-600 bg-green-50 p-2 rounded-lg mb-3 text-center">
-          {success}
-        </p>
-      )}
-
-      <form className="space-y-4" onSubmit={handleSubmit}>
-        {/* Name + Email */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="Full name" name="name" />
-          <Field label="Email" name="email" type="email" />
-        </div>
-
-        {/* Phone + Username */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Phone: KHÔNG BẮT BUỘC */}
-          <Field label="Phone number" name="phoneNumber" required={false} />
-          {/* Username: BẮT BUỘC */}
-          <Field label="Username" name="username" />
-        </div>
-
-        {/* Password + Confirm Password */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Password */}
-          <div className="space-y-1 relative">
-            <label className="text-sm font-medium text-gray-800">
-              Password <span className="text-red-500">*</span>
-            </label>
-            <input
-              name="password"
-              type={showPass ? "text" : "password"}
-              placeholder="Create a password"
-              required
-              minLength={8}
-              className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5"
-            />
-            <span
-              onClick={() => setShowPass(!showPass)}
-              className="absolute right-4 top-10 cursor-pointer text-gray-500 hover:text-gray-700"
-            >
-              {/* Bạn có thể thêm icon con mắt ở đây */}
-            </span>
-          </div>
-
-          {/* Confirm Password */}
-          <div className="space-y-1 relative">
-            <label className="text-sm font-medium text-gray-800">
-              Confirm password <span className="text-red-500">*</span>
-            </label>
-            <input
-              name="confirmPassword"
-              type={showConfirmPass ? "text" : "password"}
-              placeholder="Re-enter your password"
-              required
-              className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5"
-            />
-            <span
-              onClick={() => setShowConfirmPass(!showConfirmPass)}
-              className="absolute right-4 top-10 cursor-pointer text-gray-500 hover:text-gray-700"
-            >
-              {/* Icon con mắt thứ 2 */}
-            </span>
-          </div>
-        </div>
-
-        {/* DOB + Address (NOT REQUIRED) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field
-            label="Date of birth"
-            name="dob"
-            type="date"
-            required={false}
-          />
-          <Field label="Address" name="address" required={false} />
-        </div>
-
-        {/* Gender — NOT REQUIRED, ONLY Male/Female */}
-        <div className="space-y-1">
-          <label className="text-sm font-medium text-gray-800">
-            Gender
-            {/* Không có dấu sao vì không bắt buộc */}
-          </label>
-          <select
-            name="gender"
-            className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5"
-          >
-            <option value="">Select gender</option>
-            <option value="M">Male</option>
-            <option value="F">Female</option>
-          </select>
-        </div>
-
-        {/* Submit */}
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-full bg-orange-500 text-white font-semibold py-3 hover:bg-orange-400 transition disabled:opacity-60"
+        {/* ✅ LỚP TRONG: scroll nằm ở đây (không làm mất bo góc) */}
+        <div
+          className="
+            max-h-[85vh] overflow-y-auto
+            px-4 py-5 sm:px-6 sm:py-6 md:px-8 md:py-7
+            pr-3 sm:pr-4
+          "
         >
-          {loading ? "Creating account..." : "Sign Up"}
-        </button>
-
-        <div className="flex items-center gap-3 pt-1">
-          <div className="h-px flex-1 bg-gray-200" />
-          <span className="text-xs text-gray-500">OR</span>
-          <div className="h-px flex-1 bg-gray-200" />
-        </div>
-
-        <p className="text-center text-sm text-gray-600">
-          Already have an account?{" "}
+          {/* Close */}
           <button
-            type="button"
-            onClick={handleSwitchToLogin}
-            className="font-semibold text-orange-500 hover:underline"
+            onClick={onClose}
+            className="
+              absolute right-3 top-3 sm:right-4 sm:top-4
+              text-gray-400 hover:text-gray-600
+              p-2 rounded-full
+              touch-manipulation
+            "
+            aria-label="Close"
           >
-            Login
+            ✕
           </button>
-        </p>
-      </form>
+
+          <h3 className="text-xl sm:text-2xl md:text-3xl font-semibold text-gray-900 mb-2 text-center">
+            Create your account
+          </h3>
+          <p className="text-xs sm:text-sm text-gray-500 mb-4 text-center">
+            Sign up to start your journey with EasyTravel.
+          </p>
+
+          {/* Error */}
+          {err && (
+            <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg mb-3 text-center">
+              {err}
+            </p>
+          )}
+
+          {/* Success */}
+          {success && (
+            <p className="text-sm text-green-600 bg-green-50 px-3 py-2 rounded-lg mb-3 text-center">
+              {success}
+            </p>
+          )}
+
+          <form className="space-y-4" onSubmit={handleSubmit}>
+            {/* Name + Email */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+              <Field label="Full name" name="name" />
+              <Field label="Email" name="email" type="email" />
+            </div>
+
+            {/* Phone + Username */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+              <Field label="Phone number" name="phoneNumber" required={false} />
+              <Field label="Username" name="username" />
+            </div>
+
+            {/* Password + Confirm Password */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+              {/* Password */}
+              <div className="space-y-1 relative">
+                <label className="text-sm font-medium text-gray-800">
+                  Password <span className="text-red-500">*</span>
+                </label>
+                <input
+                  name="password"
+                  type={showPass ? "text" : "password"}
+                  placeholder="Create a password"
+                  required
+                  minLength={8}
+                  className="
+                    w-full rounded-xl border border-gray-300 bg-white
+                    px-4 py-3 sm:py-2.5
+                    text-base sm:text-sm
+                    focus:outline-none focus:ring-2 focus:ring-orange-300
+                  "
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPass(!showPass)}
+                  className="
+                    absolute right-3 top-9 sm:top-8
+                    px-2 py-1
+                    text-sm text-gray-500 hover:text-gray-700
+                  "
+                >
+                  {showPass ? "Hide" : "Show"}
+                </button>
+              </div>
+
+              {/* Confirm Password */}
+              <div className="space-y-1 relative">
+                <label className="text-sm font-medium text-gray-800">
+                  Confirm password <span className="text-red-500">*</span>
+                </label>
+                <input
+                  name="confirmPassword"
+                  type={showConfirmPass ? "text" : "password"}
+                  placeholder="Re-enter your password"
+                  required
+                  className="
+                    w-full rounded-xl border border-gray-300 bg-white
+                    px-4 py-3 sm:py-2.5
+                    text-base sm:text-sm
+                    focus:outline-none focus:ring-2 focus:ring-orange-300
+                  "
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPass(!showConfirmPass)}
+                  className="
+                    absolute right-3 top-9 sm:top-8
+                    px-2 py-1
+                    text-sm text-gray-500 hover:text-gray-700
+                  "
+                >
+                  {showConfirmPass ? "Hide" : "Show"}
+                </button>
+              </div>
+            </div>
+
+            {/* DOB + Address */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+              <Field
+                label="Date of birth"
+                name="dob"
+                type="date"
+                required={false}
+              />
+              <Field label="Address" name="address" required={false} />
+            </div>
+
+            {/* Gender — NOT REQUIRED, ONLY Male/Female */}
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-800">Gender</label>
+              <select
+                name="gender"
+                className="
+                  w-full rounded-xl border border-gray-300 bg-white
+                  px-4 py-3 sm:py-2.5
+                  text-base sm:text-sm
+                  focus:outline-none focus:ring-2 focus:ring-orange-300
+                "
+              >
+                <option value="">Select gender</option>
+                <option value="M">Male</option>
+                <option value="F">Female</option>
+              </select>
+            </div>
+
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="
+                w-full rounded-full bg-orange-500 text-white font-semibold
+                py-3
+                text-base sm:text-sm
+                hover:bg-orange-400 transition
+                disabled:opacity-60
+                touch-manipulation
+              "
+            >
+              {loading ? "Creating account..." : "Sign Up"}
+            </button>
+
+            <div className="flex items-center gap-3 pt-1">
+              <div className="h-px flex-1 bg-gray-200" />
+              <span className="text-xs text-gray-500">OR</span>
+              <div className="h-px flex-1 bg-gray-200" />
+            </div>
+
+            <p className="text-center text-sm text-gray-600">
+              Already have an account?{" "}
+              <button
+                type="button"
+                onClick={handleSwitchToLogin}
+                className="font-semibold text-orange-500 hover:underline"
+              >
+                Login
+              </button>
+            </p>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }
@@ -219,7 +271,12 @@ function Field({ label, name, type = "text", placeholder, required = true }) {
         type={type}
         required={required}
         placeholder={placeholder}
-        className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5"
+        className="
+          w-full rounded-xl border border-gray-300 bg-white
+          px-4 py-3 sm:py-2.5
+          text-base sm:text-sm
+          focus:outline-none focus:ring-2 focus:ring-orange-300
+        "
       />
     </div>
   );
