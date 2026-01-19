@@ -1,4 +1,10 @@
-import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import React, {
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   FaFilter,
@@ -46,13 +52,20 @@ const dmyToYMD = (dmy) => {
   if (dd < 1 || dd > 31) return "";
 
   const dt = new Date(yyyy, mm - 1, dd);
-  if (dt.getFullYear() !== yyyy || dt.getMonth() !== mm - 1 || dt.getDate() !== dd) return "";
+  if (
+    dt.getFullYear() !== yyyy ||
+    dt.getMonth() !== mm - 1 ||
+    dt.getDate() !== dd
+  )
+    return "";
 
   return `${String(yyyy).padStart(4, "0")}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
 };
 
 const formatDMYInput = (value) => {
-  const digits = String(value || "").replace(/\D/g, "").slice(0, 8);
+  const digits = String(value || "")
+    .replace(/\D/g, "")
+    .slice(0, 8);
   const d = digits.slice(0, 2);
   const m = digits.slice(2, 4);
   const y = digits.slice(4, 8);
@@ -62,14 +75,16 @@ const formatDMYInput = (value) => {
   return out;
 };
 
-const startOfDayTs = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+const startOfDayTs = (d) =>
+  new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 
 const compareYMD = (a, b) => {
   if (a === b) return 0;
   return a < b ? -1 : 1;
 };
 
-const addMonths = (dateObj, delta) => new Date(dateObj.getFullYear(), dateObj.getMonth() + delta, 1);
+const addMonths = (dateObj, delta) =>
+  new Date(dateObj.getFullYear(), dateObj.getMonth() + delta, 1);
 
 const monthLabel = (dateObj) => {
   const m = dateObj.toLocaleString("en-US", { month: "long" });
@@ -79,7 +94,14 @@ const monthLabel = (dateObj) => {
 const daysInMonth = (y, mIndex) => new Date(y, mIndex + 1, 0).getDate();
 const firstDayOfMonth = (y, mIndex) => new Date(y, mIndex, 1).getDay();
 
-function CalendarRangePicker({ month, onMonthChange, minYMD, startYMD, endYMD, onPick }) {
+function CalendarRangePicker({
+  month,
+  onMonthChange,
+  minYMD,
+  startYMD,
+  endYMD,
+  onPick,
+}) {
   const y = month.getFullYear();
   const m = month.getMonth();
 
@@ -163,15 +185,16 @@ function CalendarRangePicker({ month, onMonthChange, minYMD, startYMD, endYMD, o
           const isEnd = endYMD && ymd === endYMD;
           const between = isBetween(ts);
 
-          const base = "h-9 rounded-xl text-sm flex items-center justify-center select-none transition";
+          const base =
+            "h-9 rounded-xl text-sm flex items-center justify-center select-none transition";
 
           const cls = disabled
             ? `${base} text-gray-300 cursor-not-allowed`
             : isStart || isEnd
-            ? `${base} bg-orange-500 text-white font-semibold`
-            : between
-            ? `${base} bg-orange-100 text-gray-800`
-            : `${base} hover:bg-gray-100 text-gray-700`;
+              ? `${base} bg-orange-500 text-white font-semibold`
+              : between
+                ? `${base} bg-orange-100 text-gray-800`
+                : `${base} hover:bg-gray-100 text-gray-700`;
 
           return (
             <button
@@ -264,7 +287,10 @@ export default function TourPage() {
     const heroDurRaw = s.durationDay ?? s.durationDays ?? "";
 
     const heroLoc = heroLocRaw ? String(heroLocRaw) : "";
-    const heroDur = heroDurRaw !== undefined && heroDurRaw !== null && heroDurRaw !== "" ? String(heroDurRaw) : "";
+    const heroDur =
+      heroDurRaw !== undefined && heroDurRaw !== null && heroDurRaw !== ""
+        ? String(heroDurRaw)
+        : "";
 
     const heroKey = JSON.stringify({
       heroStart,
@@ -279,7 +305,8 @@ export default function TourPage() {
     setCurrentPage(1);
 
     if (heroStart) {
-      const finalStart = compareYMD(heroStart, minDate) < 0 ? minDate : heroStart;
+      const finalStart =
+        compareYMD(heroStart, minDate) < 0 ? minDate : heroStart;
       setSelectedDate(finalStart);
       setDraftDate(ymdToDMY(finalStart));
       const dt = new Date(finalStart);
@@ -317,7 +344,18 @@ export default function TourPage() {
         setLocations(["", ...(Array.isArray(list) ? list : [])]);
       } catch (error) {
         console.error("Error fetching departure locations:", error);
-        setLocations(["", "Đà Lạt", "Phú Quốc", "Sa Pa", "Hội An", "Nha Trang", "Hạ Long", "Đà Nẵng", "Huế", "Côn Đảo"]);
+        setLocations([
+          "",
+          "Đà Lạt",
+          "Phú Quốc",
+          "Sa Pa",
+          "Hội An",
+          "Nha Trang",
+          "Hạ Long",
+          "Đà Nẵng",
+          "Huế",
+          "Côn Đảo",
+        ]);
       }
     };
     loadLocations();
@@ -392,7 +430,8 @@ export default function TourPage() {
         return;
       }
 
-      const finalStart = startYMD && compareYMD(startYMD, minDate) < 0 ? minDate : startYMD;
+      const finalStart =
+        startYMD && compareYMD(startYMD, minDate) < 0 ? minDate : startYMD;
 
       let endYMD = endTrim ? dmyToYMD(endTrim) : "";
       if (endTrim && !endYMD) {
@@ -420,19 +459,23 @@ export default function TourPage() {
       closeDesktopPop();
       setMobilePanel(null);
     },
-    [minDate]
+    [minDate],
   );
 
   const onCalendarPick = useCallback(
     ({ startYMD, endYMD }) => {
-      const finalStart = startYMD && compareYMD(startYMD, minDate) < 0 ? minDate : startYMD;
-      const finalEnd = endYMD && finalStart && compareYMD(endYMD, finalStart) < 0 ? "" : endYMD;
+      const finalStart =
+        startYMD && compareYMD(startYMD, minDate) < 0 ? minDate : startYMD;
+      const finalEnd =
+        endYMD && finalStart && compareYMD(endYMD, finalStart) < 0
+          ? ""
+          : endYMD;
 
       setDraftDate(finalStart ? ymdToDMY(finalStart) : "");
       setDraftEndDate(finalEnd ? ymdToDMY(finalEnd) : "");
       setDateError("");
     },
-    [minDate]
+    [minDate],
   );
 
   useEffect(() => {
@@ -472,8 +515,8 @@ export default function TourPage() {
           t.percentDiscount,
           t.limitSeats,
           t._links?.images?.href || null,
-          t.durationDays
-        )
+          t.durationDays,
+        ),
     );
   };
 
@@ -533,9 +576,18 @@ export default function TourPage() {
     if (currentPage === 2) return [1, 2, 3, 4];
     if (currentPage === 3) return [1, 2, 3, 4, 5];
 
-    if (currentPage === totalPages) return [totalPages - 2, totalPages - 1, totalPages];
-    if (currentPage === totalPages - 1) return [totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
-    if (currentPage === totalPages - 2) return [totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    if (currentPage === totalPages)
+      return [totalPages - 2, totalPages - 1, totalPages];
+    if (currentPage === totalPages - 1)
+      return [totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    if (currentPage === totalPages - 2)
+      return [
+        totalPages - 4,
+        totalPages - 3,
+        totalPages - 2,
+        totalPages - 1,
+        totalPages,
+      ];
 
     let start = currentPage - 2;
     let end = currentPage + 2;
@@ -585,7 +637,9 @@ export default function TourPage() {
     <div className="bg-gray-50 py-10 sm:py-12 flex flex-col items-center min-h-screen">
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 relative z-30">
         <div className="flex items-center justify-between gap-3 mb-6">
-          <h2 className="text-3xl sm:text-4xl font-podcast text-gray-800">Tour Packages</h2>
+          <h2 className="text-3xl sm:text-4xl font-semibold text-gray-800">
+            Tour Packages
+          </h2>
 
           {filterCount > 0 && (
             <button
@@ -620,7 +674,9 @@ export default function TourPage() {
               type="button"
               onClick={() => {
                 setDraftDate(selectedDate ? ymdToDMY(selectedDate) : "");
-                setDraftEndDate(selectedEndDate ? ymdToDMY(selectedEndDate) : "");
+                setDraftEndDate(
+                  selectedEndDate ? ymdToDMY(selectedEndDate) : "",
+                );
                 setDateError("");
                 const base = selectedDate || minDate;
                 const dt = new Date(base);
@@ -656,7 +712,11 @@ export default function TourPage() {
               onClick={() => setMobilePanel("sort")}
               className="bg-white border border-gray-300 rounded-xl py-2 flex items-center justify-center gap-2"
             >
-              {sortOrder === "asc" ? <FaSortAmountUpAlt /> : <FaSortAmountDownAlt />}
+              {sortOrder === "asc" ? (
+                <FaSortAmountUpAlt />
+              ) : (
+                <FaSortAmountDownAlt />
+              )}
               <span className="text-sm">Sort</span>
             </button>
           </div>
@@ -667,7 +727,9 @@ export default function TourPage() {
                 type="button"
                 onClick={() => {
                   setDraftDate(selectedDate ? ymdToDMY(selectedDate) : "");
-                  setDraftEndDate(selectedEndDate ? ymdToDMY(selectedEndDate) : "");
+                  setDraftEndDate(
+                    selectedEndDate ? ymdToDMY(selectedEndDate) : "",
+                  );
                   setDateError("");
                   const base = selectedDate || minDate;
                   const dt = new Date(base);
@@ -689,7 +751,9 @@ export default function TourPage() {
 
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <div className="text-xs text-gray-600 mb-1">Start (dd/mm/yyyy)</div>
+                      <div className="text-xs text-gray-600 mb-1">
+                        Start (dd/mm/yyyy)
+                      </div>
                       <input
                         type="text"
                         inputMode="numeric"
@@ -704,7 +768,9 @@ export default function TourPage() {
                     </div>
 
                     <div>
-                      <div className="text-xs text-gray-600 mb-1">End (dd/mm/yyyy)</div>
+                      <div className="text-xs text-gray-600 mb-1">
+                        End (dd/mm/yyyy)
+                      </div>
                       <input
                         type="text"
                         inputMode="numeric"
@@ -720,10 +786,13 @@ export default function TourPage() {
                   </div>
 
                   <div className="text-xs text-gray-500 mt-2">
-                    Min start: <span className="font-semibold">{ymdToDMY(minDate)}</span>
+                    Min start:{" "}
+                    <span className="font-semibold">{ymdToDMY(minDate)}</span>
                   </div>
 
-                  {dateError && <div className="text-sm text-red-600 mt-2">{dateError}</div>}
+                  {dateError && (
+                    <div className="text-sm text-red-600 mt-2">{dateError}</div>
+                  )}
 
                   <div className="mt-4">
                     <CalendarRangePicker
@@ -808,7 +877,9 @@ export default function TourPage() {
                             key={String(d)}
                             type="button"
                             className={`block w-full text-left px-3 py-2 rounded-xl hover:bg-orange-100 ${
-                              String(draftDuration) === String(d) ? "bg-orange-200" : ""
+                              String(draftDuration) === String(d)
+                                ? "bg-orange-200"
+                                : ""
                             }`}
                             onClick={() => setDraftDuration(d)}
                           >
@@ -857,7 +928,11 @@ export default function TourPage() {
                 }}
                 className="bg-white border border-gray-300 rounded-xl w-10 h-10 flex items-center justify-center hover:bg-orange-50"
               >
-                {sortOrder === "asc" ? <FaSortAmountUpAlt size={16} /> : <FaSortAmountDownAlt size={16} />}
+                {sortOrder === "asc" ? (
+                  <FaSortAmountUpAlt size={16} />
+                ) : (
+                  <FaSortAmountDownAlt size={16} />
+                )}
               </button>
 
               {showSort && (
@@ -891,11 +966,17 @@ export default function TourPage() {
         </div>
 
         {isLoading ? (
-          <div className="text-center py-16 text-gray-500 text-lg">Loading tours...</div>
+          <div className="text-center py-16 text-gray-500 text-lg">
+            Loading tours...
+          </div>
         ) : tours.length === 0 ? (
           <div className="text-center py-16">
-            <div className="text-xl font-semibold text-gray-800 mb-2">Không có tour phù hợp</div>
-            <div className="text-gray-500">Thử đổi ngày khởi hành, điểm đi hoặc số ngày để tìm thêm tour nha.</div>
+            <div className="text-xl font-semibold text-gray-800 mb-2">
+              Không có tour phù hợp
+            </div>
+            <div className="text-gray-500">
+              Thử đổi ngày khởi hành, điểm đi hoặc số ngày để tìm thêm tour nha.
+            </div>
 
             <button
               type="button"
@@ -914,7 +995,12 @@ export default function TourPage() {
         )}
 
         {totalPages > 1 && (
-          <Pagination totalPages={totalPages} currentPage={currentPage} onPageChange={setCurrentPage} visiblePages={getVisiblePages()} />
+          <Pagination
+            totalPages={totalPages}
+            currentPage={currentPage}
+            onPageChange={setCurrentPage}
+            visiblePages={getVisiblePages()}
+          />
         )}
 
         <BookingVideo />
@@ -922,11 +1008,24 @@ export default function TourPage() {
 
       {mobilePanel && (
         <div className="fixed inset-0 z-[80] sm:hidden">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setMobilePanel(null)} />
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setMobilePanel(null)}
+          />
           <div className="absolute inset-x-0 bottom-0 top-16 bg-white rounded-t-3xl shadow-2xl overflow-hidden flex flex-col">
             <div className="px-4 py-3 border-b flex items-center justify-between">
-              <div className="font-semibold text-lg">{mobilePanel === "date" ? "Date" : mobilePanel === "filter" ? "Filter" : "Sort"}</div>
-              <button type="button" onClick={() => setMobilePanel(null)} className="px-3 py-1.5 rounded-full bg-gray-100">
+              <div className="font-semibold text-lg">
+                {mobilePanel === "date"
+                  ? "Date"
+                  : mobilePanel === "filter"
+                    ? "Filter"
+                    : "Sort"}
+              </div>
+              <button
+                type="button"
+                onClick={() => setMobilePanel(null)}
+                className="px-3 py-1.5 rounded-full bg-gray-100"
+              >
                 Close
               </button>
             </div>
@@ -934,7 +1033,9 @@ export default function TourPage() {
             <div className="p-4 overflow-auto flex-1">
               {mobilePanel === "date" && (
                 <div className="space-y-3">
-                  <div className="text-sm text-gray-600">Date range (dd/mm/yyyy)</div>
+                  <div className="text-sm text-gray-600">
+                    Date range (dd/mm/yyyy)
+                  </div>
 
                   <div className="grid grid-cols-2 gap-2">
                     <div>
@@ -969,10 +1070,13 @@ export default function TourPage() {
                   </div>
 
                   <div className="text-xs text-gray-500">
-                    Min start: <span className="font-semibold">{ymdToDMY(minDate)}</span>
+                    Min start:{" "}
+                    <span className="font-semibold">{ymdToDMY(minDate)}</span>
                   </div>
 
-                  {dateError && <div className="text-sm text-red-600">{dateError}</div>}
+                  {dateError && (
+                    <div className="text-sm text-red-600">{dateError}</div>
+                  )}
 
                   <div className="pt-2">
                     <CalendarRangePicker
@@ -1018,7 +1122,9 @@ export default function TourPage() {
                           type="button"
                           onClick={() => setDraftLocation(loc)}
                           className={`py-3 px-2 rounded-2xl border text-sm ${
-                            draftLocation === loc ? "bg-orange-500 text-white border-orange-500" : "bg-white"
+                            draftLocation === loc
+                              ? "bg-orange-500 text-white border-orange-500"
+                              : "bg-white"
                           }`}
                         >
                           {loc === "" ? "All" : loc}
@@ -1036,7 +1142,9 @@ export default function TourPage() {
                           type="button"
                           onClick={() => setDraftDuration(d)}
                           className={`py-3 rounded-2xl border text-sm ${
-                            String(draftDuration) === String(d) ? "bg-orange-500 text-white border-orange-500" : "bg-white"
+                            String(draftDuration) === String(d)
+                              ? "bg-orange-500 text-white border-orange-500"
+                              : "bg-white"
                           }`}
                         >
                           {d === "" ? "All" : `${d}d`}
@@ -1046,10 +1154,18 @@ export default function TourPage() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
-                    <button type="button" onClick={applyFilterDraft} className="py-3 rounded-2xl bg-orange-500 text-white font-semibold">
+                    <button
+                      type="button"
+                      onClick={applyFilterDraft}
+                      className="py-3 rounded-2xl bg-orange-500 text-white font-semibold"
+                    >
                       Apply
                     </button>
-                    <button type="button" onClick={clearFilterDraft} className="py-3 rounded-2xl bg-gray-200 font-semibold">
+                    <button
+                      type="button"
+                      onClick={clearFilterDraft}
+                      className="py-3 rounded-2xl bg-gray-200 font-semibold"
+                    >
                       Clear
                     </button>
                   </div>
@@ -1084,7 +1200,9 @@ export default function TourPage() {
                         setMobilePanel(null);
                       }}
                       className={`w-full text-left px-4 py-4 rounded-2xl border ${
-                        sortOrder === k ? "bg-orange-500 text-white border-orange-500" : "bg-white"
+                        sortOrder === k
+                          ? "bg-orange-500 text-white border-orange-500"
+                          : "bg-white"
                       }`}
                     >
                       {label}

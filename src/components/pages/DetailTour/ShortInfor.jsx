@@ -43,7 +43,7 @@ export default function TourDetail() {
       "https://placehold.co/1200x800?text=Tour+Image",
       "https://placehold.co/600x400?text=Preview",
     ],
-    []
+    [],
   );
 
   useEffect(() => {
@@ -172,9 +172,7 @@ export default function TourDetail() {
         ←
       </button>
 
-      <div className="text-center">
-        {format(shownMonth, "MMMM yyyy")}
-      </div>
+      <div className="text-center">{format(shownMonth, "MMMM yyyy")}</div>
 
       <button
         type="button"
@@ -240,9 +238,11 @@ export default function TourDetail() {
 
         days.push(
           <div key={format(day, "yyyy-MM-dd")} className="relative">
-            {isInRange && <div className="absolute inset-0 bg-orange-200 z-0" />}
+            {isInRange && (
+              <div className="absolute inset-0 bg-orange-200 z-0" />
+            )}
             <div className={cellClass}>{formatted}</div>
-          </div>
+          </div>,
         );
 
         day = addDays(day, 1);
@@ -251,7 +251,7 @@ export default function TourDetail() {
       rows.push(
         <div className="grid grid-cols-7 gap-[0px] mb-[1px]" key={String(day)}>
           {days}
-        </div>
+        </div>,
       );
       days = [];
     }
@@ -278,7 +278,7 @@ export default function TourDetail() {
     if (!token) {
       const ok = await popup.confirm(
         "Bạn cần đăng nhập để đặt tour. Mở trang đăng nhập ngay?",
-        "Yêu cầu đăng nhập"
+        "Yêu cầu đăng nhập",
       );
       if (ok) window.dispatchEvent(new Event("open-login"));
       return;
@@ -361,7 +361,10 @@ export default function TourDetail() {
       {/* Right info */}
       <div className="flex flex-col pb-4">
         <div className="mt-2 md:mt-0">
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-podcast font-light mb-1 text-gray-800 leading-snug">
+          <h1
+            className="text-2xl sm:text-3xl lg:text-4xl 
+          font-semibold font-light mb-1 text-gray-800 leading-snug"
+          >
             {title}
           </h1>
 

@@ -98,8 +98,6 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     { to: "/hotel-manager/myhotel", label: "My Hotel" },
   ];
 
-  
-
   const fetchUser = async () => {
     setLoadingUser(true);
     const jwtUser = getUserFromToken();
@@ -650,7 +648,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
             to={getHomeByRole()}
             className="flex items-center gap-2 shrink-0"
           >
-            <img src={Logo} className="h-9 w-auto" alt="logo" />
+            <img src={Logo} className="h-14 w-auto" alt="logo" />
             <span className="text-xl sm:text-2xl font-semibold text-orange-500">
               Easy
             </span>

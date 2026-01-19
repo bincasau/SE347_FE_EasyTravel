@@ -55,7 +55,7 @@ export default function TourGallery({ tourId }) {
     <section className="max-w-6xl mx-auto px-6 mt-10">
       {/* Header */}
       <div className="flex justify-between items-center mb-10">
-        <h2 className="text-4xl font-podcast text-gray-800">Gallery Tour</h2>
+        <h2 className="text-4xl font-semibold text-gray-800">Gallery Tour</h2>
 
         {/* Nút điều hướng */}
         <div className="flex gap-3">

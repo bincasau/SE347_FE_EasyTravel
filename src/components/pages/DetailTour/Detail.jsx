@@ -37,7 +37,7 @@ export default function Detail({ tour }) {
   return (
     <section className="max-w-6xl mx-auto px-6 py-10">
       {/* 🧭 Tiêu đề */}
-      <h2 className="text-4xl font-podcast text-gray-800 mb-10">Overview</h2>
+      <h2 className="text-4xl font-semibold text-gray-800 mb-10">Overview</h2>
 
       {/* Grid thông tin dạng icon trên, text dưới */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-8 text-center text-gray-700">

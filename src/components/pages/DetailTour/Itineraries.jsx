@@ -16,7 +16,9 @@ export default function Itineraries({ tourId }) {
   useEffect(() => {
     const fetchItineraries = async () => {
       try {
-        const res = await fetch(`http://localhost:8080/tours/${tourId}/itineraries`);
+        const res = await fetch(
+          `http://localhost:8080/tours/${tourId}/itineraries`,
+        );
         if (!res.ok) throw new Error("Failed to fetch itineraries");
         const data = await res.json();
 
@@ -64,14 +66,16 @@ export default function Itineraries({ tourId }) {
   if (!itineraries.length)
     return (
       <section className="max-w-6xl mx-auto px-6 py-10 text-gray-500">
-        <h2 className="text-5xl font-podcast text-gray-800 mb-6">Itineraries</h2>
+        <h2 className="text-5xl font-semibold text-gray-800 mb-6">
+          Itineraries
+        </h2>
         <p>No itinerary available for this tour.</p>
       </section>
     );
 
   return (
     <section className="max-w-6xl mx-auto px-6 py-10">
-      <h2 className="text-4xl font-podcast text-gray-800 mb-8">Itineraries</h2>
+      <h2 className="text-4xl font-semibold text-gray-800 mb-8">Itineraries</h2>
 
       <div className="flex flex-col gap-5 pr-2">
         {itineraries.map((item, index) => {
@@ -95,7 +99,7 @@ export default function Itineraries({ tourId }) {
                   <div className="bg-orange-500 text-white rounded-full p-2 shadow-sm">
                     <FaCalendarDay size={18} />
                   </div>
-                  <h3 className="text-2xl font-podcast text-gray-800 truncate">
+                  <h3 className="text-2xl font-semibold text-gray-800 truncate">
                     {item.title}
                   </h3>
                 </div>
@@ -119,7 +123,10 @@ export default function Itineraries({ tourId }) {
                       {/* Cột 1 */}
                       <div className="flex flex-col gap-2">
                         {col1.map((line, i) => (
-                          <p key={i} className="text-gray-700 text-sm leading-relaxed">
+                          <p
+                            key={i}
+                            className="text-gray-700 text-sm leading-relaxed"
+                          >
                             {line}.
                           </p>
                         ))}
@@ -128,7 +135,10 @@ export default function Itineraries({ tourId }) {
                       {/* Cột 2 */}
                       <div className="flex flex-col gap-2">
                         {col2.map((line, i) => (
-                          <p key={i} className="text-gray-700 text-sm leading-relaxed">
+                          <p
+                            key={i}
+                            className="text-gray-700 text-sm leading-relaxed"
+                          >
                             {line}.
                           </p>
                         ))}

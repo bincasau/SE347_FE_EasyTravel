@@ -61,7 +61,7 @@ function Stars({ value = 0 }) {
           <FaStar key={n} className="text-orange-400" />
         ) : (
           <FaRegStar key={n} className="text-gray-300" />
-        )
+        ),
       )}
     </div>
   );
@@ -143,7 +143,7 @@ export default function Reviews({ tourId }) {
 
   const visibleReviews = useMemo(
     () => reviews.slice(0, visibleCount),
-    [reviews, visibleCount]
+    [reviews, visibleCount],
   );
 
   // ✅ LOAD LIST (ĐỔI ENDPOINT CHO ĐÚNG CONTROLLER)
@@ -201,13 +201,16 @@ export default function Reviews({ tourId }) {
 
     setSubmitting(true);
     try {
-      const res = await fetchWithJwt(`/custom-reviews/create?tourId=${tourId}`, {
-        method: "POST",
-        body: JSON.stringify({
-          rating: Number(newRating),
-          comment: newComment.trim(),
-        }),
-      });
+      const res = await fetchWithJwt(
+        `/custom-reviews/create?tourId=${tourId}`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            rating: Number(newRating),
+            comment: newComment.trim(),
+          }),
+        },
+      );
       if (!res.ok) throw new Error(await readText(res));
 
       popup.success("Gửi review thành công!");
@@ -286,7 +289,7 @@ export default function Reviews({ tourId }) {
 
   return (
     <section className="max-w-6xl mx-auto px-6 py-10">
-      <h2 className="text-5xl font-podcast text-gray-800 mb-6">
+      <h2 className="text-5xl font-semibold text-gray-800 mb-6">
         Reviews ({reviews.length})
       </h2>
 
@@ -317,7 +320,9 @@ export default function Reviews({ tourId }) {
                     <div className="flex items-center gap-3">
                       <Avatar name={name} src={avatar} />
                       <div>
-                        <div className="font-semibold text-gray-800">{name}</div>
+                        <div className="font-semibold text-gray-800">
+                          {name}
+                        </div>
                         <div className="text-xs text-gray-400">
                           {fmtDate(getCreatedAt(r))}
                         </div>
@@ -325,7 +330,10 @@ export default function Reviews({ tourId }) {
                           {!isEditing ? (
                             <Stars value={getRating(r)} />
                           ) : (
-                            <StarPicker value={editRating} onChange={setEditRating} />
+                            <StarPicker
+                              value={editRating}
+                              onChange={setEditRating}
+                            />
                           )}
                         </div>
                       </div>

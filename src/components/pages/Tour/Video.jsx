@@ -5,7 +5,7 @@ export default function BookingVideo() {
     <section className="w-full mt-12 sm:mt-16 lg:mt-20">
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
         {/* Title */}
-        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-podcast text-gray-900 mb-5">
+        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold text-gray-900 mb-5">
           Beautiful Vietnam
         </h2>
 
