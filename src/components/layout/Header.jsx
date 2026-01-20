@@ -362,6 +362,22 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
   const isHotelManagerRevenueActive = location.pathname.startsWith(
     "/hotel-manager/revenue",
   );
+  // ===== ADMIN ACTIVE CHECK =====
+  const isAdminDashboardActive =
+    location.pathname === "/admin" ||
+    location.pathname.startsWith("/admin/dashboard");
+
+  const isAdminToursActive = location.pathname.startsWith("/admin/tours");
+
+  const isAdminUsersActive = location.pathname.startsWith("/admin/users");
+
+  const isAdminHotelsActive = location.pathname.startsWith("/admin/hotels");
+
+  const isAdminNotificationsActive = location.pathname.startsWith(
+    "/admin/notifications",
+  );
+
+  const isAdminBlogsActive = location.pathname.startsWith("/admin/blogs");
 
   const renderNavClass = (it, isActive) => {
     if (it.to === "/tours" && isToursActive) return activeLink;
@@ -376,8 +392,25 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
         <li key={it.to}>
           <NavLink
             to={it.to}
-            end
-            className={({ isActive }) => renderNavClass(it, isActive)}
+            className={() => {
+              if (it.to === "/admin/dashboard" && isAdminDashboardActive)
+                return activeLink;
+              if (it.to === "/admin/tours" && isAdminToursActive)
+                return activeLink;
+              if (it.to === "/admin/users" && isAdminUsersActive)
+                return activeLink;
+              if (it.to === "/admin/hotels" && isAdminHotelsActive)
+                return activeLink;
+              if (
+                it.to === "/admin/notifications" &&
+                isAdminNotificationsActive
+              )
+                return activeLink;
+              if (it.to === "/admin/blogs" && isAdminBlogsActive)
+                return activeLink;
+
+              return baseLink;
+            }}
             onClick={() => setOpenMobile(false)}
           >
             {t(`header.${it.key}`)}

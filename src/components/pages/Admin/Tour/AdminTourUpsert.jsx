@@ -464,7 +464,7 @@ export default function AdminTourUpsert() {
           : "Chờ duyệt";
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+    <div className=" mx-auto px-4 sm:px-6 py-6">
       {/* Success modal responsive */}
       {openSuccess && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

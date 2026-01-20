@@ -141,10 +141,19 @@ export default function AddHotel() {
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-6">
+    <div className="w-full mx-auto px-4 sm:px-6 py-6">
       <div className="bg-white rounded-2xl shadow-md p-4 sm:p-6">
-        <h1 className="text-2xl font-bold mb-6">Thêm khách sạn</h1>
+        <div className="flex items-center justify-between gap-3 mb-6">
+          <h1 className="text-2xl font-bold">Thêm khách sạn</h1>
 
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="w-auto px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50"
+          >
+            Quay lại
+          </button>
+        </div>
         {/* chỉ show msg khi lỗi/validation */}
         {msg && (
           <div className="mb-4 p-3 rounded-xl bg-gray-50 border text-sm break-words">
@@ -312,7 +321,9 @@ export default function AddHotel() {
             className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="text-xl font-semibold">Thêm khách sạn thành công</div>
+            <div className="text-xl font-semibold">
+              Thêm khách sạn thành công
+            </div>
             <div className="mt-2 text-sm text-gray-600">
               Bạn muốn quay về danh sách khách sạn hay tiếp tục tạo mới?
             </div>

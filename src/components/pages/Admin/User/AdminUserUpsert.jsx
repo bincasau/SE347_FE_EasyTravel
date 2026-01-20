@@ -154,7 +154,7 @@ export default function AdminUserUpsert() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+    <div className=" mx-auto px-4 sm:px-6 py-6 sm:py-10">
       {/* Header responsive */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div className="min-w-0">
@@ -175,7 +175,10 @@ export default function AdminUserUpsert() {
         </button>
       </div>
 
-      <form onSubmit={onSubmit} className="bg-white rounded-2xl shadow-md p-4 sm:p-6">
+      <form
+        onSubmit={onSubmit}
+        className="bg-white rounded-2xl shadow-md p-4 sm:p-6"
+      >
         {err ? (
           <div className="mb-4 p-3 rounded-xl bg-red-50 text-red-700 text-sm">
             {err}
@@ -303,14 +306,18 @@ export default function AdminUserUpsert() {
               </Section>
 
               <Section title="Bảo mật">
-                <Field label={isEdit ? "Mật khẩu mới (không bắt buộc)" : "Mật khẩu"}>
+                <Field
+                  label={isEdit ? "Mật khẩu mới (không bắt buộc)" : "Mật khẩu"}
+                >
                   <input
                     type="password"
                     value={form.password}
                     onChange={(e) => setField("password", e.target.value)}
                     className="w-full input"
                     placeholder={
-                      isEdit ? "Để trống nếu không đổi mật khẩu" : "Nhập mật khẩu"
+                      isEdit
+                        ? "Để trống nếu không đổi mật khẩu"
+                        : "Nhập mật khẩu"
                     }
                     required={!isEdit}
                   />
@@ -378,7 +385,8 @@ export default function AdminUserUpsert() {
 
                   {file ? (
                     <div className="text-xs text-gray-500">
-                      Preview đang hiển thị ảnh mới. Bấm {isEdit ? "Cập nhật" : "Tạo mới"} để lưu.
+                      Preview đang hiển thị ảnh mới. Bấm{" "}
+                      {isEdit ? "Cập nhật" : "Tạo mới"} để lưu.
                     </div>
                   ) : null}
                 </div>
