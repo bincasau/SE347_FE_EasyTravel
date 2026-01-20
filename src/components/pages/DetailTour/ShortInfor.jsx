@@ -184,6 +184,10 @@ export default function TourDetail() {
   const start = parseISO(startDate);
   const end = parseISO(endDate);
 
+  // ✅ kiểm tra tour đã qua hay chưa (endDate < hôm nay)
+  const now = new Date();
+  const tourPassed = isBefore(end, now);
+
   // ✅ giới hạn month có thể chuyển
   const minMonth = startOfMonth(start);
   const maxMonth = startOfMonth(end);
@@ -465,15 +469,15 @@ export default function TourDetail() {
 
             <button
               onClick={handleBuyNow}
-              disabled={soldOut}
+              disabled={soldOut || tourPassed}
               className={[
                 "w-full rounded-full px-6 py-3 shadow-md transition-all mt-3",
-                soldOut
+                soldOut || tourPassed
                   ? "bg-gray-300 text-gray-600 cursor-not-allowed"
                   : "bg-orange-500 hover:bg-orange-600 text-white",
               ].join(" ")}
             >
-              {soldOut ? "Sold out" : "Book Now"}
+              {tourPassed ? "Tour đã qua" : soldOut ? "Sold out" : "Book Now"}
             </button>
           </div>
         </div>

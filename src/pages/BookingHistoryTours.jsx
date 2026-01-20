@@ -32,7 +32,11 @@ function extractMessage(input, fallback = "Có lỗi xảy ra!") {
 
   // Error hoặc string
   const raw =
-    input instanceof Error ? input.message : typeof input === "string" ? input : "";
+    input instanceof Error
+      ? input.message
+      : typeof input === "string"
+      ? input
+      : "";
 
   const s = String(raw || "").trim();
   if (!s) return fallback;
@@ -186,13 +190,19 @@ export default function BookingHistoryTours() {
     setTimeout(() => load(0), 0);
   };
 
-  // ✅ CHỈ SUCCESS mới được refund
-  const onRefund = async (bookingId, status) => {
+  // ✅ CHỈ SUCCESS + TOUR chưa PASSED mới được refund
+  const onRefund = async (bookingId, bookingStatus, tourStatus) => {
     if (!bookingId) return;
 
-    const st = String(status || "").trim().toLowerCase();
+    const st = String(bookingStatus || "").trim().toLowerCase();
     if (st !== "success") {
       notifyError("Chỉ booking có trạng thái SUCCESS mới được refund.");
+      return;
+    }
+
+    const ts = String(tourStatus || "").trim().toLowerCase();
+    if (ts === "passed") {
+      notifyError("Tour đã PASSED nên không thể refund.");
       return;
     }
 
@@ -217,7 +227,6 @@ export default function BookingHistoryTours() {
 
       if (typeof closeLoading === "function") closeLoading();
 
-      // res có thể là object hoặc string/JSON string => extractMessage xử lý
       notifySuccess(extractMessage(res, "Refund thành công!"));
       load();
     } catch (e) {
@@ -329,10 +338,14 @@ export default function BookingHistoryTours() {
               const adults = Number(r?.adults ?? 0);
               const children = Number(r?.children ?? 0);
               const total = r?.totalPrice ?? 0;
-              const status = r?.status || "Pending";
+
+              const bookingStatus = r?.status || "Pending";
+              const tourStatus = tour?.status || "";
 
               const isSuccess =
-                String(status).trim().toLowerCase() === "success";
+                String(bookingStatus).trim().toLowerCase() === "success";
+              const isTourPassed =
+                String(tourStatus).trim().toLowerCase() === "passed";
 
               const date = fmtDate(r?.bookingDate);
 
@@ -341,6 +354,21 @@ export default function BookingHistoryTours() {
                 : null;
 
               const isRefunding = refundingId === bookingId;
+
+              const canRefund =
+                Boolean(bookingId) &&
+                isSuccess &&
+                !isTourPassed &&
+                !isRefunding &&
+                !loading;
+
+              const refundTitle = !bookingId
+                ? "Thiếu bookingId"
+                : !isSuccess
+                ? "Chỉ booking trạng thái SUCCESS mới được refund"
+                : isTourPassed
+                ? "Tour đã PASSED nên không thể refund"
+                : "Refund booking";
 
               return (
                 <div
@@ -353,7 +381,21 @@ export default function BookingHistoryTours() {
                     </div>
 
                     <span className="text-xs px-3 py-1 rounded-full bg-orange-50 text-orange-600 border border-orange-200">
-                      {status}
+                      {bookingStatus}
+                    </span>
+                  </div>
+
+                  {/* ✅ show tour status để dễ debug */}
+                  <div className="mt-2 text-xs text-gray-500">
+                    Tour status:{" "}
+                    <span
+                      className={
+                        isTourPassed
+                          ? "text-red-600 font-semibold"
+                          : "text-gray-700 font-medium"
+                      }
+                    >
+                      {tourStatus || "-"}
                     </span>
                   </div>
 
@@ -389,16 +431,14 @@ export default function BookingHistoryTours() {
                     )}
 
                     <button
-                      disabled={!bookingId || isRefunding || loading || !isSuccess}
-                      onClick={() => onRefund(bookingId, status)}
-                      className={`px-4 py-2 rounded-xl border text-sm font-medium disabled:opacity-50 ${
-                        isSuccess ? "hover:bg-gray-50" : "cursor-not-allowed"
-                      }`}
-                      title={
-                        isSuccess
-                          ? "Refund booking"
-                          : "Chỉ booking trạng thái SUCCESS mới được refund"
+                      disabled={!canRefund}
+                      onClick={() =>
+                        onRefund(bookingId, bookingStatus, tourStatus)
                       }
+                      className={`px-4 py-2 rounded-xl border text-sm font-medium disabled:opacity-50 ${
+                        canRefund ? "hover:bg-gray-50" : "cursor-not-allowed"
+                      }`}
+                      title={refundTitle}
                     >
                       {isRefunding ? "Refunding..." : "Refund"}
                     </button>

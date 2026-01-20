@@ -17,14 +17,11 @@ async function fetchJSON(url, options = {}) {
   const text = await res.text();
 
   if (!res.ok) {
-    // BE hay trả JSON string => throw nguyên text
     throw new Error(text || `HTTP ${res.status}`);
   }
 
-  // BE có thể trả empty string
   if (!text) return null;
 
-  // có trường hợp BE trả string thuần => JSON.parse sẽ fail
   try {
     return JSON.parse(text);
   } catch {
@@ -64,13 +61,10 @@ const formatVND = (n) =>
 
 /* =========================
    ✅ Extract message helper
-   - Nhận: string | object | Error
-   - Nếu là JSON string -> parse -> lấy message
 ========================= */
 function extractMessage(input, fallback = "Có lỗi xảy ra!") {
   if (input == null) return fallback;
 
-  // 1) nếu input là object trả từ BE
   if (typeof input === "object" && !(input instanceof Error)) {
     return (
       input?.message ||
@@ -82,14 +76,16 @@ function extractMessage(input, fallback = "Có lỗi xảy ra!") {
     );
   }
 
-  // 2) nếu input là Error
   const raw =
-    input instanceof Error ? input.message : typeof input === "string" ? input : "";
+    input instanceof Error
+      ? input.message
+      : typeof input === "string"
+      ? input
+      : "";
 
   const s = String(raw || "").trim();
   if (!s) return fallback;
 
-  // 3) nếu s là JSON string => parse ra lấy message
   try {
     const obj = JSON.parse(s);
     if (typeof obj === "string") return obj;
@@ -103,12 +99,45 @@ function extractMessage(input, fallback = "Có lỗi xảy ra!") {
         fallback
       );
     }
-  } catch {
-    // not JSON -> ignore
-  }
+  } catch {}
 
-  // 4) còn lại trả nguyên text
   return s;
+}
+
+/* =========================
+   ✅ Date compare: checkOut < today ?
+   - so sánh theo NGÀY (00:00)
+========================= */
+function parseDateOnly(value) {
+  if (!value) return null;
+  const s = String(value).trim();
+
+  // lấy YYYY-MM-DD phần đầu
+  const ymd = s.length >= 10 ? s.slice(0, 10) : s;
+  const parts = ymd.split("-");
+  if (parts.length !== 3) return null;
+
+  const y = Number(parts[0]);
+  const m = Number(parts[1]);
+  const d = Number(parts[2]);
+  if (!y || !m || !d) return null;
+
+  // local date at 00:00
+  const dt = new Date(y, m - 1, d, 0, 0, 0, 0);
+  if (Number.isNaN(dt.getTime())) return null;
+  return dt;
+}
+
+function startOfToday() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+}
+
+// true nếu checkOutDate bé hơn hôm nay
+function isCheckoutPast(checkOutDate) {
+  const co = parseDateOnly(checkOutDate);
+  if (!co) return false; // không có ngày -> không chặn
+  return co.getTime() < startOfToday().getTime();
 }
 
 export default function BookingHistoryHotels() {
@@ -131,12 +160,8 @@ export default function BookingHistoryHotels() {
 
   // ✅ sort: booking gần nhất lên đầu
   const rows = [...(data.content || [])].sort((a, b) => {
-    const da = new Date(
-      a?.createdAt || a?.bookingDate || a?.checkInDate || 0
-    ).getTime();
-    const db = new Date(
-      b?.createdAt || b?.bookingDate || b?.checkInDate || 0
-    ).getTime();
+    const da = new Date(a?.createdAt || a?.bookingDate || a?.checkInDate || 0).getTime();
+    const db = new Date(b?.createdAt || b?.bookingDate || b?.checkInDate || 0).getTime();
     return db - da;
   });
 
@@ -153,8 +178,7 @@ export default function BookingHistoryHotels() {
   };
 
   const confirmRefund = async (msg) => {
-    if (popup && typeof popup.confirm === "function")
-      return await popup.confirm(msg);
+    if (popup && typeof popup.confirm === "function") return await popup.confirm(msg);
     return window.confirm(msg);
   };
 
@@ -195,13 +219,20 @@ export default function BookingHistoryHotels() {
     setTimeout(() => load(0), 0);
   };
 
-  // ✅ CHỈ SUCCESS mới refund được (giống Tour)
-  const onRefund = async (bookingId, status) => {
+  // ✅ CHỈ SUCCESS + checkOut >= today mới refund
+  const onRefund = async (bookingId, status, checkOutDate) => {
     if (!bookingId) return;
 
+    // 1) status phải SUCCESS
     const st = String(status || "").trim().toLowerCase();
     if (st !== "success") {
       notifyError("Chỉ booking có trạng thái SUCCESS mới được refund.");
+      return;
+    }
+
+    // 2) checkOut không được nhỏ hơn hôm nay
+    if (isCheckoutPast(checkOutDate)) {
+      notifyError("Booking đã quá ngày check-out nên không thể refund.");
       return;
     }
 
@@ -224,7 +255,6 @@ export default function BookingHistoryHotels() {
 
       if (typeof closeLoading === "function") closeLoading();
 
-      // ✅ res có thể là object hoặc string/JSON string -> extractMessage xử lý hết
       notifySuccess(extractMessage(res, "Refund khách sạn thành công!"));
       load();
     } catch (e) {
@@ -232,7 +262,6 @@ export default function BookingHistoryHotels() {
 
       if (typeof closeLoading === "function") closeLoading();
 
-      // ✅ e.message có thể là JSON string -> notifyError sẽ tách message
       notifyError(e);
     } finally {
       setRefundingId(null);
@@ -304,10 +333,7 @@ export default function BookingHistoryHotels() {
             Apply
           </button>
 
-          <button
-            onClick={onClearFilter}
-            className="border rounded-xl px-4 py-2"
-          >
+          <button onClick={onClearFilter} className="border rounded-xl px-4 py-2">
             Clear
           </button>
         </div>
@@ -338,18 +364,31 @@ export default function BookingHistoryHotels() {
               const roomType = room?.roomType || room?.type || "Room";
 
               const checkIn = fmtDate(r?.checkInDate);
-              const checkOut = fmtDate(r?.checkOutDate);
+              const checkOutRaw = r?.checkOutDate;
+              const checkOut = fmtDate(checkOutRaw);
+
               const total = r?.totalPrice ?? 0;
               const status = r?.status || "Pending";
 
-              const isSuccess =
-                String(status).trim().toLowerCase() === "success";
+              const isSuccess = String(status).trim().toLowerCase() === "success";
+              const isPastCheckout = isCheckoutPast(checkOutRaw);
 
               const hotelSlug = hotelId
                 ? buildTourSlug(Number(hotelId), String(hotelName))
                 : null;
 
               const isRefunding = refundingId === bookingId;
+
+              // ✅ điều kiện refund
+              const canRefund = Boolean(bookingId) && isSuccess && !isPastCheckout;
+
+              const refundTitle = !bookingId
+                ? "Thiếu bookingId"
+                : !isSuccess
+                ? "Chỉ booking trạng thái SUCCESS mới được refund"
+                : isPastCheckout
+                ? "Đã quá ngày check-out nên không thể refund"
+                : "Refund booking";
 
               return (
                 <div
@@ -376,6 +415,11 @@ export default function BookingHistoryHotels() {
                     </div>
                     <div>
                       <span className="font-medium">Check-out:</span> {checkOut}
+                      {isPastCheckout ? (
+                        <span className="ml-2 text-xs text-red-600 font-medium">
+                          (Past)
+                        </span>
+                      ) : null}
                     </div>
                     <div>
                       <span className="font-medium">Total:</span>{" "}
@@ -398,18 +442,12 @@ export default function BookingHistoryHotels() {
                     )}
 
                     <button
-                      disabled={
-                        !bookingId || isRefunding || loading || !isSuccess
-                      }
-                      onClick={() => onRefund(bookingId, status)}
+                      disabled={!canRefund || isRefunding || loading}
+                      onClick={() => onRefund(bookingId, status, checkOutRaw)}
                       className={`px-4 py-2 rounded-xl border text-sm font-medium disabled:opacity-50 ${
-                        isSuccess ? "hover:bg-gray-50" : "cursor-not-allowed"
+                        canRefund ? "hover:bg-gray-50" : "cursor-not-allowed"
                       }`}
-                      title={
-                        isSuccess
-                          ? "Refund booking"
-                          : "Chỉ booking trạng thái SUCCESS mới được refund"
-                      }
+                      title={refundTitle}
                     >
                       {isRefunding ? "Refunding..." : "Refund"}
                     </button>
