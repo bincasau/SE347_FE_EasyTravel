@@ -2,11 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { fetchHotelBookingHistory } from "@/apis/bookingHistory";
 import { buildTourSlug } from "@/utils/slug";
-
-// ✅ popup: nếu popup.js export default
 import { popup } from "@/utils/popup";
-// nếu popup.js export named thì dùng:
-// import { popup } from "@/utils/popup";
 
 const BASE_URL = "http://localhost:8080";
 
@@ -21,9 +17,19 @@ async function fetchJSON(url, options = {}) {
   const text = await res.text();
 
   if (!res.ok) {
+    // BE hay trả JSON string => throw nguyên text
     throw new Error(text || `HTTP ${res.status}`);
   }
-  return text ? JSON.parse(text) : null;
+
+  // BE có thể trả empty string
+  if (!text) return null;
+
+  // có trường hợp BE trả string thuần => JSON.parse sẽ fail
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
 }
 
 // ✅ Refund HOTEL theo bookingId
@@ -40,6 +46,13 @@ async function refundByBooking(bookingType, bookingId) {
   });
 }
 
+// ✅ random delay 1-3s
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const sleepRandom = (minMs = 1000, maxMs = 3000) => {
+  const ms = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
+  return sleep(ms);
+};
+
 const fmtDate = (d) => {
   if (!d) return "-";
   const s = String(d);
@@ -48,6 +61,55 @@ const fmtDate = (d) => {
 
 const formatVND = (n) =>
   Number(n ?? 0).toLocaleString("vi-VN", { style: "currency", currency: "VND" });
+
+/* =========================
+   ✅ Extract message helper
+   - Nhận: string | object | Error
+   - Nếu là JSON string -> parse -> lấy message
+========================= */
+function extractMessage(input, fallback = "Có lỗi xảy ra!") {
+  if (input == null) return fallback;
+
+  // 1) nếu input là object trả từ BE
+  if (typeof input === "object" && !(input instanceof Error)) {
+    return (
+      input?.message ||
+      input?.msg ||
+      input?.error ||
+      input?.detail ||
+      input?.title ||
+      fallback
+    );
+  }
+
+  // 2) nếu input là Error
+  const raw =
+    input instanceof Error ? input.message : typeof input === "string" ? input : "";
+
+  const s = String(raw || "").trim();
+  if (!s) return fallback;
+
+  // 3) nếu s là JSON string => parse ra lấy message
+  try {
+    const obj = JSON.parse(s);
+    if (typeof obj === "string") return obj;
+    if (obj && typeof obj === "object") {
+      return (
+        obj?.message ||
+        obj?.msg ||
+        obj?.error ||
+        obj?.detail ||
+        obj?.title ||
+        fallback
+      );
+    }
+  } catch {
+    // not JSON -> ignore
+  }
+
+  // 4) còn lại trả nguyên text
+  return s;
+}
 
 export default function BookingHistoryHotels() {
   const [loading, setLoading] = useState(false);
@@ -79,13 +141,15 @@ export default function BookingHistoryHotels() {
   });
 
   const notifySuccess = (msg) => {
-    if (popup && typeof popup.success === "function") popup.success(msg);
-    else alert(msg);
+    const text = extractMessage(msg, "Thành công!");
+    if (popup && typeof popup.success === "function") popup.success(text);
+    else alert(text);
   };
 
   const notifyError = (msg) => {
-    if (popup && typeof popup.error === "function") popup.error(msg);
-    else alert(msg);
+    const text = extractMessage(msg, "Có lỗi xảy ra!");
+    if (popup && typeof popup.error === "function") popup.error(text);
+    else alert(text);
   };
 
   const confirmRefund = async (msg) => {
@@ -108,7 +172,7 @@ export default function BookingHistoryHotels() {
     } catch (e) {
       console.error(e);
       setData({ content: [], totalPages: 0, totalElements: 0, number: 0 });
-      notifyError(e?.message || "Không tải được lịch sử khách sạn.");
+      notifyError(e);
     } finally {
       setLoading(false);
     }
@@ -147,13 +211,29 @@ export default function BookingHistoryHotels() {
     if (!ok) return;
 
     setRefundingId(bookingId);
+
+    const closeLoading =
+      popup && typeof popup.loading === "function"
+        ? popup.loading("Đang refund...")
+        : null;
+
     try {
+      await sleepRandom(1000, 3000);
+
       const res = await refundByBooking("HOTEL", bookingId);
-      notifySuccess(res?.message || "Refund khách sạn thành công!");
+
+      if (typeof closeLoading === "function") closeLoading();
+
+      // ✅ res có thể là object hoặc string/JSON string -> extractMessage xử lý hết
+      notifySuccess(extractMessage(res, "Refund khách sạn thành công!"));
       load();
     } catch (e) {
       console.error(e);
-      notifyError(e?.message || "Refund thất bại!");
+
+      if (typeof closeLoading === "function") closeLoading();
+
+      // ✅ e.message có thể là JSON string -> notifyError sẽ tách message
+      notifyError(e);
     } finally {
       setRefundingId(null);
     }
@@ -318,7 +398,9 @@ export default function BookingHistoryHotels() {
                     )}
 
                     <button
-                      disabled={!bookingId || isRefunding || loading || !isSuccess}
+                      disabled={
+                        !bookingId || isRefunding || loading || !isSuccess
+                      }
                       onClick={() => onRefund(bookingId, status)}
                       className={`px-4 py-2 rounded-xl border text-sm font-medium disabled:opacity-50 ${
                         isSuccess ? "hover:bg-gray-50" : "cursor-not-allowed"

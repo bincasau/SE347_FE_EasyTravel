@@ -2,12 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { fetchTourBookingHistory } from "@/apis/bookingHistory";
 import { buildTourSlug } from "@/utils/slug";
-
-// ✅ Popup: chọn 1 kiểu import đúng với popup.js của bạn
-// (1) Nếu popup.js export default:
 import { popup } from "@/utils/popup";
-// (2) Nếu popup.js export named:
-// import { popup } from "@/utils/popup";
 
 const BASE_URL = "http://localhost:8080";
 
@@ -17,15 +12,69 @@ const getToken = () =>
   localStorage.getItem("accessToken") ||
   "";
 
+/* =========================
+   ✅ Helpers: message parsing
+========================= */
+function extractMessage(input, fallback = "Có lỗi xảy ra!") {
+  if (input == null) return fallback;
+
+  // object trả từ BE (không phải Error)
+  if (typeof input === "object" && !(input instanceof Error)) {
+    return (
+      input?.message ||
+      input?.msg ||
+      input?.error ||
+      input?.detail ||
+      input?.title ||
+      fallback
+    );
+  }
+
+  // Error hoặc string
+  const raw =
+    input instanceof Error ? input.message : typeof input === "string" ? input : "";
+
+  const s = String(raw || "").trim();
+  if (!s) return fallback;
+
+  // nếu s là JSON string -> parse ra lấy message
+  try {
+    const obj = JSON.parse(s);
+    if (typeof obj === "string") return obj;
+    if (obj && typeof obj === "object") {
+      return (
+        obj?.message ||
+        obj?.msg ||
+        obj?.error ||
+        obj?.detail ||
+        obj?.title ||
+        fallback
+      );
+    }
+  } catch {
+    // not JSON -> ignore
+  }
+
+  return s;
+}
+
 async function fetchJSON(url, options = {}) {
   const res = await fetch(url, options);
   const text = await res.text();
 
   if (!res.ok) {
+    // BE hay trả JSON string => throw nguyên text
     throw new Error(text || `HTTP ${res.status}`);
   }
 
-  return text ? JSON.parse(text) : null;
+  if (!text) return null;
+
+  // BE có thể trả string thuần -> JSON.parse fail
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
 }
 
 async function refundByBooking(bookingType, bookingId) {
@@ -40,6 +89,13 @@ async function refundByBooking(bookingType, bookingId) {
     },
   });
 }
+
+// ✅ random delay 1-3s
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const sleepRandom = (minMs = 1000, maxMs = 3000) => {
+  const ms = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
+  return sleep(ms);
+};
 
 const fmtDate = (d) => {
   if (!d) return "-";
@@ -76,13 +132,15 @@ export default function BookingHistoryTours() {
   });
 
   const notifySuccess = (msg) => {
-    if (popup && typeof popup.success === "function") popup.success(msg);
-    else alert(msg);
+    const text = extractMessage(msg, "Thành công!");
+    if (popup && typeof popup.success === "function") popup.success(text);
+    else alert(text);
   };
 
   const notifyError = (msg) => {
-    if (popup && typeof popup.error === "function") popup.error(msg);
-    else alert(msg);
+    const text = extractMessage(msg, "Có lỗi xảy ra!");
+    if (popup && typeof popup.error === "function") popup.error(text);
+    else alert(text);
   };
 
   const confirmRefund = async (msg) => {
@@ -105,7 +163,7 @@ export default function BookingHistoryTours() {
     } catch (e) {
       console.error(e);
       setData({ content: [], totalPages: 0, totalElements: 0, number: 0 });
-      notifyError(e?.message || "Không tải được lịch sử tour.");
+      notifyError(e);
     } finally {
       setLoading(false);
     }
@@ -144,13 +202,30 @@ export default function BookingHistoryTours() {
     if (!ok) return;
 
     setRefundingId(bookingId);
+
+    // ✅ popup loading spinner
+    const closeLoading =
+      popup && typeof popup.loading === "function"
+        ? popup.loading("Đang refund...")
+        : null;
+
     try {
+      // ✅ delay random 1-3s cho thấy loading
+      await sleepRandom(1000, 3000);
+
       const res = await refundByBooking("TOUR", bookingId);
-      notifySuccess(res?.message || "Refund thành công!");
+
+      if (typeof closeLoading === "function") closeLoading();
+
+      // res có thể là object hoặc string/JSON string => extractMessage xử lý
+      notifySuccess(extractMessage(res, "Refund thành công!"));
       load();
     } catch (e) {
       console.error(e);
-      notifyError(e?.message || "Refund thất bại!");
+
+      if (typeof closeLoading === "function") closeLoading();
+
+      notifyError(e);
     } finally {
       setRefundingId(null);
     }
@@ -243,7 +318,6 @@ export default function BookingHistoryTours() {
             No tour bookings yet.
           </div>
         ) : (
-          // ✅ 1 hàng 1 card
           <div className="grid grid-cols-1 gap-4">
             {rows.map((r, idx) => {
               const tour = r?.tour;
