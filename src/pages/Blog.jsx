@@ -1,10 +1,16 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import BlogCard from "../components/pages/Blog/BlogCard";
 import BlogSidebar from "../components/pages/Blog/BlogSiderbar";
 
 export default function Blog() {
-  const [blogs, setBlogs] = useState([]); // list gốc (dùng cho sidebar recent/gallery)
-  const [filteredBlogs, setFilteredBlogs] = useState([]); // list hiển thị bên trái
+  // ✅ sidebarBlogs: load 1 lần để sidebar recent/gallery
+  const [sidebarBlogs, setSidebarBlogs] = useState([]);
+
+  // ✅ pagedBlogs: list theo page (3 bài/trang)
+  const [pagedBlogs, setPagedBlogs] = useState([]);
+
+  // ✅ list hiển thị bên trái (có thể = pagedBlogs hoặc list filter)
+  const [filteredBlogs, setFilteredBlogs] = useState([]);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -13,11 +19,14 @@ export default function Blog() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterDate, setFilterDate] = useState("");
 
-  const [selectedTag, setSelectedTag] = useState(""); // tag đang chọn
+  const [selectedTag, setSelectedTag] = useState("");
   const [loading, setLoading] = useState(true);
 
-  const blogsPerPage = 5;
+  const blogsPerPage = 3;
   const BASE_URL = "http://localhost:8080";
+
+  // ✅ scroll to top list
+  const listTopRef = useRef(null);
 
   const S3_BLOG_BASE =
     "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/blog";
@@ -38,7 +47,9 @@ export default function Blog() {
     createdAt: b.createdAt ?? null,
   });
 
-  // DEBOUNCE SEARCH (0.7s)
+  // =========================
+  // ✅ 1) Debounce search
+  // =========================
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchTerm);
@@ -46,8 +57,47 @@ export default function Blog() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // FETCH BLOG DEFAULT (PAGED)
-  const fetchBlogs = async (page = 1) => {
+  // =========================
+  // ✅ 2) Load ALL blogs ONCE for sidebar
+  //    (loop pages để lấy hết)
+  // =========================
+  const fetchAllBlogsOnce = async () => {
+    try {
+      // load nhẹ nhàng: loop theo page/size
+      const size = 50; // mỗi request 50, tùy bạn
+      let page = 0;
+      let all = [];
+      let total = 1;
+
+      while (page < total) {
+        const res = await fetch(`${BASE_URL}/blogs?page=${page}&size=${size}`);
+        if (!res.ok) throw new Error("Không thể tải all blogs cho sidebar");
+
+        const data = await res.json();
+        const items = data._embedded?.blogs || [];
+        all = all.concat(items);
+
+        total = data.page?.totalPages || 1;
+        page += 1;
+      }
+
+      const formatted = all.map((b, idx) => mapBlog(b, idx));
+      setSidebarBlogs(formatted);
+    } catch (err) {
+      console.error("❌ Lỗi fetch all blogs sidebar:", err);
+      setSidebarBlogs([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchAllBlogsOnce(); // ✅ chỉ chạy 1 lần khi mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // =========================
+  // ✅ 3) Fetch blogs default paged (3 bài/trang)
+  // =========================
+  const fetchBlogsPaged = async (page = 1) => {
     try {
       setLoading(true);
 
@@ -60,12 +110,12 @@ export default function Blog() {
       const items = data._embedded?.blogs || [];
       const formatted = items.map((b, index) => mapBlog(b, index));
 
-      setBlogs(formatted);
+      setPagedBlogs(formatted);
       setFilteredBlogs(formatted);
       setTotalPages(data.page?.totalPages || 1);
     } catch (err) {
       console.error("❌ Lỗi fetch blogs:", err);
-      setBlogs([]);
+      setPagedBlogs([]);
       setFilteredBlogs([]);
       setTotalPages(1);
     } finally {
@@ -73,14 +123,26 @@ export default function Blog() {
     }
   };
 
-  // Load mặc định theo page (chỉ khi KHÔNG có search/date/tag)
+  // Load default theo page (chỉ khi KHÔNG có search/date/tag)
   useEffect(() => {
     if (debouncedSearch !== "" || filterDate !== "" || selectedTag !== "") return;
-    fetchBlogs(currentPage);
+    fetchBlogsPaged(currentPage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, debouncedSearch, filterDate, selectedTag]);
 
-  // SEARCH + FILTER DATE COMBO API (chỉ chạy khi không chọn TAG)
+  // ✅ auto scroll top khi đổi trang (default mode)
+  useEffect(() => {
+    const isDefaultMode =
+      debouncedSearch === "" && filterDate === "" && selectedTag === "";
+    if (!isDefaultMode) return;
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+
+  }, [currentPage, debouncedSearch, filterDate, selectedTag]);
+
+  // =========================
+  // ✅ 4) SEARCH + FILTER DATE (không tag)
+  // =========================
   useEffect(() => {
     const fetchFiltered = async () => {
       if (selectedTag) return;
@@ -104,7 +166,7 @@ export default function Blog() {
           )}`;
         } else {
           setCurrentPage(1);
-          fetchBlogs(1);
+          fetchBlogsPaged(1);
           return;
         }
 
@@ -116,14 +178,20 @@ export default function Blog() {
         const formatted = items.map((b, index) => mapBlog(b, index));
 
         setFilteredBlogs(formatted);
-        setBlogs(formatted);
+
+        // ✅ pagedBlogs không còn ảnh hưởng sidebar nữa
+        setPagedBlogs(formatted);
 
         setTotalPages(1);
         setCurrentPage(1);
+
+        // scroll top khi filter/search
+        window.scrollTo({ top: 0, behavior: "smooth" });
+
       } catch (err) {
         console.error("❌ Filter error:", err);
         setFilteredBlogs([]);
-        setBlogs([]);
+        setPagedBlogs([]);
         setTotalPages(1);
       } finally {
         setLoading(false);
@@ -134,7 +202,9 @@ export default function Blog() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch, filterDate, selectedTag]);
 
-  // FILTER BY TAG API
+  // =========================
+  // ✅ 5) FILTER BY TAG
+  // =========================
   const fetchByTag = async (tag) => {
     try {
       setLoading(true);
@@ -152,7 +222,7 @@ export default function Blog() {
 
       setSelectedTag(tag);
       setFilteredBlogs(formatted);
-      setBlogs(formatted);
+      setPagedBlogs(formatted);
 
       setTotalPages(1);
       setCurrentPage(1);
@@ -160,10 +230,13 @@ export default function Blog() {
       setSearchTerm("");
       setDebouncedSearch("");
       setFilterDate("");
+
+      window.scrollTo({ top: 0, behavior: "smooth" });
+
     } catch (err) {
       console.error("❌ Tag filter error:", err);
       setFilteredBlogs([]);
-      setBlogs([]);
+      setPagedBlogs([]);
       setTotalPages(1);
     } finally {
       setLoading(false);
@@ -178,7 +251,7 @@ export default function Blog() {
   const clearTag = () => {
     setSelectedTag("");
     setCurrentPage(1);
-    fetchBlogs(1);
+    fetchBlogsPaged(1);
   };
 
   // PAGINATION
@@ -235,18 +308,28 @@ export default function Blog() {
         gap-8
       "
     >
-      {/* ✅ SIDEBAR Ở TRÊN (mobile) & BÊN PHẢI (desktop) */}
+      {/* ✅ SIDEBAR */}
       <div className="w-full lg:w-[32%] lg:order-2">
         <BlogSidebar
-          blogs={blogs}
-          onSearch={setSearchTerm}
+          // ✅ dùng sidebarBlogs (load 1 lần) thay vì pagedBlogs
+          blogs={sidebarBlogs}
+          onSearch={(v) => {
+            setSearchTerm(v);
+            // nếu đang ở trang khác, về trang 1 cho UX đẹp
+            setCurrentPage(1);
+          }}
           onTagSelect={handleTagSelect}
-          onDateFilter={setFilterDate}
+          onDateFilter={(v) => {
+            setFilterDate(v);
+            setCurrentPage(1);
+          }}
         />
       </div>
 
-      {/* ✅ LIST Ở DƯỚI (mobile) & BÊN TRÁI (desktop) */}
+      {/* ✅ LIST */}
       <div className="w-full lg:w-[68%] lg:order-1">
+        <div ref={listTopRef} />
+
         {selectedTag && (
           <div className="mb-6 flex items-center gap-3">
             <div className="text-sm text-gray-600">
@@ -262,15 +345,11 @@ export default function Blog() {
         )}
 
         {loading ? (
-          <div className="text-center py-10 text-gray-500">
-            Đang tải bài viết...
-          </div>
+          <div className="text-center py-10 text-gray-500">Đang tải bài viết...</div>
         ) : filteredBlogs.length > 0 ? (
           filteredBlogs.map((blog) => <BlogCard key={blog.id} {...blog} />)
         ) : (
-          <p className="text-gray-500 text-center py-8">
-            Không tìm thấy bài viết nào.
-          </p>
+          <p className="text-gray-500 text-center py-8">Không tìm thấy bài viết nào.</p>
         )}
 
         {showPagination && (
