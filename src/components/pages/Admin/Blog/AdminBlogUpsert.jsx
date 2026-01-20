@@ -106,10 +106,10 @@ export default function AdminBlogUpsert() {
     e.preventDefault();
     setErr("");
 
-    if (!myUserId) {
-      setErr("Không xác định được người dùng hiện tại.");
-      return;
-    }
+    // if (!myUserId) {
+    //   setErr("Không xác định được người dùng hiện tại.");
+    //   return;
+    // }
 
     if (!canSubmit) {
       setErr("Vui lòng nhập Tiêu đề và Nội dung.");

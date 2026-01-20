@@ -20,7 +20,6 @@ export async function getAllBlogs() {
   }
 }
 
-
 const API_URL = "http://localhost:8080";
 
 function getAuthHeaders() {
@@ -49,34 +48,32 @@ export async function saveBlog(payload, file) {
   const url = `${API_BASE}/admin/blog/save`;
   const headers = { ...getAuthHeaders() };
 
-  let res;
+  const fd = new FormData();
 
+  // LUÔN LUÔN dùng FormData và Blob cho phần blog data
+  // Điều này đảm bảo Content-Type của part "blog" luôn là application/json
+  fd.append(
+    "blog",
+    new Blob([JSON.stringify(payload)], { type: "application/json" }),
+  );
+
+  // Nếu có file thì append, không có thì Backend nhận được null (required = false)
   if (file) {
-    const fd = new FormData();
-    fd.append(
-      "blog",
-      new Blob([JSON.stringify(payload)], { type: "application/json" })
-    );
-
     fd.append("file", file);
-
-    res = await fetch(url, {
-      method: "POST",
-      headers,
-      body: fd,
-    });
-  } else {
-    res = await fetch(url, {
-      method: "POST",
-      headers: { ...headers, "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
   }
+
+  // QUAN TRỌNG: Không set "Content-Type" thủ công khi dùng fetch + FormData.
+  // Trình duyệt sẽ tự động thêm boundary cho multipart/form-data.
+  const res = await fetch(url, {
+    method: "POST",
+    headers: headers, // Chỉ chứa Authorization Bearer token
+    body: fd,
+  });
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(
-      `Save blog failed: ${res.status} ${res.statusText} ${text}`
+      `Save blog failed: ${res.status} ${res.statusText} ${text}`,
     );
   }
 
@@ -87,7 +84,6 @@ export async function saveBlog(payload, file) {
     return text;
   }
 }
-
 
 export async function deleteBlog(id) {
   const res = await fetch(`${API_URL}/admin/delete-blog/${id}`, {
