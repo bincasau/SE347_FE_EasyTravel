@@ -19,7 +19,12 @@ export default function BookingStep2({
 
   const isRoomBooking = !!room?.type;
 
-  const [isLocked, setIsLocked] = useState(false);
+  const [locked, setLocked] = useState({
+    name: false,
+    surname: false,
+    phone: false,
+    email: false,
+  });
   const [showLoginPopup, setShowLoginPopup] = useState(false);
 
   /* =======================
@@ -36,6 +41,21 @@ export default function BookingStep2({
     return {
       surname: parts.slice(0, -1).join(" "),
       name: parts[parts.length - 1],
+    };
+  }
+
+  function buildLockedByUser(u) {
+    const nm = (u?.name || "").trim();
+    const sn = (u?.surname || "").trim();
+    const ph = (u?.phone || "").trim();
+    const em = (u?.email || "").trim();
+
+    // ✅ có dữ liệu thì lock, thiếu thì cho sửa
+    return {
+      name: !!nm,
+      surname: !!sn,
+      phone: !!ph,
+      email: !!em,
     };
   }
 
@@ -65,14 +85,14 @@ export default function BookingStep2({
       if (!user) {
         sessionStorage.setItem(
           "redirectAfterLogin",
-          window.location.pathname + window.location.search
+          window.location.pathname + window.location.search,
         );
         setShowLoginPopup(true);
         return;
       }
 
       setBookingData((prev) => ({ ...prev, user }));
-      setIsLocked(true);
+      setLocked(buildLockedByUser(user)); // ✅ thiếu field nào thì field đó mở
     };
 
     init();
@@ -84,7 +104,7 @@ export default function BookingStep2({
       if (!user) return;
 
       setBookingData((prev) => ({ ...prev, user }));
-      setIsLocked(true);
+      setLocked(buildLockedByUser(user)); // ✅ thiếu field nào thì field đó mở
       setShowLoginPopup(false);
 
       const redirect = sessionStorage.getItem("redirectAfterLogin");
@@ -102,7 +122,7 @@ export default function BookingStep2({
      INPUT CHANGE
   ======================= */
   const handleChange = (field, value) => {
-    if (isLocked) return;
+    if (locked[field]) return;
     setBookingData({
       ...bookingData,
       user: { ...bookingData.user, [field]: value },
@@ -139,25 +159,25 @@ export default function BookingStep2({
             <InputField
               label="Name"
               value={name}
-              disabled={isLocked}
+              disabled={locked.name}
               onChange={(v) => handleChange("name", v)}
             />
             <InputField
               label="Surname"
               value={surname}
-              disabled={isLocked}
+              disabled={locked.surname}
               onChange={(v) => handleChange("surname", v)}
             />
             <InputField
               label="Telephone"
               value={phone}
-              disabled={isLocked}
+              disabled={locked.phone}
               onChange={(v) => handleChange("phone", v)}
             />
             <InputField
               label="Email Address"
               value={email}
-              disabled={isLocked}
+              disabled={locked.email}
               onChange={(v) => handleChange("email", v)}
             />
           </div>
