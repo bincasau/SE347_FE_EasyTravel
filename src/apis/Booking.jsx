@@ -51,3 +51,36 @@ export async function createHotelBooking(payload) {
 
   return res.json();
 }
+
+export async function getVnpayPaymentUrl({
+  amount,
+  bookingId,
+  bookingType = "HOTEL",
+  bankCode = "",
+  token = "",
+}) {
+  const params = new URLSearchParams();
+  params.append("amount", amount || 0);
+  params.append("bookingId", bookingId);
+  params.append("bookingType", bookingType);
+  if (bankCode) params.append("bankCode", bankCode);
+
+  const url = `http://localhost:8080/payment/vn-pay?${params.toString()}`;
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: token ? `Bearer ${token}` : "",
+    },
+  });
+
+  if (!res.ok) {
+    const msg = await res.text().catch(() => "");
+    throw new Error(`VNPay request failed: ${res.status} ${msg}`);
+  }
+
+  const data = await res.json().catch(() => null);
+
+  // theo code bạn đang dùng: payData?.data?.paymentUrl
+  return data?.data?.paymentUrl || "";
+}

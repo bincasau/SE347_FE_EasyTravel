@@ -231,7 +231,9 @@ export default function AdminTourForm({
           className={inputCls}
         >
           <option value="">
-            {loadingGuides ? "Đang tải danh sách..." : "— Chọn hướng dẫn viên —"}
+            {loadingGuides
+              ? "Đang tải danh sách..."
+              : "— Chọn hướng dẫn viên —"}
           </option>
 
           {guides.map((u) => {
@@ -273,7 +275,7 @@ export default function AdminTourForm({
         </div>
 
         <div>
-          <div className="text-sm font-medium mb-1">Tổng ghế</div>
+          <div className="text-sm font-medium mb-1">Giới hạn ghế</div>
           <input
             name="limitSeats"
             type="number"

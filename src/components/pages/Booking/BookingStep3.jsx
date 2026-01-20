@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { createHotelBooking } from "@/apis/Booking";
+import { createHotelBooking, getVnpayPaymentUrl } from "@/apis/Booking";
 import { popup } from "@/utils/popup";
 
 const AWS_ROOM_IMAGE_BASE =
@@ -22,16 +22,14 @@ export default function BookingStep3({ bookingData, prevStep }) {
 
   const realHotelId = useMemo(
     () => hotel?.hotelId ?? hotel?.id ?? null,
-    [hotel]
+    [hotel],
   );
   const realRoomId = useMemo(() => room?.roomId ?? room?.id ?? null, [room]);
 
   const roomImageBed = room?.image_bed ?? room?.imageBed ?? "";
 
-  const [payment, setPayment] = useState("cash");
   const [bankCode, setBankCode] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showModal, setShowModal] = useState(false);
 
   const nights = safeData.nights || 1;
 
@@ -60,11 +58,10 @@ export default function BookingStep3({ bookingData, prevStep }) {
       return;
     }
 
-    const token = getToken();
-
     try {
       setLoading(true);
 
+      // 1) Tạo booking trước
       const payload = {
         checkInDate: safeData.checkInDate,
         checkOutDate: safeData.checkOutDate,
@@ -87,48 +84,23 @@ export default function BookingStep3({ bookingData, prevStep }) {
         return;
       }
 
-      if (payment === "cash") {
-        await popup.success(
-          "Đặt phòng thành công! Vui lòng thanh toán khi nhận phòng."
-        );
-        setShowModal(true);
+      // 2) Xin link VNPay (đã tách fetch ra Booking API)
+      const token = getToken();
+      const paymentUrl = await getVnpayPaymentUrl({
+        amount: safeData.total || 0,
+        bookingId,
+        bookingType: "HOTEL",
+        bankCode: bankCode || "",
+        token,
+      });
+
+      if (!paymentUrl) {
+        popup.error("Không lấy được link VNPay");
         return;
       }
 
-      if (payment === "vnpay") {
-        const params = new URLSearchParams();
-        params.append("amount", safeData.total || 0);
-        params.append("bookingId", bookingId);
-        params.append("bookingType", "HOTEL");
-        if (bankCode) params.append("bankCode", bankCode);
-
-        const vnpApi = `http://localhost:8080/payment/vn-pay?${params.toString()}`;
-
-        const payRes = await fetch(vnpApi, {
-          method: "GET",
-          headers: {
-            Authorization: token ? `Bearer ${token}` : "",
-          },
-        });
-
-        if (!payRes.ok) {
-          const msg = await payRes.text().catch(() => "");
-          popup.error(`VNPay request failed: ${payRes.status} ${msg}`);
-          return;
-        }
-
-        const payData = await payRes.json();
-        const paymentUrl = payData?.data?.paymentUrl;
-
-        if (!paymentUrl) {
-          popup.error("Không lấy được link VNPay");
-          return;
-        }
-
-        await popup.success("Đang chuyển hướng đến VNPay...");
-        window.location.assign(paymentUrl);
-        return;
-      }
+      await popup.success("Đang chuyển hướng đến VNPay...");
+      window.location.assign(paymentUrl);
     } catch (err) {
       console.error("❌ Hotel booking error:", err);
       popup.error(err?.message || "Lỗi khi đặt phòng");
@@ -146,29 +118,9 @@ export default function BookingStep3({ bookingData, prevStep }) {
           </h2>
 
           <div className="space-y-4">
-            <div
-              className={`border rounded-lg p-4 cursor-pointer ${
-                payment === "cash" ? "border-orange-500 bg-orange-50" : ""
-              }`}
-              onClick={() => setPayment("cash")}
-            >
+            <div className="border rounded-lg p-4 border-orange-500 bg-orange-50">
               <label className="flex items-center gap-3 cursor-pointer">
-                <input type="radio" checked={payment === "cash"} readOnly />
-                <span className="font-medium">Thanh toán tiền mặt</span>
-              </label>
-              <p className="text-xs text-gray-500 ml-6">
-                Thanh toán khi nhận phòng
-              </p>
-            </div>
-
-            <div
-              className={`border rounded-lg p-4 cursor-pointer ${
-                payment === "vnpay" ? "border-orange-500 bg-orange-50" : ""
-              }`}
-              onClick={() => setPayment("vnpay")}
-            >
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input type="radio" checked={payment === "vnpay"} readOnly />
+                <input type="radio" checked readOnly />
                 <span className="font-medium text-orange-600">
                   Thanh toán qua VNPay
                 </span>
@@ -177,35 +129,34 @@ export default function BookingStep3({ bookingData, prevStep }) {
                 Chuyển hướng đến cổng thanh toán
               </p>
 
-              {payment === "vnpay" && (
-                <div className="pt-3 ml-6">
-                  <label className="block text-sm text-gray-700 mb-1">
-                    Chọn ngân hàng (không bắt buộc)
-                  </label>
-                  <select
-                    className="w-full border rounded-lg px-3 py-2"
-                    value={bankCode}
-                    onChange={(e) => setBankCode(e.target.value)}
-                  >
-                    <option value="">Auto / Let VNPay choose</option>
-                    <option value="NCB">NCB</option>
-                    <option value="VNPAYQR">VNPAYQR</option>
-                    <option value="VIETCOMBANK">Vietcombank</option>
-                    <option value="VIETINBANK">Vietinbank</option>
-                    <option value="BIDV">BIDV</option>
-                    <option value="AGRIBANK">Agribank</option>
-                    <option value="SACOMBANK">Sacombank</option>
-                    <option value="ACB">ACB</option>
-                    <option value="TECHCOMBANK">Techcombank</option>
-                    <option value="MB">MB</option>
-                    <option value="VPBANK">VPBank</option>
-                  </select>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Nếu không chọn ngân hàng, VNPay sẽ hiển thị danh sách trong
-                    bước thanh toán.
-                  </p>
-                </div>
-              )}
+              <div className="pt-3 ml-6">
+                <label className="block text-sm text-gray-700 mb-1">
+                  Chọn ngân hàng (không bắt buộc)
+                </label>
+                <select
+                  className="w-full border rounded-lg px-3 py-2"
+                  value={bankCode}
+                  onChange={(e) => setBankCode(e.target.value)}
+                  disabled={loading}
+                >
+                  <option value="">Auto / Let VNPay choose</option>
+                  <option value="NCB">NCB</option>
+                  <option value="VNPAYQR">VNPAYQR</option>
+                  <option value="VIETCOMBANK">Vietcombank</option>
+                  <option value="VIETINBANK">Vietinbank</option>
+                  <option value="BIDV">BIDV</option>
+                  <option value="AGRIBANK">Agribank</option>
+                  <option value="SACOMBANK">Sacombank</option>
+                  <option value="ACB">ACB</option>
+                  <option value="TECHCOMBANK">Techcombank</option>
+                  <option value="MB">MB</option>
+                  <option value="VPBANK">VPBank</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Nếu không chọn ngân hàng, VNPay sẽ hiển thị danh sách trong
+                  bước thanh toán.
+                </p>
+              </div>
             </div>
           </div>
 
@@ -267,7 +218,7 @@ export default function BookingStep3({ bookingData, prevStep }) {
               disabled={loading}
               className="w-full rounded-full bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white py-3 font-medium"
             >
-              {loading ? "Đang xử lý..." : "Xác nhận & Thanh toán"}
+              {loading ? "Đang xử lý..." : "Thanh toán qua VNPay"}
             </button>
           </div>
         </aside>
