@@ -53,7 +53,7 @@ export default function BookingHistoryHotels() {
   const [loading, setLoading] = useState(false);
 
   const [page, setPage] = useState(0);
-  const [size] = useState(8);
+  const [size] = useState(5);
 
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
@@ -69,9 +69,12 @@ export default function BookingHistoryHotels() {
 
   // ✅ sort: booking gần nhất lên đầu
   const rows = [...(data.content || [])].sort((a, b) => {
-    // ưu tiên createdAt/bookingDate nếu backend có
-    const da = new Date(a?.createdAt || a?.bookingDate || a?.checkInDate || 0).getTime();
-    const db = new Date(b?.createdAt || b?.bookingDate || b?.checkInDate || 0).getTime();
+    const da = new Date(
+      a?.createdAt || a?.bookingDate || a?.checkInDate || 0
+    ).getTime();
+    const db = new Date(
+      b?.createdAt || b?.bookingDate || b?.checkInDate || 0
+    ).getTime();
     return db - da;
   });
 
@@ -86,7 +89,8 @@ export default function BookingHistoryHotels() {
   };
 
   const confirmRefund = async (msg) => {
-    if (popup && typeof popup.confirm === "function") return await popup.confirm(msg);
+    if (popup && typeof popup.confirm === "function")
+      return await popup.confirm(msg);
     return window.confirm(msg);
   };
 
@@ -127,8 +131,15 @@ export default function BookingHistoryHotels() {
     setTimeout(() => load(0), 0);
   };
 
-  const onRefund = async (bookingId) => {
+  // ✅ CHỈ SUCCESS mới refund được (giống Tour)
+  const onRefund = async (bookingId, status) => {
     if (!bookingId) return;
+
+    const st = String(status || "").trim().toLowerCase();
+    if (st !== "success") {
+      notifyError("Chỉ booking có trạng thái SUCCESS mới được refund.");
+      return;
+    }
 
     const ok = await confirmRefund(
       `Bạn có chắc muốn refund tiền cho booking #${bookingId} không?`
@@ -151,11 +162,6 @@ export default function BookingHistoryHotels() {
   const canPrev = page > 0;
   const canNext = page + 1 < (data.totalPages || 0);
 
-  const isRefundDone = (status) => {
-    const s = String(status || "").toLowerCase();
-    return s === "refunded" || s === "cancelled" || s === "canceled";
-  };
-
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -166,7 +172,9 @@ export default function BookingHistoryHotels() {
             to="/booking-history/tours"
             className={({ isActive }) =>
               `px-4 py-2 rounded-xl border ${
-                isActive ? "bg-orange-500 text-white border-orange-500" : "bg-white"
+                isActive
+                  ? "bg-orange-500 text-white border-orange-500"
+                  : "bg-white"
               }`
             }
           >
@@ -176,7 +184,9 @@ export default function BookingHistoryHotels() {
             to="/booking-history/hotels"
             className={({ isActive }) =>
               `px-4 py-2 rounded-xl border ${
-                isActive ? "bg-orange-500 text-white border-orange-500" : "bg-white"
+                isActive
+                  ? "bg-orange-500 text-white border-orange-500"
+                  : "bg-white"
               }`
             }
           >
@@ -214,7 +224,10 @@ export default function BookingHistoryHotels() {
             Apply
           </button>
 
-          <button onClick={onClearFilter} className="border rounded-xl px-4 py-2">
+          <button
+            onClick={onClearFilter}
+            className="border rounded-xl px-4 py-2"
+          >
             Clear
           </button>
         </div>
@@ -233,7 +246,6 @@ export default function BookingHistoryHotels() {
             No hotel bookings yet.
           </div>
         ) : (
-          // ✅ 1 hàng 1 card
           <div className="grid grid-cols-1 gap-4">
             {rows.map((r, idx) => {
               const hotel = r?.hotel;
@@ -250,11 +262,14 @@ export default function BookingHistoryHotels() {
               const total = r?.totalPrice ?? 0;
               const status = r?.status || "Pending";
 
-              const hotelSlug =
-                hotelId ? buildTourSlug(Number(hotelId), String(hotelName)) : null;
+              const isSuccess =
+                String(status).trim().toLowerCase() === "success";
+
+              const hotelSlug = hotelId
+                ? buildTourSlug(Number(hotelId), String(hotelName))
+                : null;
 
               const isRefunding = refundingId === bookingId;
-              const hideRefund = isRefundDone(status);
 
               return (
                 <div
@@ -302,15 +317,20 @@ export default function BookingHistoryHotels() {
                       <span />
                     )}
 
-                    {!hideRefund && (
-                      <button
-                        disabled={!bookingId || isRefunding || loading}
-                        onClick={() => onRefund(bookingId)}
-                        className="px-4 py-2 rounded-xl border text-sm font-medium disabled:opacity-50 hover:bg-gray-50"
-                      >
-                        {isRefunding ? "Refunding..." : "Refund"}
-                      </button>
-                    )}
+                    <button
+                      disabled={!bookingId || isRefunding || loading || !isSuccess}
+                      onClick={() => onRefund(bookingId, status)}
+                      className={`px-4 py-2 rounded-xl border text-sm font-medium disabled:opacity-50 ${
+                        isSuccess ? "hover:bg-gray-50" : "cursor-not-allowed"
+                      }`}
+                      title={
+                        isSuccess
+                          ? "Refund booking"
+                          : "Chỉ booking trạng thái SUCCESS mới được refund"
+                      }
+                    >
+                      {isRefunding ? "Refunding..." : "Refund"}
+                    </button>
                   </div>
                 </div>
               );

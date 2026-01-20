@@ -16,7 +16,7 @@ import {
   FaChevronRight,
 } from "react-icons/fa";
 
-import { filterTours, getDepartureLocations } from "../apis/Tour";
+import { filterTours, getDepartureLocations, getAllTours } from "../apis/Tour";
 import TourCard from "../components/pages/Tour/TourCard";
 import Pagination from "../utils/Pagination";
 import BookingVideo from "../components/pages/Tour/Video";
@@ -228,7 +228,7 @@ export default function TourPage() {
   const location = useLocation();
   const nav = useNavigate();
 
-  // ✅ state change scroll (pagination/filter/sort/search/date là state)
+  // ✅ state change scroll
   const scrollTop = useCallback(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
   }, []);
@@ -247,7 +247,8 @@ export default function TourPage() {
 
   const [tours, setTours] = useState([]);
   const [locations, setLocations] = useState([]);
-  const [durations] = useState(["", 2, 3, 4, 5, 7, 10]);
+  const [destinations, setDestinations] = useState([""]); // ✅ NEW
+  const [durations, setDurations] = useState([""]); // ✅ NEW from DB
 
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -259,10 +260,11 @@ export default function TourPage() {
   const [sortOrder, setSortOrder] = useState("recent");
 
   const [selectedLocation, setSelectedLocation] = useState("");
+  const [selectedDestination, setSelectedDestination] = useState(""); // ✅ NEW
   const [selectedDuration, setSelectedDuration] = useState("");
 
   const [selectedDate, setSelectedDate] = useState("");
-  const [selectedEndDate, setSelectedEndDate] = useState("");
+  const [selectedEndDate, setSelectedEndDate] = useState(""); // (UI only)
 
   const [draftDate, setDraftDate] = useState("");
   const [draftEndDate, setDraftEndDate] = useState("");
@@ -270,6 +272,7 @@ export default function TourPage() {
   const [dateError, setDateError] = useState("");
 
   const [draftLocation, setDraftLocation] = useState("");
+  const [draftDestination, setDraftDestination] = useState(""); // ✅ NEW
   const [draftDuration, setDraftDuration] = useState("");
 
   const [showFilter, setShowFilter] = useState(false);
@@ -291,22 +294,31 @@ export default function TourPage() {
   // ✅ FIX: request guard chống “request cũ ghi đè request mới”
   const reqIdRef = useRef(0);
 
+  // ✅ apply from Hero state
   useEffect(() => {
     const s = location.state;
     if (!s) return;
 
     const heroStart = s.startDate || "";
-    const heroEnd = s.endDate || "";
+    const heroEnd = s.endDate || ""; // UI only
     const heroLocRaw = s.departureLocation ?? s.departure ?? "";
     const heroDurRaw = s.durationDay ?? s.durationDays ?? "";
+    const heroDesRaw = s.destination ?? s.dest ?? ""; // ✅ nếu sau này hero gửi
 
     const heroLoc = heroLocRaw ? String(heroLocRaw) : "";
     const heroDur =
       heroDurRaw !== undefined && heroDurRaw !== null && heroDurRaw !== ""
         ? String(heroDurRaw)
         : "";
+    const heroDes = heroDesRaw ? String(heroDesRaw) : "";
 
-    const heroKey = JSON.stringify({ heroStart, heroEnd, heroLoc, heroDur });
+    const heroKey = JSON.stringify({
+      heroStart,
+      heroEnd,
+      heroLoc,
+      heroDur,
+      heroDes,
+    });
     if (lastHeroKeyRef.current === heroKey) return;
     lastHeroKeyRef.current = heroKey;
 
@@ -337,6 +349,9 @@ export default function TourPage() {
     setSelectedLocation(heroLoc);
     setDraftLocation(heroLoc);
 
+    setSelectedDestination(heroDes);
+    setDraftDestination(heroDes);
+
     setSelectedDuration(heroDur);
     setDraftDuration(heroDur);
 
@@ -347,8 +362,10 @@ export default function TourPage() {
     scrollTop();
   }, [location.state, minDate, scrollTop]);
 
+  // ✅ Load locations + durations + destinations from DB
   useEffect(() => {
-    const loadLocations = async () => {
+    const loadMeta = async () => {
+      // 1) departure locations
       try {
         const list = await getDepartureLocations();
         setLocations(["", ...(Array.isArray(list) ? list : [])]);
@@ -367,10 +384,40 @@ export default function TourPage() {
           "Côn Đảo",
         ]);
       }
+
+      // 2) durations + destinations from all tours
+      try {
+        const all = await getAllTours(); // ⚠️ có thể hơi nặng nếu data lớn
+        const arr = Array.isArray(all) ? all : [];
+
+        // durations
+        const durs = arr
+          .map((t) => t?.durationDays ?? t?.durationDay ?? "")
+          .map((x) => String(x ?? "").trim())
+          .filter((x) => x !== "" && !Number.isNaN(Number(x)))
+          .map((x) => Number(x));
+        const uniqueDurs = Array.from(new Set(durs)).sort((a, b) => a - b);
+        setDurations(["", ...uniqueDurs]);
+
+        // destinations
+        const dests = arr
+          .map((t) => String(t?.destination ?? "").trim())
+          .filter(Boolean);
+        const uniqueDests = Array.from(new Set(dests)).sort((a, b) =>
+          a.localeCompare(b, "vi")
+        );
+        setDestinations(["", ...uniqueDests]);
+      } catch (e) {
+        console.error("Load durations/destinations error:", e);
+        setDurations(["", 2, 3, 4, 5, 7, 10]); // fallback
+        setDestinations([""]); // fallback
+      }
     };
-    loadLocations();
+
+    loadMeta();
   }, []);
 
+  // debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
@@ -393,15 +440,17 @@ export default function TourPage() {
 
   const applyFilterDraft = useCallback(() => {
     setSelectedLocation(draftLocation);
+    setSelectedDestination(draftDestination);
     setSelectedDuration(draftDuration);
     setCurrentPage(1);
     setShowFilter(false);
     setMobilePanel(null);
     scrollTop();
-  }, [draftLocation, draftDuration, scrollTop]);
+  }, [draftLocation, draftDestination, draftDuration, scrollTop]);
 
   const clearFilterDraft = useCallback(() => {
     setDraftLocation("");
+    setDraftDestination("");
     setDraftDuration("");
   }, []);
 
@@ -458,6 +507,7 @@ export default function TourPage() {
         return;
       }
 
+      // ⚠️ Backend filterTours KHÔNG nhận endDate -> endDate chỉ để hiển thị UI
       setSelectedDate(finalStart || "");
       setSelectedEndDate(endYMD || "");
       setDraftDate(finalStart ? ymdToDMY(finalStart) : "");
@@ -513,7 +563,7 @@ export default function TourPage() {
     }
   }, [sortOrder]);
 
-  const toTourModelList = (rawList) => {
+  const toTourModelList = useCallback((rawList) => {
     return rawList.map(
       (t) =>
         new Tour(
@@ -531,7 +581,7 @@ export default function TourPage() {
           t.durationDays
         )
     );
-  };
+  }, []);
 
   // ✅ FIXED: chống request cũ ghi đè request mới
   const fetchTours = useCallback(async () => {
@@ -543,10 +593,10 @@ export default function TourPage() {
       const startDateQuery = selectedDate || minDate;
       const keyword = debouncedSearchTerm.trim();
 
+      // ⚠️ Backend chỉ nhận: keyword,startDate,durationDay,departureLocation,status,page,size,sort*
       const data = await filterTours({
         keyword,
         startDate: startDateQuery,
-        endDate: selectedEndDate || "",
         durationDay: selectedDuration || "",
         departureLocation: selectedLocation || "",
         status: "Activated",
@@ -555,10 +605,21 @@ export default function TourPage() {
         sort: mapSort(),
       });
 
-      // ✅ nếu đã có request mới hơn -> bỏ response cũ
       if (reqId !== reqIdRef.current) return;
 
-      const rawList = data?._embedded?.tours ?? [];
+      let rawList = data?._embedded?.tours ?? [];
+
+      // ✅ destination filter CLIENT-SIDE
+      if (selectedDestination) {
+        const desLower = String(selectedDestination).trim().toLowerCase();
+        rawList = rawList.filter((t) =>
+          String(t?.destination ?? "")
+            .trim()
+            .toLowerCase()
+            .includes(desLower)
+        );
+      }
+
       setTours(toTourModelList(rawList));
       setTotalPages(Math.max(1, data?.page?.totalPages || 1));
     } catch (error) {
@@ -573,12 +634,13 @@ export default function TourPage() {
     currentPage,
     debouncedSearchTerm,
     selectedDate,
-    selectedEndDate,
     selectedDuration,
     selectedLocation,
+    selectedDestination,
     minDate,
     pageSize,
     mapSort,
+    toTourModelList,
   ]);
 
   useEffect(() => {
@@ -618,6 +680,7 @@ export default function TourPage() {
 
   const clearAllFilters = () => {
     setSelectedLocation("");
+    setSelectedDestination("");
     setSelectedDuration("");
     setSelectedDate("");
     setSelectedEndDate("");
@@ -630,6 +693,7 @@ export default function TourPage() {
     setDraftSearch("");
 
     setDraftLocation("");
+    setDraftDestination("");
     setDraftDuration("");
 
     setCurrentPage(1);
@@ -642,6 +706,7 @@ export default function TourPage() {
 
   const filterCount =
     (selectedLocation ? 1 : 0) +
+    (selectedDestination ? 1 : 0) +
     (selectedDuration ? 1 : 0) +
     (selectedDate ? 1 : 0) +
     (selectedEndDate ? 1 : 0) +
@@ -692,6 +757,7 @@ export default function TourPage() {
             </button>
           </div>
 
+          {/* Mobile quick buttons */}
           <div className="grid grid-cols-3 gap-2 sm:hidden">
             <button
               type="button"
@@ -716,6 +782,7 @@ export default function TourPage() {
               type="button"
               onClick={() => {
                 setDraftLocation(selectedLocation);
+                setDraftDestination(selectedDestination);
                 setDraftDuration(selectedDuration);
                 setMobilePanel("filter");
               }}
@@ -735,15 +802,12 @@ export default function TourPage() {
               onClick={() => setMobilePanel("sort")}
               className="bg-white border border-gray-300 rounded-xl py-2 flex items-center justify-center gap-2"
             >
-              {sortOrder === "asc" ? (
-                <FaSortAmountUpAlt />
-              ) : (
-                <FaSortAmountDownAlt />
-              )}
+              {sortOrder === "asc" ? <FaSortAmountUpAlt /> : <FaSortAmountDownAlt />}
               <span className="text-sm">Sort</span>
             </button>
           </div>
 
+          {/* Desktop controls */}
           <div className="hidden sm:flex items-center justify-end gap-2">
             {/* Date picker */}
             <div className="relative">
@@ -853,6 +917,7 @@ export default function TourPage() {
                 type="button"
                 onClick={() => {
                   setDraftLocation(selectedLocation);
+                  setDraftDestination(selectedDestination);
                   setDraftDuration(selectedDuration);
                   setShowFilter((v) => !v);
                   setShowSort(false);
@@ -869,10 +934,10 @@ export default function TourPage() {
               </button>
 
               {showFilter && (
-                <div className="absolute right-0 mt-2 w-80 bg-white border rounded-2xl shadow-lg p-4 z-50">
-                  <div className="grid grid-cols-2 gap-3">
+                <div className="absolute right-0 mt-2 w-[980px] max-w-[90vw] bg-white border rounded-2xl shadow-lg p-4 z-50">
+                  <div className="grid grid-cols-3 gap-3">
                     <div>
-                      <p className="font-semibold mb-2">Location</p>
+                      <p className="font-semibold mb-2">Departure</p>
                       <div className="max-h-48 overflow-auto pr-1">
                         {locations.map((loc) => (
                           <button
@@ -884,6 +949,24 @@ export default function TourPage() {
                             onClick={() => setDraftLocation(loc)}
                           >
                             {loc === "" ? "All" : loc}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="font-semibold mb-2">Destination</p>
+                      <div className="max-h-48 overflow-auto pr-1">
+                        {destinations.map((des) => (
+                          <button
+                            key={des}
+                            type="button"
+                            className={`block w-full text-left px-3 py-2 rounded-xl hover:bg-orange-100 ${
+                              draftDestination === des ? "bg-orange-200" : ""
+                            }`}
+                            onClick={() => setDraftDestination(des)}
+                          >
+                            {des === "" ? "All" : des}
                           </button>
                         ))}
                       </div>
@@ -997,7 +1080,8 @@ export default function TourPage() {
               Không có tour phù hợp
             </div>
             <div className="text-gray-500">
-              Thử đổi ngày khởi hành, điểm đi hoặc số ngày để tìm thêm tour nha.
+              Thử đổi ngày khởi hành, điểm đi, điểm đến hoặc số ngày để tìm thêm
+              tour nha.
             </div>
 
             <button
@@ -1031,6 +1115,7 @@ export default function TourPage() {
         <BookingVideo />
       </div>
 
+      {/* Mobile panels */}
       {mobilePanel && (
         <div className="fixed inset-0 z-[80] sm:hidden">
           <div
@@ -1134,7 +1219,7 @@ export default function TourPage() {
               {mobilePanel === "filter" && (
                 <div className="space-y-5">
                   <div>
-                    <div className="font-semibold mb-2">Location</div>
+                    <div className="font-semibold mb-2">Departure</div>
                     <div className="grid grid-cols-2 gap-2">
                       {locations.map((loc) => (
                         <button
@@ -1148,6 +1233,26 @@ export default function TourPage() {
                           }`}
                         >
                           {loc === "" ? "All" : loc}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="font-semibold mb-2">Destination</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {destinations.map((des) => (
+                        <button
+                          key={des}
+                          type="button"
+                          onClick={() => setDraftDestination(des)}
+                          className={`py-3 px-2 rounded-2xl border text-sm ${
+                            draftDestination === des
+                              ? "bg-orange-500 text-white border-orange-500"
+                              : "bg-white"
+                          }`}
+                        >
+                          {des === "" ? "All" : des}
                         </button>
                       ))}
                     </div>
@@ -1176,9 +1281,7 @@ export default function TourPage() {
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      onClick={() => {
-                        applyFilterDraft();
-                      }}
+                      onClick={applyFilterDraft}
                       className="py-3 rounded-2xl bg-orange-500 text-white font-semibold"
                     >
                       Apply
