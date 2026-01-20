@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import AdminUserCard from "@/components/pages/Admin/User/AdminUserCard";
 import Pagination from "@/utils/Pagination";
-import { getUsers, adminDeleteUser } from "@/apis/User";
+import { getUsers, adminDeleteUser, fetchUsers } from "@/apis/User";
 
 import { exportUsersExcel } from "@/components/pages/Admin/User/UsersExportExcel";
 import { importUsersExcel } from "@/components/pages/Admin/User/UsersImportExcel";
@@ -67,17 +67,27 @@ export default function UserManagement() {
   const roleFromUrl = searchParams.get("role") || "ALL";
   const [roleFilter, setRoleFilter] = useState(roleFromUrl);
 
+  // ✅ search state (chỉ thêm)
+  const qFromUrl = searchParams.get("q") || "";
+  const [q, setQ] = useState(qFromUrl);
+
   const fileInputId = "users-import-excel-input";
 
   async function loadUsers(pageUI, role) {
     setLoading(true);
     try {
-      const data = await getUsers({
-        page: pageUI,
-        size: 10,
-        role,
-        status: "ALL",
-      });
+      const keyword = (searchParams.get("q") || "").trim();
+
+      const data = keyword
+        ? await fetchUsers({
+            keyword,
+          })
+        : await getUsers({
+            page: pageUI,
+            size: 10,
+            role,
+            status: "ALL",
+          });
 
       setUsers(data?._embedded?.users ?? []);
       setTotalPages(data?.page?.totalPages ?? 1);
@@ -92,12 +102,16 @@ export default function UserManagement() {
   useEffect(() => {
     loadUsers(currentPage, roleFilter);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, roleFilter]);
+  }, [currentPage, roleFilter, qFromUrl]);
 
   const handlePageChange = (pageUI) => {
     const safe = clamp(pageUI, 1, totalPages || 1);
     const next = { page: String(safe) };
     if (roleFilter !== "ALL") next.role = roleFilter;
+
+    const keyword = (searchParams.get("q") || "").trim();
+    if (keyword) next.q = keyword;
+
     setSearchParams(next);
   };
 
@@ -112,6 +126,10 @@ export default function UserManagement() {
 
     const next = { page: "1" };
     if (v !== "ALL") next.role = v;
+
+    const keyword = (searchParams.get("q") || "").trim();
+    if (keyword) next.q = keyword;
+
     setSearchParams(next);
   };
 
@@ -158,7 +176,7 @@ export default function UserManagement() {
       if (rs?.errors?.length) {
         alert(
           `Import xong: ${rs.ok} OK, ${rs.fail} FAIL\n\n` +
-            rs.errors.slice(0, 10).join("\n")
+            rs.errors.slice(0, 10).join("\n"),
         );
       } else {
         alert(`Import xong: ${rs.ok} OK, ${rs.fail} FAIL`);
@@ -170,6 +188,25 @@ export default function UserManagement() {
     } finally {
       setImporting(false);
     }
+  };
+
+  // ✅ submit search: set URL q (chỉ thêm)
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    const kw = (q || "").trim();
+
+    const next = { page: "1" };
+    if (roleFilter !== "ALL") next.role = roleFilter;
+    if (kw) next.q = kw;
+
+    setSearchParams(next);
+  };
+
+  const handleClearSearch = () => {
+    setQ("");
+    const next = { page: "1" };
+    if (roleFilter !== "ALL") next.role = roleFilter;
+    setSearchParams(next);
   };
 
   return (
@@ -193,8 +230,33 @@ export default function UserManagement() {
           </select>
         </div>
 
+        {/* ✅ Search bar (chỉ thêm, không đổi cái khác) */}
+        <form onSubmit={handleSearchSubmit} className="flex gap-2">
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search users..."
+            className="flex-1 px-4 py-2 rounded-full text-sm font-semibold bg-gray-100 text-gray-700 outline-none"
+          />
+          {q?.trim() && (
+            <button
+              type="button"
+              onClick={handleClearSearch}
+              className="px-5 py-2 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition"
+            >
+              Clear
+            </button>
+          )}
+          <button
+            type="submit"
+            className="px-5 py-2 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition"
+          >
+            Search
+          </button>
+        </form>
+
         {/* Actions: wrap + mobile full width */}
-        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-3">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:justify-end gap-2 sm:gap-3">
           {/* input hidden import */}
           <input
             id={fileInputId}
@@ -251,7 +313,11 @@ export default function UserManagement() {
       ) : (
         <div className="flex flex-col gap-4 sm:gap-6">
           {users.map((user) => (
-            <AdminUserCard key={user.userId} user={user} onRemove={handleRemove} />
+            <AdminUserCard
+              key={user.userId}
+              user={user}
+              onRemove={handleRemove}
+            />
           ))}
         </div>
       )}

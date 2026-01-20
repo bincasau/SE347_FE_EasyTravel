@@ -20,7 +20,7 @@ function buildUserFormData(user, file) {
   const fd = new FormData();
   fd.append(
     "user",
-    new Blob([JSON.stringify(user)], { type: "application/json" })
+    new Blob([JSON.stringify(user)], { type: "application/json" }),
   );
   if (file) fd.append("file", file);
   return fd;
@@ -121,3 +121,34 @@ export async function getUserById(id) {
   return await readJsonOrText(res);
 }
 
+export async function fetchUsers({ keyword = "", page = 0, size = 10 } = {}) {
+  const kw = (keyword || "").trim();
+
+  const params = new URLSearchParams({
+    page,
+    size,
+  });
+
+  if (kw) {
+    params.append("username", kw);
+    params.append("name", kw);
+  }
+
+  const url = `${API_BASE}/users/search/findByUsernameContainingOrNameContaining?${params.toString()}`;
+  console.log("fetchUsers url:", url);
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      ...getAuthHeaders(),
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`Fetch users failed: ${res.status}`);
+  }
+
+  const data = await res.json();
+  console.log("fetchUsers data:", data);
+  return data;
+}

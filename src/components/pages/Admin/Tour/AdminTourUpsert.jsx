@@ -1,7 +1,7 @@
 // src/pages/Admin/AdminTourUpsert.jsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { getTourFullById, saveTourUpsert } from "@/apis/Tour";
+import { getTourFullById, saveTourUpsert, copyTour } from "@/apis/Tour";
 import { getUsers } from "@/apis/User";
 
 import TourCurrentInfoCard from "@/components/pages/admin/Tour/TourCurrentInfoCard";
@@ -10,6 +10,8 @@ import ExtraImagesManager from "@/components/pages/admin/Common/ExtraImagesManag
 import TourParticipantsCard from "@/components/pages/admin/Tour/TourParticipantsCard";
 import AdminTourForm from "@/components/pages/admin/Tour/AdminTourForm";
 import { adminCancelTourSideEffects } from "@/apis/Tour";
+
+import { popup } from "@/utils/popup";
 
 const S3_TOUR_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/tour";
@@ -99,7 +101,7 @@ function calcDurationDays(start, end) {
   return diff >= 0 ? diff + 1 : 1;
 }
 
-function validateForm(next) {
+function validateForm(next, isEdit) {
   const e = {};
 
   if (!next.title?.trim()) e.title = "Vui lòng nhập tiêu đề.";
@@ -131,8 +133,13 @@ function validateForm(next) {
   if (durationDays < 1) e.durationDays = "Số ngày phải >= 1.";
   if (availableSeats < 0) e.availableSeats = "Ghế còn không được âm.";
   if (limitSeats < 1) e.limitSeats = "Số ghế tối thiểu phải >= 1.";
-  if (availableSeats < limitSeats)
-    e.availableSeats = "Ghế còn phải >= số ghế tối thiểu để tour chạy.";
+
+  if (!isEdit) {
+    if (availableSeats <= limitSeats) {
+      e.availableSeats =
+        "Khi tạo tour mới: Số ghế còn phải lớn hơn số ghế tối thiểu (limit).";
+    }
+  }
 
   if (!next.startDate) e.startDate = "Vui lòng chọn ngày bắt đầu.";
   if (!next.endDate) e.endDate = "Vui lòng chọn ngày kết thúc.";
@@ -158,12 +165,12 @@ export default function AdminTourUpsert() {
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [canceling, setCanceling] = useState(false);
+  const [copying, setCopying] = useState(false);
   const [err, setErr] = useState("");
 
   const [form, setForm] = useState(buildEmptyForm());
   const [fieldErrors, setFieldErrors] = useState(() =>
-    validateForm(buildEmptyForm()),
+    validateForm(buildEmptyForm(), isEdit),
   );
   const [touched, setTouched] = useState({});
   const [submitted, setSubmitted] = useState(false);
@@ -192,14 +199,14 @@ export default function AdminTourUpsert() {
   }, [form.priceAdult, form.percentDiscount]);
 
   const canSubmit = useMemo(() => {
-    if (saving || canceling || loading) return false;
+    if (saving || loading || copying) return false;
     return Object.keys(fieldErrors).length === 0;
-  }, [fieldErrors, saving, canceling, loading]);
+  }, [fieldErrors, saving, loading, copying]);
 
   function resetForm() {
     const empty = buildEmptyForm();
     setForm(empty);
-    setFieldErrors(validateForm(empty));
+    setFieldErrors(validateForm(empty, false));
     setTouched({});
     setSubmitted(false);
 
@@ -239,6 +246,7 @@ export default function AdminTourUpsert() {
       } catch (e) {
         console.error("Load tour guides failed:", e);
         setGuides([]);
+        popup.error("Tải danh sách hướng dẫn viên thất bại.");
       } finally {
         setLoadingGuides(false);
       }
@@ -267,7 +275,7 @@ export default function AdminTourUpsert() {
         };
 
         setForm(mapped);
-        setFieldErrors(validateForm(mapped));
+        setFieldErrors(validateForm(mapped, true));
         setTouched({});
         setSubmitted(false);
 
@@ -276,7 +284,12 @@ export default function AdminTourUpsert() {
 
         setOriginalStatus(mapped.status || "");
       })
-      .catch((e) => alive && setErr(e?.message || "Tải dữ liệu thất bại."))
+      .catch((e) => {
+        if (!alive) return;
+        const msg = e?.message || "Tải dữ liệu thất bại.";
+        setErr(msg);
+        popup.error(msg);
+      })
       .finally(() => alive && setLoading(false));
 
     return () => {
@@ -286,7 +299,7 @@ export default function AdminTourUpsert() {
 
   function applyForm(next) {
     setForm(next);
-    setFieldErrors(validateForm(next));
+    setFieldErrors(validateForm(next, isEdit));
   }
 
   function markTouched(name) {
@@ -304,7 +317,6 @@ export default function AdminTourUpsert() {
     if (type === "number") {
       const nextVal = value === "" ? "" : value;
       const next = { ...form, [name]: nextVal };
-
       applyForm(next);
       return;
     }
@@ -347,6 +359,34 @@ export default function AdminTourUpsert() {
     });
   }
 
+  async function onCopyTour() {
+    if (!isEdit) return;
+
+    const ok = await popup.confirm(
+      "Bạn muốn copy tour này thành tour mới không?",
+      "Xác nhận",
+    );
+    if (!ok) return;
+
+    setCopying(true);
+    try {
+      const rs = await copyTour(id);
+
+      const newId = rs?.tourId ?? rs?.id ?? rs?.tour?.tourId ?? rs?.tour?.id;
+      if (!newId) {
+        popup.error("Copy thành công nhưng không lấy được id tour mới.");
+        return;
+      }
+
+      popup.success("Copy tour thành công!");
+      navigate(`/admin/tours/edit/${newId}`);
+    } catch (e) {
+      popup.error(e?.message || "Copy tour thất bại.");
+    } finally {
+      setCopying(false);
+    }
+  }
+
   async function onSubmit(e) {
     e.preventDefault();
     setErr("");
@@ -367,17 +407,20 @@ export default function AdminTourUpsert() {
 
     if (!payload.status) payload.status = "Activated";
     if (!["Canceled", "Passed", "Activated"].includes(payload.status)) {
-      setErr("Trạng thái không hợp lệ.");
+      const msg = "Trạng thái không hợp lệ.";
+      setErr(msg);
       setTouched((prev) => ({ ...prev, status: true }));
+      popup.error(msg);
       return;
     }
 
     delete payload.createdAt;
 
-    const finalErrors = validateForm(payload);
+    const finalErrors = validateForm(payload, isEdit);
     setFieldErrors(finalErrors);
 
     if (Object.keys(finalErrors).length > 0) {
+      popup.error("Vui lòng kiểm tra lại các trường bị lỗi.");
       setTouched({
         title: true,
         linkVideo: true,
@@ -413,13 +456,16 @@ export default function AdminTourUpsert() {
           await adminCancelTourSideEffects(savedId);
         } catch (e3) {
           console.error("Cancel side effects failed:", e3);
-          setErr(
-            "Đã lưu trạng thái Hủy tour, nhưng gửi thông báo/hoàn tiền bị lỗi.",
-          );
+          const msg =
+            "Đã lưu trạng thái Hủy tour, nhưng gửi thông báo/hoàn tiền bị lỗi.";
+          setErr(msg);
+          popup.error(msg);
         }
       }
 
       if (isEdit) setOriginalStatus(payload.status || "");
+
+      popup.success("Lưu tour thành công!");
 
       if (isEdit) {
         if (savedId) navigate(`/admin/tours/edit/${savedId}`);
@@ -429,28 +475,11 @@ export default function AdminTourUpsert() {
 
       setOpenSuccess(true);
     } catch (e2) {
-      setErr(e2?.message || "Lưu thất bại.");
+      const msg = e2?.message || "Lưu thất bại.";
+      setErr(msg);
+      popup.error(msg);
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function onCancelTour() {
-    if (!isEdit) return;
-
-    const ok = window.confirm("Bạn có chắc chắn muốn hủy tour này không?");
-    if (!ok) return;
-
-    setCanceling(true);
-    setErr("");
-
-    const next = { ...form, status: "Canceled" };
-    applyForm(next);
-
-    try {
-      await onSubmit({ preventDefault() {} });
-    } finally {
-      setCanceling(false);
     }
   }
 
@@ -465,7 +494,7 @@ export default function AdminTourUpsert() {
 
   return (
     <div className=" mx-auto px-4 sm:px-6 py-6">
-      {/* Success modal responsive */}
+      {/* Success modal responsive (GIỮ NGUYÊN LOGIC) */}
       {openSuccess && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
@@ -523,18 +552,24 @@ export default function AdminTourUpsert() {
           {isEdit ? (
             <button
               type="button"
-              onClick={onCancelTour}
-              disabled={canceling || saving || loading}
-              className="w-full sm:w-auto px-4 py-2 rounded-xl border border-red-200 text-red-700 bg-red-50 disabled:opacity-60"
+              onClick={onCopyTour}
+              disabled={saving || loading || copying}
+              className="w-full sm:w-auto px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition disabled:opacity-60 inline-flex items-center justify-center gap-2"
             >
-              {canceling ? "Đang hủy..." : "Hủy tour"}
+              {copying ? (
+                <>
+                  <Spinner /> Đang copy...
+                </>
+              ) : (
+                "Copy tour"
+              )}
             </button>
           ) : null}
 
           <button
             type="button"
             onClick={() => navigate("/admin/tours")}
-            disabled={saving || canceling}
+            disabled={saving || copying}
             className="w-full sm:w-auto px-4 py-2 rounded-xl border bg-white disabled:opacity-60"
           >
             Quay lại
@@ -542,6 +577,7 @@ export default function AdminTourUpsert() {
         </div>
       </div>
 
+      {/* giữ err box (không ảnh hưởng logic), nhưng đã có popup */}
       {err ? (
         <div className="mb-5 p-3 rounded-xl bg-red-50 text-red-700 border border-red-100">
           {err}
@@ -589,7 +625,6 @@ export default function AdminTourUpsert() {
               statusLabel={statusLabel}
             />
 
-            {/* Chỉ render editor/images khi đã có tourId (edit) */}
             {isEdit ? <TourItineraryEditor tourId={id} /> : null}
 
             {isEdit ? (

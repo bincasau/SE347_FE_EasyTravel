@@ -38,7 +38,7 @@ export default function AdminTourCard({ tour, onEdit, onRemove }) {
 
   const finalPriceAdult = Math.max(
     0,
-    priceAdult - (priceAdult * percentDiscount) / 100
+    priceAdult - (priceAdult * percentDiscount) / 100,
   );
 
   const imageUrl = mainImage
@@ -99,7 +99,7 @@ export default function AdminTourCard({ tour, onEdit, onRemove }) {
               <Info
                 icon={<UsersIcon className="w-5 h-5 text-orange-400" />}
                 label="Seats"
-                value={`${availableSeats}/${limitSeats}`}
+                value={`${availableSeats}`}
               />
               <Info
                 icon={<MapPinIcon className="w-5 h-5 text-orange-400" />}
@@ -126,12 +126,16 @@ export default function AdminTourCard({ tour, onEdit, onRemove }) {
                 value={`${percentDiscount}%`}
               />
               <Info
-                icon={<CurrencyDollarIcon className="w-5 h-5 text-orange-400" />}
+                icon={
+                  <CurrencyDollarIcon className="w-5 h-5 text-orange-400" />
+                }
                 label="Adult"
                 value={`${money(priceAdult)} đ`}
               />
               <Info
-                icon={<CurrencyDollarIcon className="w-5 h-5 text-orange-400" />}
+                icon={
+                  <CurrencyDollarIcon className="w-5 h-5 text-orange-400" />
+                }
                 label="Child"
                 value={`${money(priceChild)} đ`}
               />

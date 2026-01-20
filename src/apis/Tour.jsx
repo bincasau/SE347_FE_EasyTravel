@@ -13,7 +13,7 @@ const API_BASE = "http://localhost:8080";
  */
 export async function searchByTitle(keyword) {
   const url = `${API_BASE}/tours/search/findByTitleContainingIgnoreCase?keyword=${encodeURIComponent(
-    keyword
+    keyword,
   )}`;
 
   const res = await fetch(url);
@@ -29,7 +29,7 @@ export async function searchByTitle(keyword) {
 export async function searchByLocation(location) {
   const safe = String(location ?? "").trim();
   const url = `${API_BASE}/tours/search/findByDepartureLocation?departureLocation=${encodeURIComponent(
-    safe
+    safe,
   )}`;
 
   const res = await fetch(url);
@@ -60,7 +60,7 @@ export async function searchByStartDate(
   date,
   page = 0,
   size = 8,
-  sort = "startDate,asc"
+  sort = "startDate,asc",
 ) {
   const params = new URLSearchParams();
   params.set("startDate", String(date ?? "").trim());
@@ -75,7 +75,6 @@ export async function searchByStartDate(
   return res.json();
 }
 
-
 export async function getTours(page, size, sort) {
   const url = `${API_BASE}/tours?page=${page}&size=${size}&sort=${sort}`;
   const res = await fetch(url);
@@ -89,17 +88,13 @@ export async function getDepartureLocations() {
 
     const data = await res.json();
 
-
     if (!Array.isArray(data)) return [];
-    return data
-      .map((x) => String(x ?? "").trim())
-      .filter((x) => x.length > 0);
+    return data.map((x) => String(x ?? "").trim()).filter((x) => x.length > 0);
   } catch (error) {
     console.error("API getDepartureLocations error:", error);
     return [];
   }
 }
-
 
 export async function getAllTours() {
   let allTours = [];
@@ -153,7 +148,6 @@ async function fetchJsonAuth(url, options = {}) {
   return res.json();
 }
 
-
 export async function getTourFullById(id) {
   const [tour, itRes, imgRes, tgRes] = await Promise.all([
     fetchJsonPublic(`${API_BASE}/tours/${id}`),
@@ -170,13 +164,12 @@ export async function getTourFullById(id) {
   };
 }
 
-
 export async function saveTourUpsert(tour, file, guideIds) {
   const formData = new FormData();
 
   formData.append(
     "tour",
-    new Blob([JSON.stringify(tour)], { type: "application/json" })
+    new Blob([JSON.stringify(tour)], { type: "application/json" }),
   );
 
   if (file) formData.append("file", file);
@@ -186,7 +179,6 @@ export async function saveTourUpsert(tour, file, guideIds) {
     body: formData,
   });
 }
-
 
 export async function deleteTour(tourId) {
   const res = await fetch(`${API_BASE}/admin/tour/${tourId}`, {
@@ -220,12 +212,11 @@ export async function getMonthlyTourStats(month, year) {
         ...getAuthHeaders(),
         Accept: "application/json",
       },
-    }
+    },
   );
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
-
 
 export async function filterTours({
   keyword = "",
@@ -311,16 +302,16 @@ export async function adminCancelTourSideEffects(tourId) {
     new Set(
       successBookings
         .map((p) => p?.user?.userId)
-        .filter((id) => id !== null && id !== undefined)
-    )
+        .filter((id) => id !== null && id !== undefined),
+    ),
   );
 
   const bookingIds = Array.from(
     new Set(
       successBookings
         .map((p) => p?.bookingId)
-        .filter((id) => id !== null && id !== undefined)
-    )
+        .filter((id) => id !== null && id !== undefined),
+    ),
   );
 
   const msg = tourTitle
@@ -347,10 +338,56 @@ export async function adminCancelTourSideEffects(tourId) {
       throw new Error(
         typeof data === "string"
           ? data
-          : data?.message || `Refund failed for bookingId=${bookingId}`
+          : data?.message || `Refund failed for bookingId=${bookingId}`,
       );
     }
 
     console.log("refund ok:", bookingId, data);
   }
+}
+
+export async function searchToursByKeyword(keyword) {
+  const k = String(keyword ?? "").trim();
+  if (!k) return [];
+
+  const url = `${API_BASE}/tours/search/filterTours?keyword=${encodeURIComponent(k)}`;
+  console.log("[searchToursByKeyword] URL =", url);
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      ...getAuthHeaders(),
+      Accept: "application/json",
+    },
+  });
+
+  if (!res.ok) throw new Error(await res.text());
+
+  const data = await res.json();
+  return data?._embedded?.tours ?? [];
+}
+
+export async function copyTour(tourId) {
+  const id = Number(tourId);
+  if (!id) throw new Error("tourId không hợp lệ");
+
+  const url = `${API_BASE}/admin/tour/copy/${id}`;
+  console.log("[copyTour] URL =", url);
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+      Accept: "application/json",
+    },
+  });
+
+  const data = await readJsonOrText(res);
+  if (!res.ok) {
+    throw new Error(
+      typeof data === "string" ? data : data?.message || "Copy tour failed",
+    );
+  }
+
+  return data;
 }

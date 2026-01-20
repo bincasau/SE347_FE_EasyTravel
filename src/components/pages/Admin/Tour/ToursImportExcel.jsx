@@ -34,14 +34,6 @@ function normalizeDateCell(v) {
   return String(v).slice(0, 10);
 }
 
-/**
- * Expect columns like export:
- * Title, LinkVideo, Description, PriceAdult, PriceChild, DiscountPercent,
- * DurationDays, StartDate, EndDate, DepartureLocation, Destination,
- * AvailableSeats, LimitSeats, MainImage, Status, CreatedAt
- *
- * Optional: TourGuideId (nếu có)
- */
 function mapRowToPayload(row, defaultGuideId) {
   const payload = {
     title: row.Title ?? row.title ?? "",
@@ -51,7 +43,7 @@ function mapRowToPayload(row, defaultGuideId) {
     priceChild: toNumberSafe(row.PriceChild ?? row.priceChild, 0),
     percentDiscount: toNumberSafe(
       row.DiscountPercent ?? row.percentDiscount ?? row.PercentDiscount,
-      0
+      0,
     ),
     durationDays: toNumberSafe(row.DurationDays ?? row.durationDays, 1),
     startDate: normalizeDateCell(row.StartDate ?? row.startDate),
@@ -66,7 +58,7 @@ function mapRowToPayload(row, defaultGuideId) {
     // lấy TourGuideId nếu có trong file, không có thì dùng default
     tourGuideId: toNumberSafe(
       row.TourGuideId ?? row.tourGuideId ?? defaultGuideId,
-      0
+      0,
     ),
   };
 
@@ -78,8 +70,7 @@ function mapRowToPayload(row, defaultGuideId) {
 
 export default function ImportToursExcelButton({
   defaultGuideId = 0,
-  className = "px-5 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition disabled:opacity-60",
-  onDone,
+  className = "w-full sm:w-auto px-5 py-2 rounded-full bg-purple-600 text-white hover:bg-purple-700 transition disabled:opacity-60 inline-flex items-center justify-center gap-2",
 }) {
   const inputRef = useRef(null);
   const [importing, setImporting] = useState(false);
@@ -121,7 +112,7 @@ export default function ImportToursExcelButton({
         if (!guideId) {
           fail += 1;
           errors.push(
-            `Row ${i + 2}: thiếu TourGuideId (hoặc defaultGuideId=0).`
+            `Row ${i + 2}: thiếu TourGuideId (hoặc defaultGuideId=0).`,
           );
           continue;
         }
@@ -137,7 +128,9 @@ export default function ImportToursExcelButton({
 
       const summary = `Import xong: ${ok} thành công, ${fail} thất bại.`;
       setMsg(
-        errors.length ? `${summary}\n${errors.slice(0, 8).join("\n")}` : summary
+        errors.length
+          ? `${summary}\n${errors.slice(0, 8).join("\n")}`
+          : summary,
       );
 
       if (typeof onDone === "function") onDone({ ok, fail, errors });

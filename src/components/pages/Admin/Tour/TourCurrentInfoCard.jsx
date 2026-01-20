@@ -7,13 +7,14 @@ function moneyVND(v) {
 function statusBadge(statusLabel) {
   const s = String(statusLabel || "").toLowerCase();
 
-  const cls = s.includes("hủy") || s.includes("cancel")
-    ? "bg-red-50 text-red-700 ring-red-200"
-    : s.includes("kích hoạt") || s.includes("activated")
-    ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-    : s.includes("duyệt") || s.includes("passed")
-    ? "bg-blue-50 text-blue-700 ring-blue-200"
-    : "bg-gray-50 text-gray-700 ring-gray-200";
+  const cls =
+    s.includes("hủy") || s.includes("cancel")
+      ? "bg-red-50 text-red-700 ring-red-200"
+      : s.includes("kích hoạt") || s.includes("activated")
+        ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+        : s.includes("duyệt") || s.includes("passed")
+          ? "bg-blue-50 text-blue-700 ring-blue-200"
+          : "bg-gray-50 text-gray-700 ring-gray-200";
 
   return (
     <span
@@ -32,7 +33,6 @@ export default function TourCurrentInfoCard({
   endDate,
   durationDays,
   availableSeats,
-  limitSeats,
   statusLabel,
 }) {
   return (
@@ -72,10 +72,7 @@ export default function TourCurrentInfoCard({
           value={`${startDate || "-"} → ${endDate || "-"} (${durationDays} ngày)`}
         />
 
-        <Item
-          label="Số ghế"
-          value={`Còn ${availableSeats} / ${limitSeats}`}
-        />
+        <Item label="Số ghế" value={`Còn ${availableSeats} ghế`} />
       </div>
     </div>
   );
@@ -85,7 +82,9 @@ function Item({ label, value, strong }) {
   return (
     <div className="min-w-0">
       <div className="text-gray-500 text-xs">{label}</div>
-      <div className={`break-words ${strong ? "font-semibold text-gray-900" : "font-medium"}`}>
+      <div
+        className={`break-words ${strong ? "font-semibold text-gray-900" : "font-medium"}`}
+      >
         {value}
       </div>
     </div>

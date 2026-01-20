@@ -266,7 +266,6 @@ export default function AdminTourForm({
             onBlur={onBlur}
             className={inputCls}
             min={0}
-            max={form.limitSeats === "" ? undefined : form.limitSeats}
           />
           <FieldError
             msg={fieldErrors.availableSeats}
