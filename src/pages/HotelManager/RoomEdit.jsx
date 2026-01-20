@@ -95,7 +95,6 @@ export default function RoomEdit() {
 
   useEffect(() => {
     if (!room) {
-      // ✅ optional: báo nhẹ rồi back
       popup.error("Không tìm thấy dữ liệu phòng để chỉnh sửa.").finally(() => {
         navigate(-1, { replace: true });
       });
@@ -106,6 +105,7 @@ export default function RoomEdit() {
   const [original, setOriginal] = useState(null);
 
   // ✅ form theo UI snake_case, nhưng lúc gửi BE -> camelCase
+  // ❌ removed: status
   const [form, setForm] = useState({
     room_id: "",
     room_number: "",
@@ -113,7 +113,6 @@ export default function RoomEdit() {
     number_of_guests: "",
     price: "", // ✅ lưu dạng string số thô để edit
     description: "",
-    status: "AVAILABLE",
   });
 
   // ✅ single image (bedFile/wcFile)
@@ -146,7 +145,6 @@ export default function RoomEdit() {
       price:
         room.price === null || room.price === undefined ? "" : String(room.price),
       description: String(room.description ?? room.desc ?? ""),
-      status: String(room.status ?? "AVAILABLE"),
     };
 
     // ảnh cũ
@@ -167,7 +165,6 @@ export default function RoomEdit() {
     // reset file mới
     setBedFile(null);
     setWcFile(null);
-
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room]);
 
@@ -244,7 +241,6 @@ export default function RoomEdit() {
     const priceNum = parseVNDToNumber(form.price);
     if (!Number.isFinite(priceNum)) return popup.error("Price invalid.");
 
-    // ✅ (optional) hỏi confirm trước khi save
     const ok = await popup.confirm("Bạn có chắc muốn lưu thay đổi?", "Xác nhận");
     if (!ok) return;
 
@@ -254,7 +250,7 @@ export default function RoomEdit() {
       roomNumber: safeNumber(form.room_number, 0),
       roomType: String(form.room_type).trim(),
       numberOfGuest: safeNumber(form.number_of_guests, 0),
-      price: priceNum, // ✅ gửi số
+      price: priceNum,
       desc: String(form.description || "").trim(),
       ...(room?.hotel?.hotelId
         ? { hotel: { hotelId: Number(room.hotel.hotelId) } }
@@ -283,7 +279,6 @@ export default function RoomEdit() {
 
       await popup.success("Cập nhật phòng thành công!");
 
-      // update original
       const bedOld = bedPreview?.startsWith("blob:")
         ? bedPreview
         : original?.bedOld || "";
@@ -320,7 +315,6 @@ export default function RoomEdit() {
     "w-full border rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-200";
   const inputReadonly = isEditing ? "" : "bg-gray-50 text-gray-700 border-gray-200";
 
-  // ✅ display text cho read-only
   const priceDisplay = useMemo(() => {
     const n = parseVNDToNumber(form.price);
     return Number.isFinite(n) ? formatVND(n) : "--";
@@ -425,21 +419,6 @@ export default function RoomEdit() {
               ) : null}
             </Field>
 
-            <Field label="Status">
-              <select
-                name="status"
-                value={form.status}
-                onChange={handleChange}
-                className={`${inputBase} ${inputReadonly}`}
-                disabled={!isEditing}
-              >
-                <option value="AVAILABLE">AVAILABLE</option>
-                <option value="BOOKED">BOOKED</option>
-                <option value="MAINTENANCE">MAINTENANCE</option>
-                <option value="INACTIVE">INACTIVE</option>
-              </select>
-            </Field>
-
             <Field label="Description" className="md:col-span-2">
               <textarea
                 name="description"
@@ -456,7 +435,7 @@ export default function RoomEdit() {
             <SingleImage
               title="Bed Image (bedFile)"
               preview={bedPreview || FALLBACK_IMAGE}
-              onPick={pickBed}
+              onPick={() => pickBed()}
               onClear={clearBed}
               inputRef={bedInputRef}
               onChange={(e) => {
@@ -471,7 +450,7 @@ export default function RoomEdit() {
             <SingleImage
               title="WC Image (wcFile)"
               preview={wcPreview || FALLBACK_IMAGE}
-              onPick={pickWc}
+              onPick={() => pickWc()}
               onClear={clearWc}
               inputRef={wcInputRef}
               onChange={(e) => {

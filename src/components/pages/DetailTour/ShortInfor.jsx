@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   startOfMonth,
@@ -21,6 +21,10 @@ import { getUserFromToken } from "@/utils/auth";
 import { extractIdFromSlug, buildTourSlug } from "@/utils/slug";
 import { popup } from "@/utils/popup";
 
+const BASE_URL = "http://localhost:8080";
+const S3_TOUR_IMG_BASE =
+  "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/image";
+
 export default function TourDetail() {
   const { slugId } = useParams();
   const navigate = useNavigate();
@@ -32,19 +36,62 @@ export default function TourDetail() {
   const [selectedImg, setSelectedImg] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ✅ NEW: month state cho calendar
+  // ✅ month state cho calendar
   const [currentMonth, setCurrentMonth] = useState(null);
-
-  const S3_TOUR_IMG_BASE =
-    "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/image";
 
   const fallbackImages = useMemo(
     () => [
       "https://placehold.co/1200x800?text=Tour+Image",
       "https://placehold.co/600x400?text=Preview",
     ],
-    [],
+    []
   );
+
+  const buildS3Url = (fileOrUrl) => {
+    if (!fileOrUrl) return "";
+    const s = String(fileOrUrl).trim();
+    if (!s) return "";
+    if (s.startsWith("http://") || s.startsWith("https://")) return s;
+    return `${S3_TOUR_IMG_BASE}/${s.replace(/^\/+/, "")}`;
+  };
+
+  const fetchTourImages = async (tourId) => {
+    const res = await fetch(`${BASE_URL}/tours/${tourId}/images`);
+    if (!res.ok) throw new Error("Không thể tải danh sách ảnh tour");
+
+    const data = await res.json();
+    const list = data?._embedded?.images;
+
+    if (!Array.isArray(list)) return [];
+
+    // map ra url S3 + sort theo imageId/createdAt nếu cần
+    const mapped = list
+      .map((it) => ({
+        imageId: it?.imageId ?? 0,
+        createdAt: it?.createdAt,
+        url: buildS3Url(it?.url),
+        title: it?.title,
+        altText: it?.altText,
+      }))
+      .filter((x) => x.url);
+
+    // sort: ưu tiên imageId tăng dần (1,2,3...) hoặc createdAt
+    mapped.sort((a, b) => {
+      const ia = Number(a.imageId || 0);
+      const ib = Number(b.imageId || 0);
+      if (ia && ib) return ia - ib;
+      const ta = new Date(a.createdAt || 0).getTime();
+      const tb = new Date(b.createdAt || 0).getTime();
+      return (ta || 0) - (tb || 0);
+    });
+
+    // chỉ lấy url (UI đang dùng url string)
+    // nếu bạn muốn dùng alt/title theo ảnh, mình sẽ sửa UI cho dùng object
+    const urls = mapped.map((x) => x.url);
+
+    // remove duplicate
+    return Array.from(new Set(urls));
+  };
 
   useEffect(() => {
     const fetchTour = async () => {
@@ -55,29 +102,36 @@ export default function TourDetail() {
           return;
         }
 
-        const res = await fetch(`http://localhost:8080/tours/${id}`);
-        if (!res.ok) throw new Error("Không thể tải dữ liệu tour");
+        setLoading(true);
 
+        // 1) fetch tour detail
+        const res = await fetch(`${BASE_URL}/tours/${id}`);
+        if (!res.ok) throw new Error("Không thể tải dữ liệu tour");
         const data = await res.json();
         setTour(data);
 
+        // fix slug
         const correctSlugId = buildTourSlug(id, data?.title);
         if (slugId !== correctSlugId) {
           navigate(`/detailtour/${correctSlugId}`, { replace: true });
         }
 
-        const s3Images = Array.from({ length: 5 }, (_, idx) => {
-          const n = idx + 1;
-          return `${S3_TOUR_IMG_BASE}/tour_${id}_img_${n}.jpg`;
-        });
-
-        setImages(s3Images);
-        setSelectedImg(s3Images[0]);
-
-        // ✅ init month = tháng của startDate
+        // init month = tháng của startDate
         if (data?.startDate) {
           const s = parseISO(data.startDate);
           setCurrentMonth(startOfMonth(s));
+        }
+
+        // 2) fetch images list by tour id
+        const urls = await fetchTourImages(id);
+
+        if (urls.length > 0) {
+          setImages(urls);
+          setSelectedImg(urls[0]);
+        } else {
+          // không có ảnh => dùng fallback
+          setImages([]);
+          setSelectedImg(null);
         }
       } catch (err) {
         console.error("❌ Lỗi khi fetch tour:", err);
@@ -88,13 +142,8 @@ export default function TourDetail() {
       }
     };
 
-    setLoading(true);
     fetchTour();
   }, [id, slugId, navigate]);
-
-  useEffect(() => {
-    if (images?.length) setSelectedImg(images[0]);
-  }, [images]);
 
   if (loading) {
     return (
@@ -139,7 +188,6 @@ export default function TourDetail() {
   const minMonth = startOfMonth(start);
   const maxMonth = startOfMonth(end);
 
-  // fallback nếu chưa init
   const shownMonth = currentMonth || startOfMonth(start);
 
   const canPrev = !isBefore(subMonths(shownMonth, 1), minMonth);
@@ -238,11 +286,9 @@ export default function TourDetail() {
 
         days.push(
           <div key={format(day, "yyyy-MM-dd")} className="relative">
-            {isInRange && (
-              <div className="absolute inset-0 bg-orange-200 z-0" />
-            )}
+            {isInRange && <div className="absolute inset-0 bg-orange-200 z-0" />}
             <div className={cellClass}>{formatted}</div>
-          </div>,
+          </div>
         );
 
         day = addDays(day, 1);
@@ -251,7 +297,7 @@ export default function TourDetail() {
       rows.push(
         <div className="grid grid-cols-7 gap-[0px] mb-[1px]" key={String(day)}>
           {days}
-        </div>,
+        </div>
       );
       days = [];
     }
@@ -259,7 +305,9 @@ export default function TourDetail() {
     return <div>{rows}</div>;
   };
 
+  // ✅ preview theo đúng số ảnh backend trả về (không đủ thì không hiện thêm ô nào)
   const previewImages = images.slice(0, 3);
+
   const mainImg = selectedImg || images[0] || fallbackImages[0];
 
   const getToken = () =>
@@ -278,7 +326,7 @@ export default function TourDetail() {
     if (!token) {
       const ok = await popup.confirm(
         "Bạn cần đăng nhập để đặt tour. Mở trang đăng nhập ngay?",
-        "Yêu cầu đăng nhập",
+        "Yêu cầu đăng nhập"
       );
       if (ok) window.dispatchEvent(new Event("open-login"));
       return;
@@ -325,46 +373,46 @@ export default function TourDetail() {
           />
         </div>
 
-        <div className="grid grid-cols-3 gap-3 sm:gap-4 mt-3 sm:mt-4">
-          {previewImages.map((img, i) => {
-            const isActive = img === mainImg;
+        {/* ✅ chỉ render preview nếu có ảnh */}
+        {previewImages.length > 0 && (
+          <div className="grid grid-cols-3 gap-3 sm:gap-4 mt-3 sm:mt-4">
+            {previewImages.map((img, i) => {
+              const isActive = img === mainImg;
 
-            return (
-              <button
-                key={i}
-                type="button"
-                onClick={() => setSelectedImg(img)}
-                className={[
-                  "rounded-xl overflow-hidden bg-gray-100 shadow-sm",
-                  "h-[90px] sm:h-[120px] lg:h-[140px] w-full",
-                  "ring-2 ring-offset-2 transition",
-                  isActive
-                    ? "ring-orange-500"
-                    : "ring-transparent hover:ring-orange-300",
-                ].join(" ")}
-              >
-                <img
-                  src={img}
-                  alt={`preview-${i}`}
-                  className="w-full h-full object-cover hover:scale-[1.03] transition-transform duration-200"
-                  onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    e.currentTarget.src = fallbackImages[1];
-                  }}
-                />
-              </button>
-            );
-          })}
-        </div>
+              return (
+                <button
+                  key={img}
+                  type="button"
+                  onClick={() => setSelectedImg(img)}
+                  className={[
+                    "rounded-xl overflow-hidden bg-gray-100 shadow-sm",
+                    "h-[90px] sm:h-[120px] lg:h-[140px] w-full",
+                    "ring-2 ring-offset-2 transition",
+                    isActive
+                      ? "ring-orange-500"
+                      : "ring-transparent hover:ring-orange-300",
+                  ].join(" ")}
+                >
+                  <img
+                    src={img}
+                    alt={`preview-${i}`}
+                    className="w-full h-full object-cover hover:scale-[1.03] transition-transform duration-200"
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = fallbackImages[1];
+                    }}
+                  />
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Right info */}
       <div className="flex flex-col pb-4">
         <div className="mt-2 md:mt-0">
-          <h1
-            className="text-2xl sm:text-3xl lg:text-4xl 
-          font-semibold font-light mb-1 text-gray-800 leading-snug"
-          >
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-semibold font-light mb-1 text-gray-800 leading-snug">
             {title}
           </h1>
 

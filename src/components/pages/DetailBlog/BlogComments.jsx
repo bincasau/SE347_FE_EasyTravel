@@ -37,14 +37,19 @@ function Avatar({ name, avatar }) {
       alt={name || "avatar"}
       className="w-8 h-8 rounded-full object-cover border"
       onError={(e) => {
-        // fallback -> đổi thành avatar chữ bằng cách ẩn img
         e.currentTarget.style.display = "none";
       }}
     />
   );
 }
 
-export default function BlogComments({ blogId }) {
+/**
+ * Props:
+ * - blogId: required
+ * - isLoggedIn?: boolean (optional) -> nếu có, component dùng theo prop này
+ * - onOpenLogin?: () => void (optional) -> bấm để mở modal login
+ */
+export default function BlogComments({ blogId, isLoggedIn, onOpenLogin }) {
   const [comments, setComments] = useState([]);
   const [visibleCount, setVisibleCount] = useState(4);
   const [loading, setLoading] = useState(true);
@@ -56,12 +61,28 @@ export default function BlogComments({ blogId }) {
   const [editingContent, setEditingContent] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
+  // ===== detect login (fallback) =====
+  // Nếu bạn có auth store thì hãy truyền isLoggedIn từ ngoài vào cho chuẩn.
+  const fallbackLoggedIn = useMemo(() => {
+    try {
+      const t =
+        localStorage.getItem("accessToken") ||
+        localStorage.getItem("token") ||
+        localStorage.getItem("jwt");
+      return !!t;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const loggedIn = typeof isLoggedIn === "boolean" ? isLoggedIn : fallbackLoggedIn;
+
   const visibleComments = useMemo(
     () => comments.slice(0, visibleCount),
     [comments, visibleCount]
   );
 
-  // ===== field getters (theo response mới) =====
+  // ===== field getters =====
   const getId = (c, i) => c?.commentId ?? c?.id ?? i;
   const getTime = (c) => c?.createdAt ?? c?.time ?? c?.created_at;
   const getContent = (c) => c?.content ?? "";
@@ -114,6 +135,13 @@ export default function BlogComments({ blogId }) {
   // ===== ADD =====
   const onSubmit = async (e) => {
     e.preventDefault();
+
+    if (!loggedIn) {
+      popup.error("Bạn cần đăng nhập để bình luận.");
+      onOpenLogin?.();
+      return;
+    }
+
     const text = content.trim();
     if (!text) return;
 
@@ -126,7 +154,15 @@ export default function BlogComments({ blogId }) {
       popup.success("Đã gửi bình luận!");
     } catch (e2) {
       console.error(e2);
-      popup.error(e2?.message || "Không thể gửi bình luận (cần đăng nhập?)");
+
+      // Nếu backend trả 401/403 thì hiển thị message đăng nhập
+      const status = e2?.status || e2?.response?.status;
+      if (status === 401 || status === 403) {
+        popup.error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+        onOpenLogin?.();
+      } else {
+        popup.error(e2?.message || "Không thể gửi bình luận (cần đăng nhập?)");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -134,6 +170,11 @@ export default function BlogComments({ blogId }) {
 
   // ===== EDIT =====
   const startEdit = (c) => {
+    if (!loggedIn) {
+      popup.error("Bạn cần đăng nhập để sửa bình luận.");
+      onOpenLogin?.();
+      return;
+    }
     const id = getId(c);
     setEditingId(id);
     setEditingContent(getContent(c));
@@ -146,6 +187,13 @@ export default function BlogComments({ blogId }) {
 
   const saveEdit = async () => {
     if (!editingId) return;
+
+    if (!loggedIn) {
+      popup.error("Bạn cần đăng nhập để sửa bình luận.");
+      onOpenLogin?.();
+      return;
+    }
+
     const text = editingContent.trim();
     if (!text) return;
 
@@ -157,7 +205,13 @@ export default function BlogComments({ blogId }) {
       popup.success("Đã cập nhật bình luận!");
     } catch (e) {
       console.error(e);
-      popup.error(e?.message || "Không thể sửa bình luận");
+      const status = e?.status || e?.response?.status;
+      if (status === 401 || status === 403) {
+        popup.error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+        onOpenLogin?.();
+      } else {
+        popup.error(e?.message || "Không thể sửa bình luận");
+      }
     } finally {
       setSavingEdit(false);
     }
@@ -165,6 +219,12 @@ export default function BlogComments({ blogId }) {
 
   // ===== DELETE =====
   const onDelete = async (id) => {
+    if (!loggedIn) {
+      popup.error("Bạn cần đăng nhập để xoá bình luận.");
+      onOpenLogin?.();
+      return;
+    }
+
     const ok = await popup.confirm("Xoá bình luận này?");
     if (!ok) return;
 
@@ -174,7 +234,13 @@ export default function BlogComments({ blogId }) {
       popup.success("Đã xoá bình luận!");
     } catch (e) {
       console.error(e);
-      popup.error(e?.message || "Không thể xoá bình luận");
+      const status = e?.status || e?.response?.status;
+      if (status === 401 || status === 403) {
+        popup.error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+        onOpenLogin?.();
+      } else {
+        popup.error(e?.message || "Không thể xoá bình luận");
+      }
     }
   };
 
@@ -210,7 +276,6 @@ export default function BlogComments({ blogId }) {
               >
                 <div className="flex items-start justify-between gap-3 mb-2">
                   <div className="flex items-center gap-3">
-                    {/* avatar image or fallback letter */}
                     <div className="w-8 h-8">
                       {avatar ? (
                         <Avatar name={name} avatar={avatar} />
@@ -232,13 +297,17 @@ export default function BlogComments({ blogId }) {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => startEdit(c)}
-                      className="text-xs px-3 py-1 rounded-full border hover:bg-white"
+                      className="text-xs px-3 py-1 rounded-full border hover:bg-white disabled:opacity-60"
+                      disabled={!loggedIn}
+                      title={!loggedIn ? "Đăng nhập để sửa" : "Sửa"}
                     >
                       Sửa
                     </button>
                     <button
                       onClick={() => onDelete(id)}
-                      className="text-xs px-3 py-1 rounded-full border border-red-300 text-red-600 hover:bg-red-50"
+                      className="text-xs px-3 py-1 rounded-full border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-60"
+                      disabled={!loggedIn}
+                      title={!loggedIn ? "Đăng nhập để xoá" : "Xoá"}
                     >
                       Xoá
                     </button>
@@ -301,27 +370,49 @@ export default function BlogComments({ blogId }) {
         </div>
       )}
 
+      {/* FORM */}
       <form
         onSubmit={onSubmit}
         className="mt-8 bg-gray-50 p-5 rounded-xl shadow-sm border"
       >
-        <h4 className="font-semibold text-gray-800 mb-3">Viết bình luận</h4>
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <h4 className="font-semibold text-gray-800">Viết bình luận</h4>
+
+          
+        </div>
+
+        {!loggedIn && (
+          <div className="mb-3 text-sm text-gray-600 bg-white border rounded-lg px-3 py-2">
+            Bạn cần <span className="font-semibold">đăng nhập</span> để bình
+            luận.
+          </div>
+        )}
 
         <textarea
-          placeholder="Nội dung bình luận..."
+          placeholder={
+            loggedIn ? "Nội dung bình luận..." : "Đăng nhập để viết bình luận..."
+          }
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          className="w-full border rounded-md px-3 py-2 text-sm h-24 resize-none focus:ring-2 focus:ring-orange-400 outline-none"
+          disabled={!loggedIn || submitting}
+          className={`
+            w-full border rounded-md px-3 py-2 text-sm h-24 resize-none
+            focus:ring-2 focus:ring-orange-400 outline-none
+            ${!loggedIn ? "bg-gray-100 cursor-not-allowed" : "bg-white"}
+          `}
         />
 
         <button
           type="submit"
-          disabled={submitting}
-          className={`mt-3 px-5 py-2 rounded-full text-white font-medium transition ${
-            submitting
-              ? "bg-gray-400 cursor-not-allowed"
-              : "bg-orange-500 hover:bg-orange-600"
-          }`}
+          disabled={!loggedIn || submitting}
+          className={`
+            mt-3 px-5 py-2 rounded-full text-white font-medium transition
+            ${
+              !loggedIn || submitting
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-orange-500 hover:bg-orange-600"
+            }
+          `}
         >
           {submitting ? "Đang gửi..." : "Gửi bình luận"}
         </button>

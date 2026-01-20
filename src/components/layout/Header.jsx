@@ -59,9 +59,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
       return (tb || 0) - (ta || 0);
     });
 
-  const unreadCount = notifications.filter(
-    (n) => !normalizeNoti(n).read,
-  ).length;
+  const unreadCount = notifications.filter((n) => !normalizeNoti(n).read).length;
 
   // ✅ Khi đã login mới hiển thị badge (vì chưa login sẽ ẩn chuông luôn)
   const showBadge = !!user && unreadCount > 0;
@@ -119,19 +117,23 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
   };
 
   /**
-   * ✅ IMPORTANT FIX:
-   * - Luôn load PUBLIC (broadcast) notifications
-   * - Nếu có user => load thêm MY notifications
-   * - Merge theo id, giữ read state (nếu đã read ở UI thì giữ)
+   * ✅ CHỈNH THEO YÊU CẦU:
+   * - CUSTOMER: KHÔNG lấy broadcast/public
+   * - Role khác: có broadcast/public
+   * - Luôn lấy MY notifications nếu đã login
+   * - Merge theo id, giữ read state
    */
   const loadNotifications = async () => {
     setLoadingNoti(true);
     try {
+      // ✅ CUSTOMER thì ẩn broadcast/public trong chuông
+      const includePublic = user?.role && user.role !== "CUSTOMER";
+
       const [publicList, myList] = await Promise.all([
-        getPublicNotifications().catch(() => []),
-        user
-          ? getMyNotifications("ACTIVE").catch(() => [])
+        includePublic
+          ? getPublicNotifications().catch(() => [])
           : Promise.resolve([]),
+        user ? getMyNotifications("ACTIVE").catch(() => []) : Promise.resolve([]),
       ]);
 
       const incoming = [
@@ -161,8 +163,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
           mergedMap.set(n.id, {
             ...old,
             ...n,
-            read:
-              Boolean(old.read) || Boolean(n.read) || Boolean(oldPrev?.read),
+            read: Boolean(old.read) || Boolean(n.read) || Boolean(oldPrev?.read),
           });
         };
 
@@ -302,13 +303,11 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
   }, [openMobile]);
 
   const handleLogout = async () => {
-    // ✅ đóng mobile menu + dropdown trước để không che popup
     setOpenMobile(false);
     setOpenUserMenu(false);
     setOpenNoti(false);
     setOpenLang(false);
 
-    // ✅ đợi 1 tick để menu translate-x chạy xong (tránh vẫn che)
     await new Promise((r) => setTimeout(r, 50));
 
     const ok = await popup.confirm("Bạn có chắc muốn đăng xuất?", "Đăng xuất");
@@ -350,6 +349,11 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     location.pathname.startsWith("/guide/schedule") ||
     /^\/guide\/tour\/[^/]+\/schedule\/?$/.test(location.pathname);
 
+  // ✅ NEW: Upcoming active cả ở /guide/upcoming-tours và /guide/tour/:id/participants
+  const isGuideUpcomingActive =
+    location.pathname.startsWith("/guide/upcoming-tours") ||
+    /^\/guide\/tour\/[^/]+\/participants\/?$/.test(location.pathname);
+
   const isGuidePastToursActive =
     location.pathname.startsWith("/guide/past-tours") ||
     location.pathname.startsWith("/detailtour");
@@ -360,23 +364,20 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     location.pathname.startsWith("/hotel-manager/rooms/view");
 
   const isHotelManagerRevenueActive = location.pathname.startsWith(
-    "/hotel-manager/revenue",
+    "/hotel-manager/revenue"
   );
+
   // ===== ADMIN ACTIVE CHECK =====
   const isAdminDashboardActive =
     location.pathname === "/admin" ||
     location.pathname.startsWith("/admin/dashboard");
 
   const isAdminToursActive = location.pathname.startsWith("/admin/tours");
-
   const isAdminUsersActive = location.pathname.startsWith("/admin/users");
-
   const isAdminHotelsActive = location.pathname.startsWith("/admin/hotels");
-
   const isAdminNotificationsActive = location.pathname.startsWith(
-    "/admin/notifications",
+    "/admin/notifications"
   );
-
   const isAdminBlogsActive = location.pathname.startsWith("/admin/blogs");
 
   const renderNavClass = (it, isActive) => {
@@ -395,19 +396,12 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
             className={() => {
               if (it.to === "/admin/dashboard" && isAdminDashboardActive)
                 return activeLink;
-              if (it.to === "/admin/tours" && isAdminToursActive)
+              if (it.to === "/admin/tours" && isAdminToursActive) return activeLink;
+              if (it.to === "/admin/users" && isAdminUsersActive) return activeLink;
+              if (it.to === "/admin/hotels" && isAdminHotelsActive) return activeLink;
+              if (it.to === "/admin/notifications" && isAdminNotificationsActive)
                 return activeLink;
-              if (it.to === "/admin/users" && isAdminUsersActive)
-                return activeLink;
-              if (it.to === "/admin/hotels" && isAdminHotelsActive)
-                return activeLink;
-              if (
-                it.to === "/admin/notifications" &&
-                isAdminNotificationsActive
-              )
-                return activeLink;
-              if (it.to === "/admin/blogs" && isAdminBlogsActive)
-                return activeLink;
+              if (it.to === "/admin/blogs" && isAdminBlogsActive) return activeLink;
 
               return baseLink;
             }}
@@ -431,10 +425,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
                 isHotelManagerAddRoomActive
               )
                 return activeLink;
-              if (
-                it.to === "/hotel-manager/revenue" &&
-                isHotelManagerRevenueActive
-              )
+              if (it.to === "/hotel-manager/revenue" && isHotelManagerRevenueActive)
                 return activeLink;
               return isActive ? activeLink : baseLink;
             }}
@@ -455,8 +446,14 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
             className={({ isActive }) => {
               if (it.to === "/guide/schedule" && isGuideScheduleActive)
                 return activeLink;
+
+              // ✅ NEW: Upcoming active for both upcoming page + participants page
+              if (it.to === "/guide/upcoming-tours" && isGuideUpcomingActive)
+                return activeLink;
+
               if (it.to === "/guide/past-tours" && isGuidePastToursActive)
                 return activeLink;
+
               return isActive ? activeLink : baseLink;
             }}
             onClick={() => setOpenMobile(false)}
@@ -498,20 +495,18 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
   const handleClickNoti = async (n) => {
     const nn = normalizeNoti(n);
 
-    // chưa login: chỉ mark local
     if (!user) {
       setNotifications((prev) =>
-        prev.map((x) => (x.id === nn.id ? { ...x, read: true } : x)),
+        prev.map((x) => (x.id === nn.id ? { ...x, read: true } : x))
       );
       return;
     }
 
-    // login: gọi API mark read
     if (!nn.read) {
       try {
         await markNotificationRead(nn.id);
         setNotifications((prev) =>
-          prev.map((x) => (x.id === nn.id ? { ...x, read: true } : x)),
+          prev.map((x) => (x.id === nn.id ? { ...x, read: true } : x))
         );
       } catch (e) {
         console.error("Mark read failed:", e);
@@ -677,10 +672,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
     <header className="sticky top-0 z-[9998] bg-white border-b border-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="h-16 flex items-center justify-between gap-3">
-          <Link
-            to={getHomeByRole()}
-            className="flex items-center gap-2 shrink-0"
-          >
+          <Link to={getHomeByRole()} className="flex items-center gap-2 shrink-0">
             <img src={Logo} className="h-14 w-auto" alt="logo" />
             <span className="text-xl sm:text-2xl font-semibold text-orange-500">
               Easy
@@ -763,9 +755,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
 
                     <div className="max-h-[360px] overflow-auto">
                       {loadingNoti ? (
-                        <div className="p-6 text-gray-500 text-sm">
-                          Loading...
-                        </div>
+                        <div className="p-6 text-gray-500 text-sm">Loading...</div>
                       ) : notifications.length === 0 ? (
                         <div className="p-6 text-gray-500 text-sm">
                           No notifications.
@@ -861,9 +851,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
           </nav>
 
           <div className="space-y-3">
-            <div className="text-xs font-semibold text-gray-500">
-              PREFERENCES
-            </div>
+            <div className="text-xs font-semibold text-gray-500">PREFERENCES</div>
 
             {/* Language (mobile) */}
             <div className="relative" ref={langMobileRef}>
@@ -938,9 +926,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
 
                     <div className="max-h-[45vh] overflow-auto">
                       {loadingNoti ? (
-                        <div className="p-4 text-gray-500 text-sm">
-                          Loading...
-                        </div>
+                        <div className="p-4 text-gray-500 text-sm">Loading...</div>
                       ) : notifications.length === 0 ? (
                         <div className="p-4 text-gray-500 text-sm">
                           No notifications.

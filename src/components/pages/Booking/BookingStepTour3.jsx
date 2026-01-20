@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { popup } from "@/utils/popup";
 
 const formatVND = (n) =>
@@ -10,9 +10,16 @@ const formatVND = (n) =>
 export default function BookingStepTour3({ bookingData, prevStep }) {
   const { user, tickets, total, tourInfo, date } = bookingData;
 
-  const [payment, setPayment] = useState("cash");
-  const [bankCode, setBankCode] = useState("");
+  // ✅ Mặc định chọn VNPay + bank NCB
+  const [payment, setPayment] = useState("vnpay");
+  const [bankCode, setBankCode] = useState("NCB");
+
   const [loading, setLoading] = useState(false);
+
+  // ✅ nếu quay lại VNPay mà bankCode trống thì set lại NCB
+  useEffect(() => {
+    if (payment === "vnpay" && !bankCode) setBankCode("NCB");
+  }, [payment, bankCode]);
 
   const getToken = () =>
     localStorage.getItem("jwt") ||
@@ -25,7 +32,6 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
 
     const token = getToken();
 
-    // ✅ resolve tourId an toàn
     const realTourId = tourInfo?.tourId ?? tourInfo?.id ?? null;
 
     if (!realTourId) {
@@ -68,9 +74,6 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
         popup.error("Booking failed: missing bookingId!");
         return;
       }
-
-      // ✅ CASH
-      
 
       // ✅ VNPAY
       if (payment === "vnpay") {
@@ -142,8 +145,6 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
       <div className="border rounded-lg p-4 space-y-3">
         <h3 className="font-semibold text-gray-800 mb-2">Payment Method</h3>
 
-        
-
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="radio"
@@ -164,7 +165,9 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
               value={bankCode}
               onChange={(e) => setBankCode(e.target.value)}
             >
-              <option value="">Auto / Let VNPay choose</option>
+              {/* ✅ nếu bạn muốn luôn mặc định NCB thì option này có thể bỏ */}
+              {/* <option value="">Auto / Let VNPay choose</option> */}
+
               <option value="NCB">NCB</option>
               <option value="VNPAYQR">VNPAYQR</option>
               <option value="VIETCOMBANK">Vietcombank</option>
@@ -178,7 +181,7 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
               <option value="VPBANK">VPBank</option>
             </select>
             <p className="text-xs text-gray-500 mt-1">
-              If you don't choose a bank, VNPay will display options during
+              You can switch bank here; default is NCB.
             </p>
           </div>
         )}

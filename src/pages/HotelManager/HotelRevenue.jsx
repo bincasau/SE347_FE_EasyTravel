@@ -56,7 +56,7 @@ export default function HotelRevenue() {
   /** ✅ fetch bookings by month/year (JWT required) */
   const fetchBookingsByMonth = useCallback(
     async ({ month, year }) => {
-      const url = `${API_BASE}/hotel_manager/bookings?month=${month}&year=${year}&_t=${Date.now()}`;
+      const url = `${API_BASE}/hotel_manager/bookings?month=${month}&year=${year}`;
 
       const res = await fetch(url, {
         method: "GET",

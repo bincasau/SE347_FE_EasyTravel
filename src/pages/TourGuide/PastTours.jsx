@@ -172,13 +172,13 @@ export default function PastTours() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
-      <h2 className="text-2xl sm:text-3xl font-bold text-center text-orange-500 mb-6 sm:mb-12">
+    <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8 py-2 sm:py-5">
+      <h2 className="text-2xl sm:text-3xl font-bold text-center text-orange-500 mb-2 sm:mb-2">
         Past Tours
       </h2>
 
       {/* SORT */}
-      <div className="flex justify-center sm:justify-end mb-4 sm:mb-6">
+      <div className="flex justify-center sm:justify-end mb-4 sm:mb-2">
         <select
           className="border rounded-full px-4 py-2 text-sm bg-white w-full sm:w-auto"
           value={sortOrder}

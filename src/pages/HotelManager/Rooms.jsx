@@ -336,8 +336,7 @@ export default function MyRooms() {
                 >
                   <option value="price_asc">Price: Low → High</option>
                   <option value="price_desc">Price: High → Low</option>
-                  <option value="date_desc">Newest</option>
-                  <option value="date_asc">Oldest</option>
+                  
                 </select>
 
                 <button

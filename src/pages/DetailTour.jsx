@@ -58,7 +58,7 @@ export default function DetailTour() {
     );
 
   return (
-    <div className="bg-gray-50 min-h-screen py-12">
+    <div className="bg-gray-50 min-h-screen py-5">
       <ShortInfor tour={tour} />
       <Detail tour={tour} />
 

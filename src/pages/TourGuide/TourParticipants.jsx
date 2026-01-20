@@ -174,10 +174,7 @@ export default function TourParticipants() {
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
             Tour Participants
           </h1>
-          <p className="text-sm text-gray-500">
-            Tour ID: <b>{tourId}</b> • Hiển thị: <b>{filtered.length}</b> /{" "}
-            <b>{participants.length}</b>
-          </p>
+          
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2">

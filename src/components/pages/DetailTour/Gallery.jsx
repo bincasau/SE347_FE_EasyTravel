@@ -1,29 +1,102 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
 
+const BASE_URL = "http://localhost:8080";
+const S3_BASE = "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/image";
+
+const buildS3Url = (fileOrUrl) => {
+  if (!fileOrUrl) return "";
+  const s = String(fileOrUrl).trim();
+  if (!s) return "";
+  if (s.startsWith("http://") || s.startsWith("https://")) return s;
+  return `${S3_BASE}/${s.replace(/^\/+/, "")}`;
+};
+
 export default function TourGallery({ tourId }) {
-  const [images, setImages] = useState([]); // ✅ 5 link S3
+  const [images, setImages] = useState([]); // ✅ urls từ backend
   const [index, setIndex] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  const S3_BASE =
-    "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/image";
-
   useEffect(() => {
-    if (!tourId) return;
+    let alive = true;
 
-    setLoading(true);
+    const fetchImages = async () => {
+      if (!tourId) return;
 
-    // ✅ build 5 ảnh theo tourId
-    const list = Array.from({ length: 3 }, (_, idx) => {
-      const n = idx + 1;
-      return `${S3_BASE}/tour_${tourId}_img_${n}.jpg`;
-    });
+      setLoading(true);
+      try {
+        const res = await fetch(`${BASE_URL}/tours/${tourId}/images`);
+        if (!res.ok) throw new Error("Không thể tải danh sách ảnh tour");
 
-    setImages(list);
-    setIndex(0);
-    setLoading(false);
+        const data = await res.json();
+        const list = data?._embedded?.images;
+
+        const mapped = Array.isArray(list)
+          ? list
+              .map((it) => ({
+                imageId: it?.imageId ?? 0,
+                createdAt: it?.createdAt,
+                url: buildS3Url(it?.url),
+              }))
+              .filter((x) => x.url)
+          : [];
+
+        // sort ổn định
+        mapped.sort((a, b) => {
+          const ia = Number(a.imageId || 0);
+          const ib = Number(b.imageId || 0);
+          if (ia && ib) return ia - ib;
+          const ta = new Date(a.createdAt || 0).getTime();
+          const tb = new Date(b.createdAt || 0).getTime();
+          return (ta || 0) - (tb || 0);
+        });
+
+        const urls = Array.from(new Set(mapped.map((x) => x.url)));
+
+        if (!alive) return;
+        setImages(urls);
+        setIndex(0);
+      } catch (e) {
+        console.error(e);
+        if (!alive) return;
+        setImages([]);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    };
+
+    fetchImages();
+    return () => {
+      alive = false;
+    };
   }, [tourId]);
+
+  const total = images.length;
+
+  const atStart = index === 0;
+  const atEnd = index >= total - 1;
+
+  const next = () => {
+    if (!atEnd) setIndex((i) => i + 1);
+  };
+  const prev = () => {
+    if (!atStart) setIndex((i) => i - 1);
+  };
+
+  // ✅ chỉ cần 3 tấm: current (lớn), next1, next2
+  const current = images[index];
+  const next1 = images[index + 1] || null;
+  const next2 = images[index + 2] || null;
+
+  // ✅ danh sách ảnh nhỏ: chỉ push cái nào tồn tại (không đủ ảnh thì không hiện ô)
+  const sideImages = useMemo(() => {
+    const arr = [];
+    if (next1) arr.push(next1);
+    if (next2) arr.push(next2);
+    return arr;
+  }, [next1, next2]);
+
+  if (!tourId) return null;
 
   if (loading) {
     return <p className="text-center text-gray-500 mt-10">Đang tải ảnh...</p>;
@@ -36,20 +109,6 @@ export default function TourGallery({ tourId }) {
       </p>
     );
   }
-
-  const atStart = index === 0;
-  const atEnd = index === images.length - 1;
-
-  const next = () => {
-    if (!atEnd) setIndex((i) => i + 1);
-  };
-  const prev = () => {
-    if (!atStart) setIndex((i) => i - 1);
-  };
-
-  const current = images[index];
-  const next1 = images[index + 1] || images[0];
-  const next2 = images[index + 2] || images[1];
 
   return (
     <section className="max-w-6xl mx-auto px-6 mt-10">
@@ -97,24 +156,28 @@ export default function TourGallery({ tourId }) {
           alt={`tour-${tourId}-img-${index + 1}`}
           className="w-full md:w-2/3 h-[400px] object-cover rounded-2xl shadow-md hover:scale-[1.01] transition"
           onError={(e) => {
+            e.currentTarget.onerror = null;
             e.currentTarget.src = "/images/tour/fallback.jpg";
           }}
         />
 
-        {/* Hai ảnh nhỏ */}
-        <div className="flex flex-col gap-4 w-full md:w-1/3">
-          {[next1, next2].map((src, i) => (
-            <img
-              key={`${tourId}-${index}-${i}`}
-              src={src}
-              alt={`tour-${tourId}-preview-${i + 1}`}
-              className="h-[195px] w-full object-cover rounded-2xl shadow-md hover:scale-[1.01] transition"
-              onError={(e) => {
-                e.currentTarget.src = "/images/tour/fallback.jpg";
-              }}
-            />
-          ))}
-        </div>
+        {/* Ảnh nhỏ: chỉ hiện nếu tồn tại */}
+        {sideImages.length > 0 && (
+          <div className="flex flex-col gap-4 w-full md:w-1/3">
+            {sideImages.map((src, i) => (
+              <img
+                key={`${tourId}-${index}-${i}`}
+                src={src}
+                alt={`tour-${tourId}-preview-${i + 1}`}
+                className="h-[195px] w-full object-cover rounded-2xl shadow-md hover:scale-[1.01] transition"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = "/images/tour/fallback.jpg";
+                }}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );

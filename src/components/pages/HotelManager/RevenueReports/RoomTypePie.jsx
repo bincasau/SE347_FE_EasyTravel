@@ -1,5 +1,12 @@
 import React, { useMemo } from "react";
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
 
 const COLORS_BY_TYPE = {
   Standard: "#2563eb",
@@ -29,6 +36,35 @@ function CustomTooltip({ active, payload }) {
       <div className="text-gray-700">Revenue: {formatMoneyVND(p.revenue)}</div>
       <div className="text-gray-700">Share: {p.percent}%</div>
     </div>
+  );
+}
+
+/** ✅ label đưa ra ngoài + ẩn lát nhỏ để khỏi đè */
+function renderOutsideLabel(props) {
+  const { cx, cy, midAngle, outerRadius, payload } = props;
+
+  const pct = safeNumber(payload?.percent, 0);
+  // ✅ lát nhỏ thì ẩn label (khỏi chồng lên nhau)
+  if (pct < 6) return null;
+
+  const RADIAN = Math.PI / 180;
+  const r = outerRadius + 18; // kéo ra ngoài
+  const x = cx + r * Math.cos(-midAngle * RADIAN);
+  const y = cy + r * Math.sin(-midAngle * RADIAN);
+
+  const textAnchor = x > cx ? "start" : "end";
+  const label = `${payload.type} ${pct}%`;
+
+  return (
+    <text
+      x={x}
+      y={y}
+      textAnchor={textAnchor}
+      dominantBaseline="central"
+      style={{ fontSize: 12, fontWeight: 600, fill: "#111827" }}
+    >
+      {label}
+    </text>
   );
 }
 
@@ -76,7 +112,9 @@ export default function RoomTypePie({ stats }) {
   if (totalBookings === 0) {
     return (
       <div className="bg-white border rounded-lg p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-2">Room Type Distribution</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-2">
+          Room Type Distribution
+        </h2>
         <p className="text-gray-400">No bookings in this month</p>
       </div>
     );
@@ -86,9 +124,12 @@ export default function RoomTypePie({ stats }) {
     <div className="bg-white border rounded-lg p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Room Type Distribution</h2>
+          <h2 className="text-lg font-semibold text-gray-900">
+            Room Type Distribution
+          </h2>
           <div className="text-sm text-gray-500 mt-1">
-            Total bookings: <b className="text-gray-900">{totalBookings}</b> • Total revenue:{" "}
+            Total bookings: <b className="text-gray-900">{totalBookings}</b> •
+            Total revenue:{" "}
             <b className="text-gray-900">{formatMoneyVND(totalRevenue)}</b>
           </div>
         </div>
@@ -104,10 +145,18 @@ export default function RoomTypePie({ stats }) {
               cx="50%"
               cy="50%"
               outerRadius={110}
-              label={({ payload }) => `${payload.type} ${payload.percent}%`}
+              // ✅ tách lát ra + lát nhỏ có độ dày tối thiểu
+              paddingAngle={3}
+              minAngle={6}
+              // ✅ label không đè
+              labelLine={false}
+              label={renderOutsideLabel}
             >
               {data.map((item) => (
-                <Cell key={item.type} fill={COLORS_BY_TYPE[item.type] || "#999999"} />
+                <Cell
+                  key={item.type}
+                  fill={COLORS_BY_TYPE[item.type] || "#999999"}
+                />
               ))}
             </Pie>
             <Tooltip content={<CustomTooltip />} />
@@ -120,15 +169,21 @@ export default function RoomTypePie({ stats }) {
         {data.map((r) => (
           <li key={r.type} className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="inline-block w-3 h-3 rounded" style={{ background: COLORS_BY_TYPE[r.type] }} />
+              <span
+                className="inline-block w-3 h-3 rounded"
+                style={{ background: COLORS_BY_TYPE[r.type] }}
+              />
               <span className="text-gray-800">{r.type}</span>
             </div>
             <div className="text-gray-700">
-              <b className="text-gray-900">{r.count}</b> ({r.percent}%) • {formatMoneyVND(r.revenue)}
+              <b className="text-gray-900">{r.count}</b> ({r.percent}%) •{" "}
+              {formatMoneyVND(r.revenue)}
             </div>
           </li>
         ))}
       </ul>
+
+      
     </div>
   );
 }

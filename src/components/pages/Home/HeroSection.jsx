@@ -7,11 +7,11 @@ import {
   faCalendarDays,
   faMapMarkerAlt,
   faMagnifyingGlass,
-  faUsers,
   faClock,
+  faLocationDot,
 } from "@fortawesome/free-solid-svg-icons";
 
-import { getDepartureLocations } from "@/apis/Tour";
+import { getDepartureLocations, getAllTours } from "@/apis/Tour";
 import { getPublicNotifications } from "@/apis/NotificationAPI";
 
 const hasValidJwt = () => {
@@ -29,16 +29,19 @@ const HeroSection = () => {
 
   const [startDate, setStartDate] = useState("");
   const [durationDays, setDurationDays] = useState("");
-  const [people, setPeople] = useState(1);
   const [departure, setDeparture] = useState("");
+
   const [departureOptions, setDepartureOptions] = useState([]);
+  const [destinationOptions, setDestinationOptions] = useState([]);
+  const [destination, setDestination] = useState("");
+
   const [loadingDeparture, setLoadingDeparture] = useState(false);
+  const [loadingDestination, setLoadingDestination] = useState(false);
 
   const [broadcastText, setBroadcastText] = useState("");
   const [showBroadcast, setShowBroadcast] = useState(true);
   const [loadingBroadcast, setLoadingBroadcast] = useState(false);
 
-  // ✅ FIX: dùng hasValidJwt thay vì !!getItem
   const [isLoggedIn, setIsLoggedIn] = useState(() => hasValidJwt());
 
   const minStartDate = useMemo(() => {
@@ -65,6 +68,7 @@ const HeroSection = () => {
     else el.click();
   };
 
+  // ✅ Load departure locations
   useEffect(() => {
     let mounted = true;
 
@@ -76,6 +80,38 @@ const HeroSection = () => {
         setDepartureOptions(Array.isArray(list) ? list : []);
       } finally {
         if (mounted) setLoadingDeparture(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // ✅ Load destination options từ ALL tours
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      try {
+        setLoadingDestination(true);
+        const all = await getAllTours(); // ✅ dựa vào TourAPI.js
+        if (!mounted) return;
+
+        const uniq = Array.from(
+          new Set(
+            (Array.isArray(all) ? all : [])
+              .map((t) => String(t?.destination ?? "").trim())
+              .filter(Boolean)
+          )
+        ).sort((a, b) => a.localeCompare(b, "vi"));
+
+        setDestinationOptions(uniq);
+      } catch (e) {
+        console.error("Load destination options error:", e);
+        setDestinationOptions([]);
+      } finally {
+        if (mounted) setLoadingDestination(false);
       }
     })();
 
@@ -108,16 +144,11 @@ const HeroSection = () => {
     }
   }, []);
 
-  // ✅ BẮT BUỘC: vào trang là load liền (kể cả trước khi syncLogin)
   useEffect(() => {
-    // ép render 1 frame rồi fetch để tránh race với render đầu
-    const id = requestAnimationFrame(() => {
-      loadBroadcast();
-    });
+    const id = requestAnimationFrame(() => loadBroadcast());
     return () => cancelAnimationFrame(id);
   }, [loadBroadcast]);
 
-  // ✅ Sync login (FIX: dùng hasValidJwt)
   useEffect(() => {
     let alive = true;
     const timers = [];
@@ -127,14 +158,9 @@ const HeroSection = () => {
       setIsLoggedIn(hasValidJwt());
     };
 
-    // check nhiều mốc để bắt kịp lúc app set/remove jwt
-    [0, 100, 300, 600, 1200].forEach((ms) => {
-      timers.push(setTimeout(syncLogin, ms));
-    });
-
+    [0, 100, 300, 600, 1200].forEach((ms) => timers.push(setTimeout(syncLogin, ms)));
     const interval = setInterval(syncLogin, 1000);
 
-    // nếu có tab khác login/logout
     const onStorage = (e) => {
       if (e.key === "jwt") syncLogin();
     };
@@ -148,18 +174,11 @@ const HeroSection = () => {
     };
   }, []);
 
-  // ✅ Khi logout thì refresh broadcast để chắc chắn có text
   useEffect(() => {
-    if (isLoggedIn) {
-      setShowBroadcast(false);
-      return;
-    }
-    setShowBroadcast(true);
     loadBroadcast();
   }, [isLoggedIn, loadBroadcast]);
 
-  // ✅ Hiện khung broadcast ngay cả khi chưa có text (đang loading) để user thấy “nó có tồn tại”
-  const shouldShowTicker = !isLoggedIn && showBroadcast;
+  const shouldShowTicker = showBroadcast;
 
   const handleSearch = () => {
     const payload = {
@@ -169,10 +188,12 @@ const HeroSection = () => {
       departure: departure || "",
       durationDay: durationDays || "",
       durationDays: durationDays || "",
-      people: Number(people || 1),
+
+      // ✅ gửi destination sang /tours
+      destination: destination || "",
     };
 
-    navigate("/tours", { state: payload, replace: true });
+    navigate("/tours", { state: payload, replace: false });
   };
 
   return (
@@ -223,7 +244,9 @@ const HeroSection = () => {
                   <div
                     className="whitespace-nowrap text-sm sm:text-base text-white/95 font-medium inline-block"
                     style={{
-                      animation: broadcastText?.trim() ? "heroMarquee 18s linear infinite" : "none",
+                      animation: broadcastText?.trim()
+                        ? "heroMarquee 18s linear infinite"
+                        : "none",
                       willChange: "transform",
                     }}
                   >
@@ -246,6 +269,7 @@ const HeroSection = () => {
         >
           <div className="rounded-3xl bg-white/90 backdrop-blur-xl p-4 sm:p-6 md:p-8 border border-white/20">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+              {/* Ngày đi */}
               <div className="flex flex-col text-left">
                 <label className="text-sm text-gray-700 mb-1 flex items-center gap-2">
                   <FontAwesomeIcon icon={faCalendarDays} />
@@ -272,6 +296,7 @@ const HeroSection = () => {
                 />
               </div>
 
+              {/* Duration */}
               <div className="flex flex-col text-left">
                 <label className="text-sm text-gray-700 mb-1 flex items-center gap-2">
                   <FontAwesomeIcon icon={faClock} />
@@ -291,21 +316,7 @@ const HeroSection = () => {
                 </select>
               </div>
 
-              <div className="flex flex-col text-left">
-                <label className="text-sm text-gray-700 mb-1 flex items-center gap-2">
-                  <FontAwesomeIcon icon={faUsers} />
-                  Số người
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  value={people}
-                  onChange={(e) => setPeople(e.target.value)}
-                  className="h-[48px] px-3 border rounded-xl text-gray-700 bg-white/80"
-                  placeholder="1"
-                />
-              </div>
-
+              {/* Departure */}
               <div className="flex flex-col text-left">
                 <label className="text-sm text-gray-700 mb-1 flex items-center gap-2">
                   <FontAwesomeIcon icon={faMapMarkerAlt} />
@@ -317,7 +328,9 @@ const HeroSection = () => {
                   className="h-[48px] px-3 border rounded-xl text-gray-700 bg-white/80"
                   disabled={loadingDeparture}
                 >
-                  <option value="">{loadingDeparture ? "Loading..." : "Tất cả"}</option>
+                  <option value="">
+                    {loadingDeparture ? "Loading..." : "Tất cả"}
+                  </option>
                   {departureOptions.map((d) => (
                     <option key={d} value={d}>
                       {d}
@@ -326,6 +339,30 @@ const HeroSection = () => {
                 </select>
               </div>
 
+              {/* ✅ Destination */}
+              <div className="flex flex-col text-left">
+                <label className="text-sm text-gray-700 mb-1 flex items-center gap-2">
+                  <FontAwesomeIcon icon={faLocationDot} />
+                  Điểm đến
+                </label>
+                <select
+                  value={destination}
+                  onChange={(e) => setDestination(e.target.value)}
+                  className="h-[48px] px-3 border rounded-xl text-gray-700 bg-white/80"
+                  disabled={loadingDestination}
+                >
+                  <option value="">
+                    {loadingDestination ? "Loading..." : "Tất cả"}
+                  </option>
+                  {destinationOptions.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Search */}
               <button
                 onClick={handleSearch}
                 className="h-[48px] w-full flex items-center justify-center gap-2 text-white rounded-xl transition-all duration-300

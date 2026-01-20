@@ -40,8 +40,7 @@ export default function RoomView() {
     description,
     image_bed,
     image_wc,
-    status,
-    floor,
+    // ❌ removed: status, floor
   } = room;
 
   // ✅ convert filename -> full S3 URL (or keep if already http)
@@ -52,7 +51,7 @@ export default function RoomView() {
     return `${S3_ROOM_BASE}/${s}`;
   };
 
-  // ✅ build images list: bed + wc (đủ 2 ảnh), có thể nhiều hơn nếu array
+  // ✅ build images list: bed + wc
   const images = useMemo(() => {
     const bedArr = Array.isArray(image_bed)
       ? image_bed
@@ -71,7 +70,6 @@ export default function RoomView() {
 
   const [index, setIndex] = useState(0);
 
-  // nếu images đổi (đổi room), reset index
   useEffect(() => {
     setIndex(0);
   }, [images.length]);
@@ -86,14 +84,6 @@ export default function RoomView() {
   const prev = () => {
     if (total <= 1) return;
     setIndex((prev) => (prev - 1 + total) % total);
-  };
-
-  const statusColor = {
-    AVAILABLE: "bg-green-100 text-green-700",
-    BOOKED: "bg-red-100 text-red-700",
-    OCCUPIED: "bg-red-100 text-red-700",
-    MAINTENANCE: "bg-yellow-100 text-yellow-700",
-    INACTIVE: "bg-gray-100 text-gray-700",
   };
 
   return (
@@ -171,26 +161,17 @@ export default function RoomView() {
 
         {/* BASIC INFO */}
         <div className="bg-white rounded-2xl border shadow-sm p-6 space-y-6">
-          {/* TITLE */}
+          {/* TITLE (no status badge) */}
           <div className="flex items-center justify-between flex-wrap gap-3">
             <h2 className="text-2xl font-bold">
               Room <span className="text-orange-600">{room_number}</span>
             </h2>
-
-            <span
-              className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                statusColor[status] || "bg-gray-100 text-gray-700"
-              }`}
-            >
-              {status || "UNKNOWN"}
-            </span>
           </div>
 
-          {/* GRID INFO */}
+          {/* GRID INFO (no floor) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Info label="Room Type" value={room_type} />
             <Info label="Guests" value={number_of_guests} />
-            <Info label="Floor" value={floor} />
             <Info label="Price" value={formatVND(price)} highlight />
           </div>
 

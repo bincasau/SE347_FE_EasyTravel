@@ -102,11 +102,7 @@ export default function ToursUpcoming() {
       setTours(normalized);
 
       // ✅ totalPages nếu BE trả kiểu Page
-      const tp =
-        Number(data?.totalPages) ||
-        Number(data?.page?.totalPages) ||
-        1;
-
+      const tp = Number(data?.totalPages) || Number(data?.page?.totalPages) || 1;
       setTotalPages(Math.max(1, tp));
     } catch (e) {
       console.error(e);
@@ -139,19 +135,18 @@ export default function ToursUpcoming() {
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-10">
-      <div className="flex items-end justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800">Upcoming Tours</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Danh sách tour bạn sắp dẫn. Bấm “View participants” để xem người booking,
-            hoặc “Export” để xuất Excel ngay.
-          </p>
-        </div>
+      {/* ✅ HEADER: title centered + reload on right */}
+      <div className="relative mb-6">
+        <h1 className="text-3xl text-center font-bold text-orange-500">
+          Upcoming Tours
+        </h1>
 
         <button
           type="button"
           onClick={loadUpcoming}
-          className="px-4 py-2 rounded-xl border border-orange-300 text-orange-600 hover:bg-orange-50"
+          className="absolute right-0 top-1/2 -translate-y-1/2
+                     px-4 py-2 rounded-xl border border-orange-300
+                     text-orange-600 hover:bg-orange-50"
         >
           Reload
         </button>
@@ -183,7 +178,7 @@ export default function ToursUpcoming() {
               {/* LEFT */}
               <div className="flex-1 min-w-0">
                 <div className="text-xs text-gray-500 mb-1">
-                  Tour ID: <b className="text-gray-700">{t.id}</b>
+                  
                 </div>
 
                 <div className="text-lg font-semibold text-gray-800 line-clamp-1">
@@ -213,14 +208,7 @@ export default function ToursUpcoming() {
                   View participants
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => nav(`/guide/tour/${t.id}/participants?export=1`)}
-                  className="px-4 py-2 rounded-xl border border-green-300 text-green-700 hover:bg-green-50"
-                  title="Mở trang và export luôn"
-                >
-                  Export
-                </button>
+                
               </div>
             </div>
           ))}

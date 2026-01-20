@@ -1,4 +1,5 @@
 import React, { useMemo, useEffect, useState } from "react";
+import { popup } from "@/utils/popup"; // ✅ SweetAlert2 popup
 
 const HOTEL_IMAGE_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/hotel";
@@ -34,7 +35,6 @@ export default function MyHotel() {
   const [deletingId, setDeletingId] = useState(null);
 
   const [error, setError] = useState("");
-  const [toast, setToast] = useState("");
 
   const [isEditing, setIsEditing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
@@ -54,11 +54,6 @@ export default function MyHotel() {
     localStorage.getItem("jwt") ||
     localStorage.getItem("token") ||
     localStorage.getItem("accessToken");
-
-  const showToast = (msg) => {
-    setToast(msg);
-    setTimeout(() => setToast(""), 2000);
-  };
 
   const normalizeHotel = (raw) => {
     if (!raw) return null;
@@ -152,9 +147,7 @@ export default function MyHotel() {
     if (Array.isArray(data)) {
       list = data;
     } else if (data?._embedded) {
-      // guess key name
-      const embeddedKey =
-        Object.keys(data._embedded)[0] || "images";
+      const embeddedKey = Object.keys(data._embedded)[0] || "images";
       list = data._embedded?.[embeddedKey] || [];
     } else {
       list = [];
@@ -195,6 +188,7 @@ export default function MyHotel() {
         }
       } catch (e) {
         setError(e?.message || "Fetch failed");
+        popup.error(e?.message || "Fetch failed");
       } finally {
         setLoading(false);
       }
@@ -222,7 +216,6 @@ export default function MyHotel() {
     : FALLBACK_IMAGE;
 
   const gallery = useMemo(() => {
-    // convert url key -> full S3 url
     return images.map((img) => ({
       ...img,
       src: `${HOTEL_EXTRA_IMAGE_BASE}/${img.url}?t=${cacheBuster}`,
@@ -299,7 +292,6 @@ export default function MyHotel() {
       throw new Error(msg);
     }
 
-    // optional json
     try {
       return await res.json();
     } catch {
@@ -333,25 +325,40 @@ export default function MyHotel() {
   const onClickEdit = () => {
     setIsEditing(true);
     setError("");
-    showToast("Edit mode");
+    popup.success("Đã bật chế độ chỉnh sửa!", "Edit mode");
   };
 
   const onCancel = () => {
     setDraft(hotel);
     setIsEditing(false);
     setError("");
-    showToast("Cancelled");
+    popup.success("Đã huỷ thay đổi.", "Cancelled");
   };
 
+  // ✅ Save -> popup confirm + popup success
   const onSave = async () => {
     try {
       setSaving(true);
       setError("");
+
+      if (!token) {
+        const msg = "NO_TOKEN (Bạn chưa đăng nhập)";
+        setError(msg);
+        await popup.error(msg);
+        return;
+      }
+
+      const ok = await popup.confirm("Bạn có chắc muốn lưu thay đổi?", "Xác nhận");
+      if (!ok) return;
+
       await updateHotelByManager();
+
       setIsEditing(false);
-      showToast("✅ Saved");
+      await popup.success("Cập nhật thông tin khách sạn thành công!");
     } catch (e) {
-      setError(e?.message || "Save failed");
+      const msg = e?.message || "Save failed";
+      setError(msg);
+      await popup.error(msg);
     } finally {
       setSaving(false);
     }
@@ -367,11 +374,19 @@ export default function MyHotel() {
       setUploading(true);
       setError("");
 
+      if (!token) {
+        const msg = "NO_TOKEN (Bạn chưa đăng nhập)";
+        setError(msg);
+        await popup.error(msg);
+        return;
+      }
+
       await uploadExtraImage(uploadFile);
 
       setUploadOpen(false);
       setUploadFile(null);
-      showToast("✅ Uploaded");
+
+      await popup.success("Upload ảnh thành công!");
 
       // ✅ reload gallery thật từ BE
       await fetchHotelImages(hotel.hotel_id);
@@ -379,7 +394,9 @@ export default function MyHotel() {
       // ✅ bust cache để S3 show ảnh mới
       setCacheBuster(Date.now());
     } catch (e) {
-      setError(e?.message || "Upload failed");
+      const msg = e?.message || "Upload failed";
+      setError(msg);
+      await popup.error(msg);
     } finally {
       setUploading(false);
     }
@@ -398,16 +415,32 @@ export default function MyHotel() {
       setDeletingId(id);
       setError("");
 
+      if (!token) {
+        const msg = "NO_TOKEN (Bạn chưa đăng nhập)";
+        setError(msg);
+        await popup.error(msg);
+        return;
+      }
+
+      const ok = await popup.confirm(
+        `Bạn muốn xoá ảnh #${id} không?`,
+        "Xác nhận xoá"
+      );
+      if (!ok) return;
+
       await deleteImage(id);
 
       setConfirmOpen(false);
       setConfirmTarget(null);
-      showToast("✅ Deleted");
+
+      await popup.success("Xoá ảnh thành công!");
 
       await fetchHotelImages(hotel.hotel_id);
       setCacheBuster(Date.now());
     } catch (e) {
-      setError(e?.message || "Delete failed");
+      const msg = e?.message || "Delete failed";
+      setError(msg);
+      await popup.error(msg);
     } finally {
       setDeletingId(null);
     }
@@ -448,12 +481,6 @@ export default function MyHotel() {
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-gray-50">
-      {toast ? (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] bg-gray-900 text-white text-sm px-4 py-2 rounded-xl shadow">
-          {toast}
-        </div>
-      ) : null}
-
       {/* HEADER */}
       <div className="bg-white border-b">
         <div className="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
@@ -518,7 +545,6 @@ export default function MyHotel() {
               </button>
             </div>
 
-            {/* ✅ hiển thị đúng ảnh đã upload */}
             {gallery.length === 0 ? (
               <div className="text-sm text-gray-500">
                 Chưa có ảnh gallery. Bấm “Add photo” để thêm.
@@ -544,7 +570,6 @@ export default function MyHotel() {
                       />
                     </button>
 
-                    {/* ✅ nút delete (hover mới hiện) */}
                     <button
                       type="button"
                       onClick={() => onAskDelete(img)}
@@ -693,11 +718,6 @@ export default function MyHotel() {
       {uploadOpen ? (
         <Modal title="Upload ảnh Gallery" onClose={() => setUploadOpen(false)}>
           <div className="space-y-4">
-            <div className="text-sm text-gray-600">
-              Upload vào: <b>/image/auth/upload</b> với query{" "}
-              <b>?type=hotel&id={hotel.hotel_id}</b>
-            </div>
-
             <input
               type="file"
               accept="image/*"
@@ -711,8 +731,9 @@ export default function MyHotel() {
                 disabled={uploading}
                 className="px-4 py-2 rounded-xl border bg-white text-sm hover:bg-gray-50 disabled:opacity-60"
               >
-                Close
+                Cancel
               </button>
+
               <button
                 onClick={onDoUpload}
                 disabled={uploading || !uploadFile}
@@ -725,7 +746,7 @@ export default function MyHotel() {
         </Modal>
       ) : null}
 
-      {/* DELETE CONFIRM */}
+      {/* DELETE CONFIRM (UI) */}
       {confirmOpen ? (
         <Modal title="Xoá ảnh?" onClose={() => setConfirmOpen(false)}>
           <div className="space-y-4">

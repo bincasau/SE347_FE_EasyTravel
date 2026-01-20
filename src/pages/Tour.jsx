@@ -64,7 +64,7 @@ const dmyToYMD = (dmy) => {
 
   return `${String(yyyy).padStart(4, "0")}-${String(mm).padStart(
     2,
-    "0",
+    "0"
   )}-${String(dd).padStart(2, "0")}`;
 };
 
@@ -197,10 +197,10 @@ function CalendarRangePicker({
           const cls = disabled
             ? `${base} text-gray-300 cursor-not-allowed`
             : isStart || isEnd
-              ? `${base} bg-orange-500 text-white font-semibold`
-              : between
-                ? `${base} bg-orange-100 text-gray-800`
-                : `${base} hover:bg-gray-100 text-gray-700`;
+            ? `${base} bg-orange-500 text-white font-semibold`
+            : between
+            ? `${base} bg-orange-100 text-gray-800`
+            : `${base} hover:bg-gray-100 text-gray-700`;
 
           return (
             <button
@@ -288,6 +288,9 @@ export default function TourPage() {
 
   const lastHeroKeyRef = useRef("");
 
+  // ✅ FIX: request guard chống “request cũ ghi đè request mới”
+  const reqIdRef = useRef(0);
+
   useEffect(() => {
     const s = location.state;
     if (!s) return;
@@ -310,7 +313,8 @@ export default function TourPage() {
     setCurrentPage(1);
 
     if (heroStart) {
-      const finalStart = compareYMD(heroStart, minDate) < 0 ? minDate : heroStart;
+      const finalStart =
+        compareYMD(heroStart, minDate) < 0 ? minDate : heroStart;
       setSelectedDate(finalStart);
       setDraftDate(ymdToDMY(finalStart));
       const dt = new Date(finalStart);
@@ -470,7 +474,7 @@ export default function TourPage() {
       setMobilePanel(null);
       scrollTop();
     },
-    [minDate, scrollTop],
+    [minDate, scrollTop]
   );
 
   const onCalendarPick = useCallback(
@@ -484,7 +488,7 @@ export default function TourPage() {
       setDraftEndDate(finalEnd ? ymdToDMY(finalEnd) : "");
       setDateError("");
     },
-    [minDate],
+    [minDate]
   );
 
   useEffect(() => {
@@ -524,12 +528,14 @@ export default function TourPage() {
           t.percentDiscount,
           t.limitSeats,
           t._links?.images?.href || null,
-          t.durationDays,
-        ),
+          t.durationDays
+        )
     );
   };
 
+  // ✅ FIXED: chống request cũ ghi đè request mới
   const fetchTours = useCallback(async () => {
+    const reqId = ++reqIdRef.current;
     setIsLoading(true);
     setTours([]);
 
@@ -549,15 +555,19 @@ export default function TourPage() {
         sort: mapSort(),
       });
 
+      // ✅ nếu đã có request mới hơn -> bỏ response cũ
+      if (reqId !== reqIdRef.current) return;
+
       const rawList = data?._embedded?.tours ?? [];
       setTours(toTourModelList(rawList));
       setTotalPages(Math.max(1, data?.page?.totalPages || 1));
     } catch (error) {
+      if (reqId !== reqIdRef.current) return;
       console.error("Fetch tours error:", error);
       setTours([]);
       setTotalPages(1);
     } finally {
-      setIsLoading(false);
+      if (reqId === reqIdRef.current) setIsLoading(false);
     }
   }, [
     currentPage,
@@ -687,7 +697,9 @@ export default function TourPage() {
               type="button"
               onClick={() => {
                 setDraftDate(selectedDate ? ymdToDMY(selectedDate) : "");
-                setDraftEndDate(selectedEndDate ? ymdToDMY(selectedEndDate) : "");
+                setDraftEndDate(
+                  selectedEndDate ? ymdToDMY(selectedEndDate) : ""
+                );
                 setDateError("");
                 const base = selectedDate || minDate;
                 const dt = new Date(base);
@@ -723,7 +735,11 @@ export default function TourPage() {
               onClick={() => setMobilePanel("sort")}
               className="bg-white border border-gray-300 rounded-xl py-2 flex items-center justify-center gap-2"
             >
-              {sortOrder === "asc" ? <FaSortAmountUpAlt /> : <FaSortAmountDownAlt />}
+              {sortOrder === "asc" ? (
+                <FaSortAmountUpAlt />
+              ) : (
+                <FaSortAmountDownAlt />
+              )}
               <span className="text-sm">Sort</span>
             </button>
           </div>
@@ -735,7 +751,9 @@ export default function TourPage() {
                 type="button"
                 onClick={() => {
                   setDraftDate(selectedDate ? ymdToDMY(selectedDate) : "");
-                  setDraftEndDate(selectedEndDate ? ymdToDMY(selectedEndDate) : "");
+                  setDraftEndDate(
+                    selectedEndDate ? ymdToDMY(selectedEndDate) : ""
+                  );
                   setDateError("");
                   const base = selectedDate || minDate;
                   const dt = new Date(base);
@@ -1025,8 +1043,8 @@ export default function TourPage() {
                 {mobilePanel === "date"
                   ? "Date"
                   : mobilePanel === "filter"
-                    ? "Filter"
-                    : "Sort"}
+                  ? "Filter"
+                  : "Sort"}
               </div>
               <button
                 type="button"
