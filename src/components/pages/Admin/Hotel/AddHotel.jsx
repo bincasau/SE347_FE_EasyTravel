@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { addHotel } from "@/apis/Hotel";
 import { getUsers } from "@/apis/User";
+import { popup } from "@/utils/popup";
 
 export default function AddHotel() {
   const navigate = useNavigate();
@@ -24,14 +25,11 @@ export default function AddHotel() {
   const [preview, setPreview] = useState("");
 
   const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState("");
-
-  // popup success
-  const [openSuccess, setOpenSuccess] = useState(false);
 
   // Load danh sách user role HOTEL_MANAGER
   useEffect(() => {
     (async () => {
+      const close = popup.loading("Đang tải danh sách quản lý khách sạn...");
       try {
         setLoadingManagers(true);
 
@@ -54,10 +52,13 @@ export default function AddHotel() {
       } catch (e) {
         console.error("Load managers failed:", e);
         setManagers([]);
+        popup.error(e?.message || "Tải danh sách quản lý thất bại");
       } finally {
+        close?.();
         setLoadingManagers(false);
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // cleanup preview url
@@ -94,13 +95,10 @@ export default function AddHotel() {
 
     if (preview) URL.revokeObjectURL(preview);
     setPreview("");
-
-    setMsg("");
   };
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    setMsg("");
 
     const hotelData = {
       name: form.name.trim(),
@@ -112,17 +110,18 @@ export default function AddHotel() {
     };
 
     if (!hotelData.name || !hotelData.address) {
-      setMsg("Vui lòng nhập Tên khách sạn và Địa chỉ.");
+      popup.error("Vui lòng nhập Tên khách sạn và Địa chỉ.");
       return;
     }
 
     if (!managerUsername.trim()) {
-      setMsg("Vui lòng chọn quản lý khách sạn.");
+      popup.error("Vui lòng chọn quản lý khách sạn.");
       return;
     }
 
     try {
       setLoading(true);
+      const close = popup.loading("Đang thêm khách sạn...");
 
       // Gửi managerUsername đúng contract API
       await addHotel({
@@ -131,10 +130,21 @@ export default function AddHotel() {
         managerUsername: managerUsername.trim(),
       });
 
-      // mở popup thành công
-      setOpenSuccess(true);
+      close?.();
+
+      // ✅ Popup hỏi: về danh sách hay tiếp tục tạo
+      const goList = await popup.confirm(
+        "Thêm khách sạn thành công.\nBạn có muốn quay về danh sách khách sạn không?",
+        "Thành công",
+      );
+
+      if (goList) {
+        navigate("/admin/hotels");
+      } else {
+        resetForm();
+      }
     } catch (err) {
-      setMsg(err?.message || "Thêm khách sạn thất bại.");
+      popup.error(err?.message || "Thêm khách sạn thất bại.");
     } finally {
       setLoading(false);
     }
@@ -154,12 +164,6 @@ export default function AddHotel() {
             Quay lại
           </button>
         </div>
-        {/* chỉ show msg khi lỗi/validation */}
-        {msg && (
-          <div className="mb-4 p-3 rounded-xl bg-gray-50 border text-sm break-words">
-            {msg}
-          </div>
-        )}
 
         <form
           onSubmit={onSubmit}
@@ -219,7 +223,7 @@ export default function AddHotel() {
               />
             </div>
 
-            {/* Manager select: hiển thị ID - Name (username), submit username */}
+            {/* Manager select */}
             <div>
               <label className="block text-sm font-medium mb-1">
                 Quản lý khách sạn <span className="text-red-500">*</span>
@@ -234,7 +238,7 @@ export default function AddHotel() {
                 <option value="">
                   {loadingManagers
                     ? "Đang tải danh sách quản lý..."
-                    : "— Chọn hotel manager —"}
+                    : "— Chọn quản lý khách sạn —"}
                 </option>
 
                 {managers.map((u) => {
@@ -264,7 +268,6 @@ export default function AddHotel() {
                 Ảnh khách sạn
               </label>
 
-              {/* input file nhìn gọn hơn */}
               <label className="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-xl border hover:bg-gray-50 cursor-pointer">
                 <span>Chọn ảnh</span>
                 <input
@@ -306,54 +309,6 @@ export default function AddHotel() {
           </div>
         </form>
       </div>
-
-      {/* SUCCESS MODAL */}
-      {openSuccess && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-          {/* overlay */}
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setOpenSuccess(false)}
-          />
-
-          {/* modal */}
-          <div
-            className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="text-xl font-semibold">
-              Thêm khách sạn thành công
-            </div>
-            <div className="mt-2 text-sm text-gray-600">
-              Bạn muốn quay về danh sách khách sạn hay tiếp tục tạo mới?
-            </div>
-
-            <div className="mt-6 flex flex-col sm:flex-row gap-3">
-              <button
-                type="button"
-                className="w-full sm:flex-1 rounded-xl border border-gray-200 py-2.5 hover:bg-gray-50"
-                onClick={() => {
-                  setOpenSuccess(false);
-                  navigate("/admin/hotels");
-                }}
-              >
-                Về trang hotel
-              </button>
-
-              <button
-                type="button"
-                className="w-full sm:flex-1 rounded-xl bg-black text-white py-2.5"
-                onClick={() => {
-                  setOpenSuccess(false);
-                  resetForm();
-                }}
-              >
-                Tiếp tục tạo
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

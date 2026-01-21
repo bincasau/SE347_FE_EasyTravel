@@ -27,7 +27,7 @@ export async function searchHotelsByNameOrAddress(
   keyword,
   page = 0,
   size = 8,
-  sort = "hotelId,asc"
+  sort = "hotelId,asc",
 ) {
   const params = new URLSearchParams();
   params.append("nameKeyword", keyword);
@@ -46,7 +46,7 @@ export async function searchHotelsByProvince(
   province,
   page = 0,
   size = 8,
-  sort = "asc"
+  sort = "asc",
 ) {
   const params = new URLSearchParams();
   params.append("province", province);
@@ -95,7 +95,6 @@ export async function getAllHotels(sort = "hotelId,asc") {
   return data._embedded?.hotels ?? [];
 }
 
-
 // Lấy danh sách ảnh của khách sạn
 export const fetchHotelImages = async (hotelId) => {
   const res = await fetch(`${API_BASE}/hotels/${hotelId}/images`);
@@ -107,13 +106,10 @@ export const fetchHotelImages = async (hotelId) => {
 };
 
 export async function addHotel({ hotelData, imageFile, managerUsername }) {
-  const token = getToken();
-  if (!token) throw new Error("Missing JWT cookie (jwt)");
-
   const formData = new FormData();
   formData.append(
     "hotel",
-    new Blob([JSON.stringify(hotelData)], { type: "application/json" })
+    new Blob([JSON.stringify(hotelData)], { type: "application/json" }),
   );
   if (imageFile) formData.append("file", imageFile);
 
@@ -122,13 +118,11 @@ export async function addHotel({ hotelData, imageFile, managerUsername }) {
   const res = await fetch(`${API_BASE}/admin/add-hotel`, {
     method: "POST",
     credentials: "include",
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
+    headers: {},
     body: formData,
   });
 
-  const text = await res.text(); 
+  const text = await res.text();
   if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
 
   // nếu backend trả JSON
@@ -145,7 +139,7 @@ export async function updateHotel(hotelId, hotelData, file) {
   const formData = new FormData();
   formData.append(
     "hotel",
-    new Blob([JSON.stringify(hotelData)], { type: "application/json" })
+    new Blob([JSON.stringify(hotelData)], { type: "application/json" }),
   );
   if (file) formData.append("file", file);
 
@@ -195,17 +189,14 @@ export async function getHotelManagerByHotelId(hotelId) {
 
   const token = getToken();
 
-  const res = await fetch(
-    `${API_BASE}/admin/hotel/${hotelId}/manager`,
-    {
-      method: "GET",
-      credentials: "include",
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        Accept: "application/json",
-      },
-    }
-  );
+  const res = await fetch(`${API_BASE}/admin/hotel/${hotelId}/manager`, {
+    method: "GET",
+    credentials: "include",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      Accept: "application/json",
+    },
+  });
 
   if (!res.ok) {
     const msg = await res.text();

@@ -9,25 +9,48 @@ import {
   CurrencyDollarIcon,
 } from "@heroicons/react/24/outline";
 import { deleteTour } from "@/apis/Tour";
+import { popup } from "@/utils/popup";
 
 const S3_TOUR_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/tour";
 
-const FALLBACK_IMG = `${S3_TOUR_BASE}/tour_default.jpg`; // nếu bạn có file này; không có thì đổi sang ảnh khác
+const FALLBACK_IMG = `${S3_TOUR_BASE}/tour_default.jpg`;
 
 function money(v) {
-  return Number(v || 0).toLocaleString();
+  return Number(v || 0).toLocaleString("vi-VN");
+}
+
+function normStatus(s) {
+  return (s ?? "").toString().trim().toUpperCase();
+}
+
+function statusViLabel(s) {
+  const v = normStatus(s);
+  if (v === "PASSED") return "Đã duyệt";
+  if (v === "ACTIVATED") return "Đang hoạt động";
+  if (v === "CANCELLED" || v === "CANCELED") return "Đã hủy";
+  if (v === "PENDING") return "Chờ duyệt";
+  return v || "—";
+}
+
+function statusBadgeClass(s) {
+  const v = normStatus(s);
+  if (v === "PASSED") return "bg-emerald-50 text-emerald-700 ring-emerald-200";
+  if (v === "ACTIVATED") return "bg-blue-50 text-blue-700 ring-blue-200";
+  if (v === "CANCELLED" || v === "CANCELED")
+    return "bg-red-50 text-red-700 ring-red-200";
+  if (v === "PENDING") return "bg-amber-50 text-amber-700 ring-amber-200";
+  return "bg-gray-100 text-gray-700 ring-gray-200";
 }
 
 export default function AdminTourCard({ tour, onEdit, onRemove }) {
   const navigate = useNavigate();
 
   const tourId = tour?.tourId ?? tour?.id;
-  const title = tour?.title ?? "Untitled tour";
+  const title = tour?.title ?? "Chưa có tên tour";
   const mainImage = tour?.mainImage ?? "";
   const startDate = tour?.startDate ?? "-";
   const endDate = tour?.endDate ?? "-";
-  const durationDays = tour?.durationDays ?? "-";
   const priceAdult = Number(tour?.priceAdult ?? 0);
   const priceChild = Number(tour?.priceChild ?? 0);
   const percentDiscount = Number(tour?.percentDiscount ?? 0);
@@ -35,6 +58,7 @@ export default function AdminTourCard({ tour, onEdit, onRemove }) {
   const limitSeats = tour?.limitSeats ?? "-";
   const departureLocation = tour?.departureLocation ?? "-";
   const destination = tour?.destination ?? "-";
+  const status = tour?.status ?? "PENDING";
 
   const finalPriceAdult = Math.max(
     0,
@@ -53,14 +77,18 @@ export default function AdminTourCard({ tour, onEdit, onRemove }) {
   };
 
   const handleRemove = async () => {
-    const ok = window.confirm("Bạn có chắc chắn muốn xóa tour này không?");
+    const ok = await popup.confirm("Bạn có chắc chắn muốn xóa tour này không?");
     if (!ok) return;
 
+    const close = popup.loading("Đang xóa tour...");
     try {
       await deleteTour(Number(tourId));
+      popup.success("Đã xóa tour");
       if (typeof onRemove === "function") onRemove(tour);
     } catch (e) {
-      alert(e?.message || "Xóa thất bại");
+      popup.error(e?.message || "Xóa thất bại");
+    } finally {
+      close?.();
     }
   };
 
@@ -93,60 +121,70 @@ export default function AdminTourCard({ tour, onEdit, onRemove }) {
             <div className="space-y-2 min-w-0">
               <Info
                 icon={<CalendarDaysIcon className="w-5 h-5 text-orange-400" />}
-                label="Date"
+                label="Ngày"
                 value={`${startDate} → ${endDate}`}
               />
               <Info
                 icon={<UsersIcon className="w-5 h-5 text-orange-400" />}
-                label="Seats"
+                label="Số chỗ"
                 value={`${availableSeats}`}
               />
               <Info
                 icon={<MapPinIcon className="w-5 h-5 text-orange-400" />}
-                label="Departure"
+                label="Điểm đi"
                 value={departureLocation}
               />
               <Info
                 icon={<MapPinIcon className="w-5 h-5 text-orange-400" />}
-                label="Destination"
+                label="Điểm đến"
                 value={destination}
               />
             </div>
 
             {/* RIGHT */}
             <div className="space-y-2 min-w-0">
+              {/* ✅ REPLACE Duration -> Status */}
               <Info
                 icon={<ClockIcon className="w-5 h-5 text-orange-400" />}
-                label="Duration"
-                value={`${durationDays} days`}
+                label="Trạng thái"
+                value={
+                  <span
+                    className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ring-1 ${statusBadgeClass(
+                      status,
+                    )}`}
+                  >
+                    {statusViLabel(status)}
+                  </span>
+                }
               />
+
               <Info
                 icon={<TagIcon className="w-5 h-5 text-orange-400" />}
-                label="Discount"
+                label="Giảm giá"
                 value={`${percentDiscount}%`}
               />
               <Info
                 icon={
                   <CurrencyDollarIcon className="w-5 h-5 text-orange-400" />
                 }
-                label="Adult"
+                label="Người lớn"
                 value={`${money(priceAdult)} đ`}
               />
               <Info
                 icon={
                   <CurrencyDollarIcon className="w-5 h-5 text-orange-400" />
                 }
-                label="Child"
+                label="Trẻ em"
                 value={`${money(priceChild)} đ`}
               />
             </div>
           </div>
         </div>
 
-        {/* ACTIONS (responsive) */}
+        {/* ACTIONS */}
         <div className="w-full lg:w-auto flex flex-col gap-3 lg:items-end">
           <div className="text-sm text-gray-700">
-            from{" "}
+            Giá từ{" "}
             <span className="text-xl font-bold text-gray-900">
               {money(finalPriceAdult)} đ
             </span>
@@ -157,14 +195,14 @@ export default function AdminTourCard({ tour, onEdit, onRemove }) {
               onClick={handleEdit}
               className="w-full sm:w-auto border border-orange-500 text-orange-500 px-6 sm:px-8 py-2 rounded-full hover:bg-orange-50 transition font-medium"
             >
-              Edit
+              Sửa
             </button>
 
             <button
               onClick={handleRemove}
               className="w-full sm:w-auto bg-orange-500 text-white px-6 sm:px-8 py-2 rounded-full hover:bg-orange-600 transition font-medium"
             >
-              Remove
+              Xóa
             </button>
           </div>
         </div>

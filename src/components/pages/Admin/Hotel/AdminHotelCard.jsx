@@ -10,6 +10,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { useNavigate } from "react-router-dom";
 import { deleteHotel } from "@/apis/Hotel";
+import { popup } from "@/utils/popup";
 
 const S3_HOTEL_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/hotel";
@@ -20,8 +21,8 @@ export default function AdminHotelCard({ hotel, onEdit, onRemove }) {
   const imageUrl = hotel?.mainImage?.startsWith("http")
     ? hotel.mainImage
     : hotel?.mainImage
-    ? `${S3_HOTEL_BASE}/${hotel.mainImage}`
-    : "";
+      ? `${S3_HOTEL_BASE}/${hotel.mainImage}`
+      : "";
 
   // trang edit chỉ cần id (không truyền state)
   const handleEdit = () => {
@@ -30,14 +31,21 @@ export default function AdminHotelCard({ hotel, onEdit, onRemove }) {
   };
 
   const handleRemove = async () => {
-    const ok = window.confirm("Bạn có chắc chắn muốn xóa khách sạn này không?");
+    const ok = await popup.confirm(
+      "Bạn có chắc chắn muốn xóa khách sạn này không?",
+      "Xác nhận xóa",
+    );
     if (!ok) return;
 
+    const close = popup.loading("Đang xóa khách sạn...");
     try {
       await deleteHotel(hotel.hotelId);
+      popup.success("Đã xóa khách sạn");
       if (typeof onRemove === "function") onRemove(hotel.hotelId);
     } catch (e) {
-      alert(e?.message || "Xóa thất bại");
+      popup.error(e?.message || "Xóa thất bại");
+    } finally {
+      close?.();
     }
   };
 
@@ -45,7 +53,7 @@ export default function AdminHotelCard({ hotel, onEdit, onRemove }) {
     if (!d) return "—";
     const dt = new Date(d);
     if (Number.isNaN(dt.getTime())) return "—";
-    return dt.toLocaleDateString("en-GB");
+    return dt.toLocaleDateString("vi-VN");
   };
 
   const managerId = hotel?.managerId ?? hotel?.manager_id ?? "—";
@@ -58,7 +66,7 @@ export default function AdminHotelCard({ hotel, onEdit, onRemove }) {
         <div className="w-full sm:w-60 shrink-0">
           <img
             src={imageUrl}
-            alt={hotel?.name || "hotel"}
+            alt={hotel?.name || "Khách sạn"}
             className="w-full h-48 sm:h-36 rounded-xl object-cover bg-gray-100"
             loading="lazy"
             onError={(e) => {
@@ -77,26 +85,26 @@ export default function AdminHotelCard({ hotel, onEdit, onRemove }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6 text-sm text-gray-700">
             <InfoRow
               icon={<BuildingOffice2Icon className="w-5 h-5 text-orange-400" />}
-              label="Hotel ID"
+              label="Mã khách sạn"
               value={hotel?.hotelId ?? "—"}
             />
 
             <InfoRow
               icon={<UserIcon className="w-5 h-5 text-orange-400" />}
-              label="Manager ID"
+              label="Mã quản lý"
               value={managerId}
             />
 
             <InfoRow
               icon={<MapPinIcon className="w-5 h-5 text-orange-400" />}
-              label="Address"
+              label="Địa chỉ"
               value={hotel?.address || "—"}
               breakWords
             />
 
             <InfoRow
               icon={<CurrencyDollarIcon className="w-5 h-5 text-orange-400" />}
-              label="Min price"
+              label="Giá thấp nhất"
               value={
                 minPrice === null || minPrice === undefined
                   ? "—"
@@ -113,7 +121,7 @@ export default function AdminHotelCard({ hotel, onEdit, onRemove }) {
 
             <InfoRow
               icon={<CalendarDaysIcon className="w-5 h-5 text-orange-400" />}
-              label="Added on"
+              label="Ngày thêm"
               value={formatDate(hotel?.createdAt || hotel?.created_at)}
             />
 
@@ -125,7 +133,7 @@ export default function AdminHotelCard({ hotel, onEdit, onRemove }) {
 
             <InfoRow
               icon={<ClockIcon className="w-5 h-5 text-orange-400" />}
-              label="Update"
+              label="Cập nhật"
               value={formatDate(hotel?.updatedAt || hotel?.updated_at)}
             />
           </div>
@@ -136,14 +144,14 @@ export default function AdminHotelCard({ hotel, onEdit, onRemove }) {
               onClick={handleEdit}
               className="w-full border border-orange-500 text-orange-500 px-6 py-2 rounded-full hover:bg-orange-50 transition font-medium"
             >
-              Edit
+              Sửa
             </button>
 
             <button
               onClick={handleRemove}
               className="w-full bg-orange-500 text-white px-6 py-2 rounded-full hover:bg-orange-600 transition font-medium"
             >
-              Remove
+              Xóa
             </button>
           </div>
         </div>
@@ -154,14 +162,14 @@ export default function AdminHotelCard({ hotel, onEdit, onRemove }) {
             onClick={handleEdit}
             className="border border-orange-500 text-orange-500 px-8 py-2 rounded-full hover:bg-orange-50 transition font-medium whitespace-nowrap"
           >
-            Edit
+            Sửa
           </button>
 
           <button
             onClick={handleRemove}
             className="bg-orange-500 text-white px-8 py-2 rounded-full hover:bg-orange-600 transition font-medium whitespace-nowrap"
           >
-            Remove
+            Xóa
           </button>
         </div>
       </div>
