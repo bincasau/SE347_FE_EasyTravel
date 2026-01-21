@@ -1,4 +1,5 @@
 // src/apis/BlogAPI.js
+import { getToken } from "@/utils/auth";
 
 const API_BASE = "http://localhost:8080";
 
@@ -23,7 +24,7 @@ export async function getAllBlogs() {
 const API_URL = "http://localhost:8080";
 
 function getAuthHeaders() {
-  const token = localStorage.getItem("jwt");
+  const token = getToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -66,6 +67,7 @@ export async function saveBlog(payload, file) {
   // Trình duyệt sẽ tự động thêm boundary cho multipart/form-data.
   const res = await fetch(url, {
     method: "POST",
+    credentials: "include",
     headers: headers, // Chỉ chứa Authorization Bearer token
     body: fd,
   });
@@ -88,6 +90,7 @@ export async function saveBlog(payload, file) {
 export async function deleteBlog(id) {
   const res = await fetch(`${API_URL}/admin/delete-blog/${id}`, {
     method: "DELETE",
+    credentials: "include",
     headers: {
       ...getAuthHeaders(),
     },

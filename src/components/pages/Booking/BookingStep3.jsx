@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { createHotelBooking, getVnpayPaymentUrl } from "@/apis/Booking";
 import { popup } from "@/utils/popup";
+import { getToken } from "@/utils/auth";
 
 const AWS_ROOM_IMAGE_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/room";
@@ -32,12 +33,6 @@ export default function BookingStep3({ bookingData, prevStep }) {
   const [loading, setLoading] = useState(false);
 
   const nights = safeData.nights || 1;
-
-  const getToken = () =>
-    localStorage.getItem("jwt") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken") ||
-    "";
 
   const handleConfirm = async () => {
     if (loading) return;

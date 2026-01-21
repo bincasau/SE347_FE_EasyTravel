@@ -5,6 +5,7 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { useNavigate } from "react-router-dom";
 import { buildTourSlug } from "@/utils/slug";
+import { useLang } from "@/contexts/LangContext";
 
 const BASE_URL = "http://localhost:8080";
 
@@ -92,6 +93,7 @@ export default function BlogSidebar({
   onDateFilter,
 }) {
   const navigate = useNavigate();
+  const { t } = useLang();
   const [tags, setTags] = useState([]);
 
   // ✅ date filter: committed = yyyy-mm-dd (gửi ra ngoài)
@@ -146,7 +148,7 @@ export default function BlogSidebar({
 
     const ymd = dmyToYMD(trimmed);
     if (!ymd) {
-      setDateError("Ngày không hợp lệ. Nhập đúng dd/mm/yyyy.");
+      setDateError(t("blogPage.invalidDate"));
       return;
     }
 
@@ -182,11 +184,11 @@ export default function BlogSidebar({
       <aside className="w-full space-y-6 self-start lg:sticky lg:top-6">
         {/* 🔍 SEARCH BOX */}
         <div className="w-full bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition">
-          <h3 className="font-semibold mb-3 text-gray-800">Search</h3>
+          <h3 className="font-semibold mb-3 text-gray-800">{t("blogPage.search")}</h3>
           <div className="relative">
             <input
               type="text"
-              placeholder="Search blog..."
+              placeholder={t("blogPage.searchBlog")}
               onChange={(e) => onSearch?.(e.target.value)}
               className="w-full border border-gray-200 rounded-lg py-2 pl-3 pr-9 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
             />
@@ -196,7 +198,7 @@ export default function BlogSidebar({
 
         {/* 🗓 DATE FILTER BOX */}
         <div className="w-full bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition">
-          <h3 className="font-semibold mb-3 text-gray-800">Filter by Date</h3>
+          <h3 className="font-semibold mb-3 text-gray-800">{t("blogPage.filterByDate")}</h3>
 
           <div className="relative">
             <input
@@ -257,7 +259,7 @@ export default function BlogSidebar({
               onClick={applyDraftDate}
               className="py-2 text-sm rounded-lg bg-orange-500 text-white hover:bg-orange-600 font-semibold"
             >
-              Apply
+              {t("tourPage.apply")}
             </button>
 
             <button
@@ -265,18 +267,18 @@ export default function BlogSidebar({
               className="py-2 text-sm rounded-lg bg-gray-200 hover:bg-gray-300 font-semibold"
               disabled={!filterYMD && !draftDMY}
             >
-              Clear
+              {t("tourPage.clear")}
             </button>
           </div>
         </div>
 
         {/* 🏷 TAG FILTER */}
         <div className="w-full bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition">
-          <h3 className="font-semibold mb-3 text-gray-800">Tags</h3>
+          <h3 className="font-semibold mb-3 text-gray-800">{t("blogPage.tags")}</h3>
 
           <div className="flex flex-wrap gap-2">
             {tags.length === 0 && (
-              <p className="text-sm text-gray-400">No tags found...</p>
+              <p className="text-sm text-gray-400">{t("blogPage.noTags")}</p>
             )}
 
             {tags.map((tag, i) => (
@@ -293,7 +295,7 @@ export default function BlogSidebar({
 
         {/* 📰 RECENT POSTS */}
         <div className="w-full bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition">
-          <h3 className="font-semibold mb-3 text-gray-800">Recent Posts</h3>
+          <h3 className="font-semibold mb-3 text-gray-800">{t("blogPage.recentPosts")}</h3>
           <ul className="space-y-3">
             {recentPosts.map((post) => (
               <li
@@ -324,7 +326,7 @@ export default function BlogSidebar({
 
         {/* 🖼 GALLERY */}
         <div className="w-full bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition">
-          <h3 className="font-semibold mb-3 text-gray-800">Gallery</h3>
+          <h3 className="font-semibold mb-3 text-gray-800">{t("blogPage.gallery")}</h3>
           <div className="grid grid-cols-3 gap-2">
             {gallery.map((post, i) => (
               <button

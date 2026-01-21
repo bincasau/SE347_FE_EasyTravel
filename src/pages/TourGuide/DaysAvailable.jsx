@@ -15,6 +15,7 @@ import {
   isAfter,
   differenceInCalendarDays,
 } from "date-fns";
+import { getToken as getCookieToken } from "@/utils/auth";
 
 const API_BASE = "http://localhost:8080";
 
@@ -30,11 +31,7 @@ export default function DaysAvailable() {
   const [errMsg, setErrMsg] = useState("");
 
   // ✅ lấy token (tự thử nhiều key phổ biến)
-  const getToken = () =>
-    localStorage.getItem("jwt") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken") ||
-    "";
+  const getToken = () => getCookieToken();
 
   // ✅ fetch auto gửi JWT
   const fetchWithAuth = async (url, options = {}) => {
@@ -45,7 +42,7 @@ export default function DaysAvailable() {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
 
-    const res = await fetch(url, { ...options, headers });
+    const res = await fetch(url, { ...options, headers, credentials: "include" });
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");

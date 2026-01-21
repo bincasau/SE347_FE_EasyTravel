@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { getToken } from "@/utils/auth";
 
 const API_BASE = "http://localhost:8080";
 
@@ -7,16 +8,6 @@ const S3_ROOM_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/room";
 
 const FALLBACK_IMAGE = `${S3_ROOM_BASE}/standard_bed.jpg`;
-
-/** -------- helpers -------- */
-function getToken() {
-  return (
-    localStorage.getItem("jwt") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken") ||
-    ""
-  );
-}
 
 async function readResponseSmart(res) {
   const ct = res.headers.get("content-type") || "";
@@ -100,11 +91,6 @@ export default function RoomCard({ room, onDeleted }) {
     }
 
     const token = getToken();
-    if (!token) {
-      setDeleteError("NO_TOKEN (Bạn chưa đăng nhập)");
-      return;
-    }
-
     const ok = window.confirm(
       `Delete room ${showRoomNumber || id}? This action cannot be undone.`
     );
@@ -117,8 +103,9 @@ export default function RoomCard({ room, onDeleted }) {
 
       const res = await fetch(url, {
         method: "DELETE",
+        credentials: "include",
         headers: {
-          Authorization: `Bearer ${token}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
 

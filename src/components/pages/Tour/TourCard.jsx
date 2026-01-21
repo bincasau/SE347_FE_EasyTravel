@@ -2,9 +2,11 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaMapMarkerAlt } from "react-icons/fa";
 import { buildTourSlug } from "@/utils/slug";
+import { useLang } from "@/contexts/LangContext";
 
 export default function TourCard({ tour }) {
   const navigate = useNavigate();
+  const { t } = useLang();
 
   const id = tour?.tourId ?? tour?.id ?? tour?.tourID ?? null;
   const title = tour?.title ?? "";
@@ -103,15 +105,15 @@ export default function TourCard({ tour }) {
         </div>
 
         <div className="flex justify-between gap-2 sm:gap-3 text-[11px] sm:text-xs text-gray-600 mb-2 sm:mb-3">
-          <span className="truncate">📅 {startDate || "Đang cập nhật"}</span>
+          <span className="truncate">📅 {startDate || t("tourPage.noData")}</span>
           <span className="flex items-center gap-1 truncate">
             <FaMapMarkerAlt className="text-orange-500 shrink-0" />
-            {destination || "Chưa có"}
+            {destination || t("tourPage.notAvailable")}
           </span>
         </div>
 
         <p className="text-[11px] sm:text-sm text-gray-700 line-clamp-2">
-          {description || "Hiện chưa có mô tả cho tour này."}
+          {description || t("tourPage.noDescriptionAvailable")}
         </p>
       </div>
     </div>

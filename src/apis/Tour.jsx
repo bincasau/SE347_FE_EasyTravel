@@ -3,6 +3,7 @@
 // 📌 Chứa toàn bộ API sử dụng cho Tour
 // =====================================
 import { adminSendNotificationToUsers } from "@/apis/NotificationAPI";
+import { getToken } from "@/utils/auth";
 const API_BASE = "http://localhost:8080";
 
 /**
@@ -126,7 +127,7 @@ export async function getAllTours() {
 }
 
 function getAuthHeaders() {
-  const token = localStorage.getItem("jwt");
+  const token = getToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -139,6 +140,7 @@ async function fetchJsonPublic(url) {
 async function fetchJsonAuth(url, options = {}) {
   const res = await fetch(url, {
     ...options,
+    credentials: "include",
     headers: {
       ...(options.headers || {}),
       ...getAuthHeaders(),
@@ -183,6 +185,7 @@ export async function saveTourUpsert(tour, file, guideIds) {
 export async function deleteTour(tourId) {
   const res = await fetch(`${API_BASE}/admin/tour/${tourId}`, {
     method: "DELETE",
+    credentials: "include",
     headers: { ...getAuthHeaders() },
   });
 
@@ -193,6 +196,7 @@ export async function deleteTour(tourId) {
 export async function getTourParticipants(tourId) {
   const res = await fetch(`${API_BASE}/admin/tour/${tourId}/participants`, {
     method: "GET",
+    credentials: "include",
     headers: {
       ...getAuthHeaders(),
       Accept: "application/json",
@@ -208,6 +212,7 @@ export async function getMonthlyTourStats(month, year) {
     `${API_BASE}/admin/tour/monthly?month=${month}&year=${year}`,
     {
       method: "GET",
+      credentials: "include",
       headers: {
         ...getAuthHeaders(),
         Accept: "application/json",
@@ -328,6 +333,7 @@ export async function adminCancelTourSideEffects(tourId) {
   for (const bookingId of bookingIds) {
     const res = await fetch(`${API_BASE}/payment/refund/TOUR/${bookingId}`, {
       method: "POST",
+      credentials: "include",
       headers: { ...getAuthHeaders(), Accept: "application/json" },
     });
 
@@ -355,6 +361,7 @@ export async function searchToursByKeyword(keyword) {
 
   const res = await fetch(url, {
     method: "GET",
+    credentials: "include",
     headers: {
       ...getAuthHeaders(),
       Accept: "application/json",
@@ -376,6 +383,7 @@ export async function copyTour(tourId) {
 
   const res = await fetch(url, {
     method: "POST",
+    credentials: "include",
     headers: {
       ...getAuthHeaders(),
       Accept: "application/json",

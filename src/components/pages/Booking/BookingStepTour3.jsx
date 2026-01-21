@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { popup } from "@/utils/popup";
+import { getToken } from "@/utils/auth";
 
 const formatVND = (n) =>
   Number(n ?? 0).toLocaleString("vi-VN", {
@@ -21,12 +22,6 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
     if (payment === "vnpay" && !bankCode) setBankCode("NCB");
   }, [payment, bankCode]);
 
-  const getToken = () =>
-    localStorage.getItem("jwt") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken") ||
-    "";
-
   const handleConfirm = async () => {
     if (loading) return;
 
@@ -35,7 +30,7 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
     const realTourId = tourInfo?.tourId ?? tourInfo?.id ?? null;
 
     if (!realTourId) {
-      popup.error("Thiếu tourId (tourInfo bị sai dữ liệu).");
+      popup.error("Missing tourId (invalid tour data).");
       return;
     }
 
@@ -52,9 +47,10 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
 
       const bookingRes = await fetch("http://localhost:8080/booking/tour", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          Authorization: token ? `Bearer ${token}` : "",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify(payload),
       });
@@ -87,8 +83,9 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
 
         const payRes = await fetch(vnpApi, {
           method: "GET",
+          credentials: "include",
           headers: {
-            Authorization: token ? `Bearer ${token}` : "",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
         });
 
@@ -106,7 +103,7 @@ export default function BookingStepTour3({ bookingData, prevStep }) {
           return;
         }
 
-        await popup.success("Đang chuyển hướng đến VNPay...");
+        await popup.success("Redirecting to VNPay...");
         window.location.assign(paymentUrl);
         return;
       }

@@ -1,8 +1,8 @@
 import { Navigate, useLocation } from "react-router-dom";
-import { getUserFromToken } from "@/utils/auth";
+import { getCachedUser } from "@/utils/auth";
 
 export default function RequireRole({ role, children }) {
-  const user = getUserFromToken();
+  const user = getCachedUser();
   const location = useLocation();
 
   console.log("Decoded user =", user);

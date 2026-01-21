@@ -7,6 +7,7 @@ import BookingStepTour3 from "../components/pages/Booking/BookingStepTour3.jsx";
 import BookingSummary from "../components/pages/Booking/BookingSummary.jsx";
 
 import { extractIdFromSlug } from "@/utils/slug";
+import { getAccountDetail } from "@/apis/AccountAPI";
 
 export default function BookingPage() {
   // ✅ hỗ trợ cả /booking/:tourId hoặc /booking/:slugId
@@ -91,22 +92,9 @@ export default function BookingPage() {
    *  2️⃣ LOAD USER FROM JWT
    * =============================== */
   useEffect(() => {
-    const token =
-      localStorage.getItem("jwt") ||
-      localStorage.getItem("token") ||
-      localStorage.getItem("accessToken");
-
-    if (!token) return;
-
     const loadUser = async () => {
       try {
-        const res = await fetch("http://localhost:8080/account/detail", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!res.ok) throw new Error("Unauthorized");
-
-        const data = await res.json();
+        const data = await getAccountDetail();
 
         setBookingData((prev) => ({
           ...prev,

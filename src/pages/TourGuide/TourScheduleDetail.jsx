@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
+import { getToken as getCookieToken } from "@/utils/auth";
 
 const API_BASE = "http://localhost:8080";
 
@@ -29,11 +30,7 @@ export default function TourScheduleDetail() {
     return `tourScheduleDoneMap:${id}`;
   }, [tourId]);
 
-  const getToken = () =>
-    localStorage.getItem("jwt") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken") ||
-    "";
+  const getToken = () => getCookieToken();
 
   const fetchWithAuth = async (url, options = {}) => {
     const token = getToken();
@@ -42,7 +39,7 @@ export default function TourScheduleDetail() {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
 
-    const res = await fetch(url, { ...options, headers });
+    const res = await fetch(url, { ...options, headers, credentials: "include" });
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");
@@ -121,7 +118,7 @@ export default function TourScheduleDetail() {
         setErrMsg("");
 
         const idNum = Number(tourId);
-        if (!idNum) throw new Error("tourId không hợp lệ");
+        if (!idNum) throw new Error("Invalid tourId");
 
         // 1) fetch upcoming -> find tour theo tourId
         const upRes = await fetchWithAuth(`${API_BASE}/tour_guide/upcoming`);
@@ -131,7 +128,7 @@ export default function TourScheduleDetail() {
         const foundTour = upcomingList.find((t) => Number(t.tourId) === idNum);
         if (!foundTour) {
           throw new Error(
-            `Không tìm thấy tourId=${idNum} trong upcoming. (Có thể tour không nằm trong upcoming)`
+            `Tour ID ${idNum} not found in upcoming tours.`
           );
         }
 
@@ -253,7 +250,7 @@ export default function TourScheduleDetail() {
 
       {/* DAYS */}
       {days.length === 0 ? (
-        <div className="text-center text-gray-500">Tour này chưa có lịch trình.</div>
+        <div className="text-center text-gray-500">This tour has no itinerary yet.</div>
       ) : (
         <div className="space-y-4">
           {days.map((day, dayIdx) => {

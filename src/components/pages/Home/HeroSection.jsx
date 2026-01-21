@@ -13,15 +13,9 @@ import {
 
 import { getDepartureLocations, getAllTours } from "@/apis/Tour";
 import { getPublicNotifications } from "@/apis/NotificationAPI";
+import { isLoggedIn } from "@/utils/auth";
 
-const hasValidJwt = () => {
-  const raw = localStorage.getItem("jwt");
-  if (!raw) return false;
-  const v = String(raw).trim();
-  if (!v) return false;
-  if (v === "null" || v === "undefined") return false;
-  return true;
-};
+const hasValidJwt = () => isLoggedIn();
 
 const HeroSection = () => {
   const { t } = useLang();
@@ -161,16 +155,14 @@ const HeroSection = () => {
     [0, 100, 300, 600, 1200].forEach((ms) => timers.push(setTimeout(syncLogin, ms)));
     const interval = setInterval(syncLogin, 1000);
 
-    const onStorage = (e) => {
-      if (e.key === "jwt") syncLogin();
-    };
-    window.addEventListener("storage", onStorage);
+    const onJwtChanged = () => syncLogin();
+    window.addEventListener("jwt-changed", onJwtChanged);
 
     return () => {
       alive = false;
       timers.forEach(clearTimeout);
       clearInterval(interval);
-      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("jwt-changed", onJwtChanged);
     };
   }, []);
 

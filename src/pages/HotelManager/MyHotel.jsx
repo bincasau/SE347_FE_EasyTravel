@@ -1,4 +1,5 @@
 import React, { useMemo, useEffect, useState } from "react";
+import { getToken } from "@/utils/auth";
 import { popup } from "@/utils/popup"; // ✅ SweetAlert2 popup
 
 const HOTEL_IMAGE_BASE =
@@ -50,10 +51,7 @@ export default function MyHotel() {
   // cache bust for S3 images
   const [cacheBuster, setCacheBuster] = useState(Date.now());
 
-  const token =
-    localStorage.getItem("jwt") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken");
+  const token = getToken();
 
   const normalizeHotel = (raw) => {
     if (!raw) return null;
@@ -92,6 +90,7 @@ export default function MyHotel() {
   const fetchMyHotel = async () => {
     const res = await fetch(API_MY_HOTEL, {
       method: "GET",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -125,6 +124,7 @@ export default function MyHotel() {
   const fetchHotelImages = async (hotelId) => {
     const res = await fetch(API_HOTEL_IMAGES(hotelId), {
       method: "GET",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -233,6 +233,7 @@ export default function MyHotel() {
 
     const res = await fetch(API_UPDATE_HOTEL_MANAGER, {
       method: "PUT",
+      credentials: "include",
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
@@ -277,6 +278,7 @@ export default function MyHotel() {
 
     const res = await fetch(`${API_UPLOAD_EXTRA}?${qs.toString()}`, {
       method: "POST",
+      credentials: "include",
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
@@ -305,6 +307,7 @@ export default function MyHotel() {
   const deleteImage = async (imageId) => {
     const res = await fetch(API_DELETE_IMAGE(imageId), {
       method: "DELETE",
+      credentials: "include",
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
@@ -341,13 +344,6 @@ export default function MyHotel() {
       setSaving(true);
       setError("");
 
-      if (!token) {
-        const msg = "NO_TOKEN (Bạn chưa đăng nhập)";
-        setError(msg);
-        await popup.error(msg);
-        return;
-      }
-
       const ok = await popup.confirm("Bạn có chắc muốn lưu thay đổi?", "Xác nhận");
       if (!ok) return;
 
@@ -373,13 +369,6 @@ export default function MyHotel() {
     try {
       setUploading(true);
       setError("");
-
-      if (!token) {
-        const msg = "NO_TOKEN (Bạn chưa đăng nhập)";
-        setError(msg);
-        await popup.error(msg);
-        return;
-      }
 
       await uploadExtraImage(uploadFile);
 
@@ -414,13 +403,6 @@ export default function MyHotel() {
     try {
       setDeletingId(id);
       setError("");
-
-      if (!token) {
-        const msg = "NO_TOKEN (Bạn chưa đăng nhập)";
-        setError(msg);
-        await popup.error(msg);
-        return;
-      }
 
       const ok = await popup.confirm(
         `Bạn muốn xoá ảnh #${id} không?`,

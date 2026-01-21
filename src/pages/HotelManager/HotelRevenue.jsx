@@ -1,6 +1,7 @@
 import { useMemo, useEffect, useState, useCallback, useRef } from "react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { getToken, isLoggedIn } from "@/utils/auth";
 
 import SummaryCards from "@/components/pages/HotelManager/HotelRevenue/SummaryCards";
 import RevenueTable from "@/components/pages/HotelManager/HotelRevenue/RevenueTable";
@@ -30,11 +31,7 @@ export default function HotelRevenue() {
   const exportRef = useRef(null);
   const [pdfMode, setPdfMode] = useState(false);
 
-  const token =
-    localStorage.getItem("jwt") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken") ||
-    "";
+  const token = getToken();
 
   /** Convert "YYYY-MM" -> monthNum/yearNum */
   const { monthNum, yearNum } = useMemo(() => {
@@ -60,6 +57,7 @@ export default function HotelRevenue() {
 
       const res = await fetch(url, {
         method: "GET",
+        credentials: "include",
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
@@ -91,7 +89,6 @@ export default function HotelRevenue() {
         setLoading(true);
         setError("");
 
-        if (!token) throw new Error("NO_TOKEN (Bạn chưa đăng nhập)");
 
         const bookings = await fetchBookingsByMonth({
           month: monthNum,
@@ -158,7 +155,7 @@ export default function HotelRevenue() {
     try {
       if (!exportRef.current) return popup.error("Không tìm thấy vùng để export!");
       if (loading) return popup.error("Đang tải dữ liệu, thử lại sau nhé!");
-      if (!token) return popup.error("Bạn chưa đăng nhập!");
+      if (!isLoggedIn()) return popup.error("Bạn chưa đăng nhập!");
 
       const ok = await popup.confirm(
         `Xuất báo cáo doanh thu tháng ${monthLabel} ra PDF?`,

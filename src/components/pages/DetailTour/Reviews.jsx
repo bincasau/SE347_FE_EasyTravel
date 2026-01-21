@@ -1,17 +1,19 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { FaStar, FaRegStar } from "react-icons/fa";
 import { popup } from "@/utils/popup";
+import { getToken, isLoggedIn } from "@/utils/auth";
 
 const API_BASE = "http://localhost:8080";
 const S3_BASE = "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/image";
 
 async function fetchWithJwt(url, options = {}) {
-  const token = localStorage.getItem("jwt");
+  const token = getToken();
   const finalUrl = url.startsWith("http") ? url : `${API_BASE}${url}`;
 
   return fetch(finalUrl, {
     cache: "no-store",
     ...options,
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...(options.headers || {}),
@@ -106,14 +108,11 @@ export default function Reviews({ tourId }) {
   const [loading, setLoading] = useState(true);
 
   // login state
-  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem("jwt"));
+  const [isLoggedInState, setIsLoggedInState] = useState(isLoggedIn());
   useEffect(() => {
-    const onStorage = () => setIsLoggedIn(!!localStorage.getItem("jwt"));
-    const onJwtChanged = () => setIsLoggedIn(!!localStorage.getItem("jwt"));
-    window.addEventListener("storage", onStorage);
+    const onJwtChanged = () => setIsLoggedInState(isLoggedIn());
     window.addEventListener("jwt-changed", onJwtChanged);
     return () => {
-      window.removeEventListener("storage", onStorage);
       window.removeEventListener("jwt-changed", onJwtChanged);
     };
   }, []);
@@ -196,7 +195,7 @@ export default function Reviews({ tourId }) {
   // ✅ CREATE
   const handleCreate = async (e) => {
     e.preventDefault();
-    if (!isLoggedIn) return requireLogin();
+    if (!isLoggedInState) return requireLogin();
     if (!newComment.trim()) return popup.error("Vui lòng nhập comment.");
 
     setSubmitting(true);
@@ -241,7 +240,7 @@ export default function Reviews({ tourId }) {
   };
 
   const handleUpdate = async () => {
-    if (!isLoggedIn) return requireLogin();
+    if (!isLoggedInState) return requireLogin();
     if (!editingId) return;
     if (!editComment.trim()) return popup.error("Vui lòng nhập comment.");
 
@@ -269,7 +268,7 @@ export default function Reviews({ tourId }) {
 
   // ✅ DELETE
   const handleDelete = async (id) => {
-    if (!isLoggedIn) return requireLogin();
+    if (!isLoggedInState) return requireLogin();
     const ok = await popup.confirm("Bạn chắc chắn muốn xoá review này?");
     if (!ok) return;
 
@@ -339,7 +338,7 @@ export default function Reviews({ tourId }) {
                       </div>
                     </div>
 
-                    {isLoggedIn && (
+                    {isLoggedInState && (
                       <div className="flex items-center gap-2">
                         {!isEditing ? (
                           <>
@@ -430,7 +429,7 @@ export default function Reviews({ tourId }) {
       >
         <h4 className="font-semibold text-gray-800 mb-3">Viết review</h4>
 
-        {!isLoggedIn && (
+        {!isLoggedInState && (
           <div className="text-xs text-gray-500 mb-3">
             Bạn cần đăng nhập để review tour
           </div>
@@ -439,7 +438,7 @@ export default function Reviews({ tourId }) {
         <StarPicker value={newRating} onChange={setNewRating} />
 
         <textarea
-          disabled={!isLoggedIn}
+          disabled={!isLoggedInState}
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
           rows={3}
@@ -449,9 +448,9 @@ export default function Reviews({ tourId }) {
 
         <button
           type="submit"
-          disabled={!isLoggedIn || submitting}
+          disabled={!isLoggedInState || submitting}
           className={`mt-3 px-5 py-2 rounded-full text-white font-medium transition ${
-            !isLoggedIn || submitting
+            !isLoggedInState || submitting
               ? "bg-gray-400 cursor-not-allowed"
               : "bg-orange-500 hover:bg-orange-600"
           }`}

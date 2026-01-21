@@ -9,7 +9,15 @@ const buildS3Url = (fileOrUrl) => {
   const s = String(fileOrUrl).trim();
   if (!s) return "";
   if (s.startsWith("http://") || s.startsWith("https://")) return s;
-  return `${S3_BASE}/${s.replace(/^\/+/, "")}`;
+  
+  // Try different S3 paths
+  const paths = [
+    `${S3_BASE}/${s.replace(/^\/+/, "")}`,
+    `${S3_BASE}/tour/${s.replace(/^\/+/, "")}`,
+    `https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/${s.replace(/^\/+/, "")}`,
+  ];
+  
+  return paths[0]; // Default to first path
 };
 
 export default function TourGallery({ tourId }) {
@@ -150,16 +158,18 @@ export default function TourGallery({ tourId }) {
 
       {/* Layout */}
       <div className="flex flex-col md:flex-row gap-4 items-stretch">
-        {/* Ảnh lớn */}
-        <img
-          src={current}
-          alt={`tour-${tourId}-img-${index + 1}`}
-          className="w-full md:w-2/3 h-[400px] object-cover rounded-2xl shadow-md hover:scale-[1.01] transition"
-          onError={(e) => {
-            e.currentTarget.onerror = null;
-            e.currentTarget.src = "/images/tour/fallback.jpg";
-          }}
-        />
+        {/* Ảnh lớn - scale responsively based on available images */}
+        <div className={sideImages.length > 0 ? "w-full md:w-2/3" : "w-full"}>
+          <img
+            src={current}
+            alt={`tour-${tourId}-img-${index + 1}`}
+            className="w-full h-[400px] object-cover rounded-2xl shadow-md hover:scale-[1.01] transition"
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = "/images/tour/fallback.jpg";
+            }}
+          />
+        </div>
 
         {/* Ảnh nhỏ: chỉ hiện nếu tồn tại */}
         {sideImages.length > 0 && (

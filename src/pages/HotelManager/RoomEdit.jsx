@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { getToken } from "@/utils/auth";
 import { useLocation, useNavigate } from "react-router-dom";
 import { popup } from "@/utils/popup"; // ✅ ADD
 
@@ -84,18 +85,14 @@ export default function RoomEdit() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const token =
-    localStorage.getItem("jwt") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken") ||
-    "";
+  const token = getToken();
 
   // room từ state
   const room = location.state?.room;
 
   useEffect(() => {
     if (!room) {
-      popup.error("Không tìm thấy dữ liệu phòng để chỉnh sửa.").finally(() => {
+      popup.error("Room data not found. Unable to edit.").finally(() => {
         navigate(-1, { replace: true });
       });
     }
@@ -223,7 +220,6 @@ export default function RoomEdit() {
 
   /** ---------- VALIDATE ---------- */
   const validate = () => {
-    if (!token) return "NO_TOKEN (Bạn chưa đăng nhập)";
     if (!form.room_id) return "Missing roomId (state room bị thiếu id)";
     if (!String(form.room_number).trim()) return "Room number is required.";
     if (!String(form.room_type).trim()) return "Room type is required.";
@@ -277,7 +273,7 @@ export default function RoomEdit() {
         body: fd,
       });
 
-      await popup.success("Cập nhật phòng thành công!");
+      await popup.success("Room updated successfully!");
 
       const bedOld = bedPreview?.startsWith("blob:")
         ? bedPreview

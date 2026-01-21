@@ -1,3 +1,5 @@
+import { getToken } from "@/utils/auth";
+
 const API_BASE = "http://localhost:8080";
 
 // Lấy danh sách khách sạn (phân trang + sort + search + province)
@@ -105,8 +107,8 @@ export const fetchHotelImages = async (hotelId) => {
 };
 
 export async function addHotel({ hotelData, imageFile, managerUsername }) {
-  const token = localStorage.getItem("jwt");
-  if (!token) throw new Error("Missing JWT (localStorage key: jwt)");
+  const token = getToken();
+  if (!token) throw new Error("Missing JWT cookie (jwt)");
 
   const formData = new FormData();
   formData.append(
@@ -119,8 +121,9 @@ export async function addHotel({ hotelData, imageFile, managerUsername }) {
 
   const res = await fetch(`${API_BASE}/admin/add-hotel`, {
     method: "POST",
+    credentials: "include",
     headers: {
-      Authorization: `Bearer ${token}`,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: formData,
   });
@@ -146,10 +149,11 @@ export async function updateHotel(hotelId, hotelData, file) {
   );
   if (file) formData.append("file", file);
 
-  const token = localStorage.getItem("jwt");
+  const token = getToken();
 
   const res = await fetch(`${API_URL}/admin/update-hotel/${hotelId}`, {
     method: "PUT",
+    credentials: "include",
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
@@ -165,10 +169,11 @@ export async function updateHotel(hotelId, hotelData, file) {
 }
 
 export async function deleteHotel(id) {
-  const token = localStorage.getItem("jwt");
+  const token = getToken();
 
   const res = await fetch(`${API_URL}/admin/delete-hotel/${id}`, {
     method: "DELETE",
+    credentials: "include",
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
@@ -188,12 +193,13 @@ export async function deleteHotel(id) {
 export async function getHotelManagerByHotelId(hotelId) {
   if (!hotelId) throw new Error("hotelId is required");
 
-  const token = localStorage.getItem("jwt");
+  const token = getToken();
 
   const res = await fetch(
     `${API_BASE}/admin/hotel/${hotelId}/manager`,
     {
       method: "GET",
+      credentials: "include",
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         Accept: "application/json",

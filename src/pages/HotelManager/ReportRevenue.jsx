@@ -1,6 +1,7 @@
 import { useMemo, useEffect, useState, useCallback, useRef, useReducer } from "react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { getToken, isLoggedIn } from "@/utils/auth";
 
 import RoomTypePie from "@/components/pages/HotelManager/RevenueReports/RoomTypePie.jsx";
 import ComparisonText from "@/components/pages/HotelManager/RevenueReports/ComparisonText.jsx";
@@ -71,11 +72,7 @@ export default function RevenueReport() {
   // ✅ bật layout riêng cho PDF
   const [pdfMode, setPdfMode] = useState(false);
 
-  const token =
-    localStorage.getItem("jwt") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken") ||
-    "";
+  const token = getToken();
 
   const safeMonth = useMemo(() => clampInt(month, 1, 12, 1), [month]);
   const safeYear = useMemo(() => clampInt(year, 1970, 2100, 2025), [year]);
@@ -135,6 +132,7 @@ export default function RevenueReport() {
 
       const res = await fetch(url, {
         method: "GET",
+        credentials: "include",
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
@@ -166,7 +164,6 @@ export default function RevenueReport() {
         setLoading(true);
         setError("");
 
-        if (!token) throw new Error("NO_TOKEN (Bạn chưa đăng nhập)");
 
         const cur = await fetchStatsByMonth({ month: safeMonth, year: safeYear });
         if (alive) setStats(cur);
@@ -221,11 +218,11 @@ export default function RevenueReport() {
 
   // ✅ Export CSV
   const exportCSV = async () => {
-    if (!token) return popup.error("Bạn chưa đăng nhập!");
-    if (loading) return popup.error("Đang tải dữ liệu, thử lại sau nhé!");
-    if (!stats) return popup.error("Không có dữ liệu để export.");
+    if (!isLoggedIn()) return popup.error("You are not logged in!");
+    if (loading) return popup.error("Loading data, please try again!");
+    if (!stats) return popup.error("No data to export.");
 
-    const ok = await popup.confirm(`Xuất báo cáo tháng ${monthLabel} ra CSV?`, "Xác nhận");
+    const ok = await popup.confirm(`Export revenue report for ${monthLabel} to CSV?`, "Confirm");
     if (!ok) return;
 
     const curRevenue = safeNumber(stats?.allTypeRevenue, 0);
@@ -252,18 +249,18 @@ export default function RevenueReport() {
     a.click();
 
     URL.revokeObjectURL(url);
-    popup.success("Export CSV thành công!");
+    popup.success("CSV export successful!");
   };
 
   /** ✅ Export PDF */
   const exportPDF = async () => {
     try {
-      if (!token) return popup.error("Bạn chưa đăng nhập!");
-      if (loading) return popup.error("Đang tải dữ liệu, thử lại sau nhé!");
-      if (!stats) return popup.error("Không có dữ liệu để export.");
-      if (!exportRef.current) return popup.error("Không tìm thấy vùng để export!");
+      if (!isLoggedIn()) return popup.error("You are not logged in!");
+      if (loading) return popup.error("Loading data, please try again!");
+      if (!stats) return popup.error("No data to export.");
+      if (!exportRef.current) return popup.error("Cannot find export region!");
 
-      const ok = await popup.confirm(`Xuất báo cáo tháng ${monthLabel} ra PDF?`, "Xác nhận");
+      const ok = await popup.confirm(`Export revenue report for ${monthLabel} to PDF?`, "Confirm");
       if (!ok) return;
 
       setPdfMode(true);
@@ -302,7 +299,7 @@ export default function RevenueReport() {
       }
 
       pdf.save(`Revenue_Report_${monthLabel}.pdf`);
-      popup.success("Export PDF thành công!");
+      popup.success("PDF export successful!");
     } catch (e) {
       console.error(e);
       popup.error(e?.message || "Export PDF failed!");

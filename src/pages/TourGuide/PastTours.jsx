@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import Pagination from "@/utils/Pagination";
+import { getToken as getCookieToken } from "@/utils/auth";
 
 const API_BASE = "http://localhost:8080";
 
@@ -20,11 +21,7 @@ export default function PastTours() {
   const pageSize = 6; // bạn đổi 4/6/8 tùy ý
 
   // ✅ lấy token
-  const getToken = () =>
-    localStorage.getItem("jwt") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken") ||
-    "";
+  const getToken = () => getCookieToken();
 
   // ✅ fetch auto gửi JWT
   const fetchWithAuth = async (url, options = {}) => {
@@ -34,7 +31,7 @@ export default function PastTours() {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
 
-    const res = await fetch(url, { ...options, headers });
+    const res = await fetch(url, { ...options, headers, credentials: "include" });
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");
@@ -196,7 +193,7 @@ export default function PastTours() {
         <div className="text-center text-red-500 py-10">{errMsg}</div>
       ) : sortedTours.length === 0 ? (
         <div className="text-center text-gray-500 py-10">
-          Không có tour đã đi.
+          No past tours.
         </div>
       ) : (
         <>

@@ -1,9 +1,6 @@
 // src/apis/Itinerary.js
+import { getToken } from "@/utils/auth";
 const API_BASE = "http://localhost:8080";
-
-function getToken() {
-  return localStorage.getItem("jwt");
-}
 
 function authHeaders() {
   const token = getToken();
@@ -24,6 +21,7 @@ export async function getItinerariesByTourId(tourId) {
 export async function addItineraryAdmin(tourId, itinerary) {
   const res = await fetch(`${API_BASE}/admin/tour/${tourId}/itinerary`, {
     method: "POST",
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...authHeaders(),
@@ -43,6 +41,7 @@ export async function addItineraryAdmin(tourId, itinerary) {
 export async function updateItineraryAdmin(itineraryId, itinerary) {
   const res = await fetch(`${API_BASE}/admin/tour/itinerary/${itineraryId}`, {
     method: "PUT",
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...authHeaders(),
@@ -62,6 +61,7 @@ export async function updateItineraryAdmin(itineraryId, itinerary) {
 export async function deleteItineraryAdmin(itineraryId) {
   const res = await fetch(`${API_BASE}/admin/tour/itinerary/${itineraryId}`, {
     method: "DELETE",
+    credentials: "include",
     headers: {
       ...authHeaders(),
     },

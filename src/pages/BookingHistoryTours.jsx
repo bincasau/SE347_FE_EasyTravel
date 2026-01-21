@@ -3,14 +3,9 @@ import { NavLink } from "react-router-dom";
 import { fetchTourBookingHistory } from "@/apis/bookingHistory";
 import { buildTourSlug } from "@/utils/slug";
 import { popup } from "@/utils/popup";
+import { getToken } from "@/utils/auth";
 
 const BASE_URL = "http://localhost:8080";
-
-const getToken = () =>
-  localStorage.getItem("jwt") ||
-  localStorage.getItem("token") ||
-  localStorage.getItem("accessToken") ||
-  "";
 
 /* =========================
    ✅ Helpers: message parsing
@@ -81,25 +76,27 @@ async function fetchJSON(url, options = {}) {
   }
 }
 
+// ✅ Refund TOUR theo bookingId
 async function refundByBooking(bookingType, bookingId) {
   const token = getToken();
   if (!token) throw new Error("Bạn chưa đăng nhập (thiếu JWT token).");
 
   return fetchJSON(`${BASE_URL}/payment/refund/${bookingType}/${bookingId}`, {
     method: "POST",
+    credentials: "include",
     headers: {
-      Authorization: `Bearer ${token}`,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       Accept: "application/json",
     },
   });
 }
 
 // ✅ random delay 1-3s
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const sleepRandom = (minMs = 1000, maxMs = 3000) => {
-  const ms = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
-  return sleep(ms);
-};
+const sleepRandom = (min, max) =>
+  new Promise((resolve) =>
+    setTimeout(resolve, Math.random() * (max - min) + min)
+  );
+
 
 const fmtDate = (d) => {
   if (!d) return "-";
@@ -384,20 +381,7 @@ export default function BookingHistoryTours() {
                       {bookingStatus}
                     </span>
                   </div>
-
-                  {/* ✅ show tour status để dễ debug */}
-                  <div className="mt-2 text-xs text-gray-500">
-                    Tour status:{" "}
-                    <span
-                      className={
-                        isTourPassed
-                          ? "text-red-600 font-semibold"
-                          : "text-gray-700 font-medium"
-                      }
-                    >
-                      {tourStatus || "-"}
-                    </span>
-                  </div>
+                  
 
                   <div className="mt-3 text-sm text-gray-600 flex flex-col gap-1">
                     <div>

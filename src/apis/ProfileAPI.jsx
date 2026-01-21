@@ -1,9 +1,9 @@
 // src/apis/ProfileAPI.js
+import { getToken } from "@/utils/auth";
 const API_BASE = "http://localhost:8080";
 
 export async function updateMyProfileApi({ user, file }) {
-  const token = localStorage.getItem("jwt");
-  if (!token) throw new Error("NO_TOKEN");
+  const token = getToken();
 
   const fd = new FormData();
   fd.append("user", new Blob([JSON.stringify(user)], { type: "application/json" }));
@@ -11,8 +11,9 @@ export async function updateMyProfileApi({ user, file }) {
 
   const res = await fetch(`${API_BASE}/account/update/my-profile`, {
     method: "PUT",
+    credentials: "include",
     headers: {
-      Authorization: `Bearer ${token}`,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       // ❌ không set Content-Type khi gửi FormData
     },
     body: fd,
@@ -28,12 +29,14 @@ export async function updateMyProfileApi({ user, file }) {
 }
 
 export async function deleteMineApi() {
-  const token = localStorage.getItem("jwt");
-  if (!token) throw new Error("NO_TOKEN");
+  const token = getToken();
 
   const res = await fetch(`${API_BASE}/account/delete-mine`, {
     method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` },
+    credentials: "include",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
   });
 
   if (!res.ok) {

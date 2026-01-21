@@ -6,6 +6,7 @@ import {
   updateComment,
 } from "@/apis/CommentAPI";
 import { popup } from "@/utils/popup";
+import { isLoggedIn } from "@/utils/auth";
 
 const S3_USER_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/user";
@@ -65,11 +66,7 @@ export default function BlogComments({ blogId, isLoggedIn, onOpenLogin }) {
   // Nếu bạn có auth store thì hãy truyền isLoggedIn từ ngoài vào cho chuẩn.
   const fallbackLoggedIn = useMemo(() => {
     try {
-      const t =
-        localStorage.getItem("accessToken") ||
-        localStorage.getItem("token") ||
-        localStorage.getItem("jwt");
-      return !!t;
+      return isLoggedIn();
     } catch {
       return false;
     }

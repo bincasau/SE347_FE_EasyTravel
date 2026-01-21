@@ -1,8 +1,9 @@
 // src/apis/UserAPI.js
+import { getToken } from "@/utils/auth";
 const API_BASE = "http://localhost:8080";
 
 function getAuthHeaders() {
-  const token = localStorage.getItem("jwt");
+  const token = getToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -29,6 +30,7 @@ function buildUserFormData(user, file) {
 export async function getAllUsers(page = 0, size = 20) {
   const res = await fetch(`${API_BASE}/users?page=${page}&size=${size}`, {
     method: "GET",
+    credentials: "include",
     headers: getAuthHeaders(),
   });
   return readJsonOrText(res);
@@ -75,6 +77,7 @@ export async function getUsers({
 
   const res = await fetch(url, {
     method: "GET",
+    credentials: "include",
     headers: getAuthHeaders(),
   });
 
@@ -85,6 +88,7 @@ export async function adminCreateUser(user, file) {
   console.log("api", user, file);
   const res = await fetch(`${API_BASE}/admin/users/save`, {
     method: "POST",
+    credentials: "include",
     headers: getAuthHeaders(),
     body: buildUserFormData(user, file),
   });
@@ -94,6 +98,7 @@ export async function adminCreateUser(user, file) {
 export async function adminUpdateUser(id, user, file) {
   const res = await fetch(`${API_BASE}/admin/users/update/${id}`, {
     method: "PUT",
+    credentials: "include",
     headers: getAuthHeaders(),
     body: buildUserFormData(user, file),
   });
@@ -103,6 +108,7 @@ export async function adminUpdateUser(id, user, file) {
 export async function adminDeleteUser(id) {
   const res = await fetch(`${API_BASE}/admin/users/delete/${id}`, {
     method: "DELETE",
+    credentials: "include",
     headers: getAuthHeaders(),
   });
   const data = await readJsonOrText(res);
@@ -112,6 +118,7 @@ export async function adminDeleteUser(id) {
 export async function getUserById(id) {
   const res = await fetch(`${API_BASE}/users/${id}`, {
     method: "GET",
+    credentials: "include",
     headers: {
       ...getAuthHeaders(),
       Accept: "application/json",
@@ -139,6 +146,7 @@ export async function fetchUsers({ keyword = "", page = 0, size = 10 } = {}) {
 
   const res = await fetch(url, {
     method: "GET",
+    credentials: "include",
     headers: {
       ...getAuthHeaders(),
     },

@@ -1,8 +1,6 @@
-const API_BASE = "http://localhost:8080";
+import { getToken } from "@/utils/auth";
 
-function getToken() {
-  return localStorage.getItem("jwt");
-}
+const API_BASE = "http://localhost:8080";
 
 async function fetchWithJwt(url, options = {}) {
   const token = getToken();
@@ -10,6 +8,7 @@ async function fetchWithJwt(url, options = {}) {
 
   const res = await fetch(finalUrl, {
     ...options,
+    credentials: "include",
     headers: {
       ...(options.headers || {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),

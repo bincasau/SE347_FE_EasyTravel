@@ -1,7 +1,9 @@
+import { getToken } from "@/utils/auth";
+
 const API_BASE = "http://localhost:8080";
 
 function getAuthHeaders() {
-  const token = localStorage.getItem("jwt");
+  const token = getToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -15,6 +17,7 @@ function listUrl(type, ownerId) {
 export async function getExtras({ type, id }) {
   const res = await fetch(listUrl(type, id), {
     method: "GET",
+    credentials: "include",
     headers: { ...getAuthHeaders() },
   });
   if (!res.ok) throw new Error(`getExtras failed: ${res.status}`);
@@ -32,6 +35,7 @@ export async function uploadExtra({ type, id, file }) {
 
   const res = await fetch(`${API_BASE}/image/auth/upload`, {
     method: "POST",
+    credentials: "include",
     headers: { ...getAuthHeaders() },
     body: fd,
   });
@@ -43,6 +47,7 @@ export async function uploadExtra({ type, id, file }) {
 export async function deleteExtra(imageId) {
   const res = await fetch(`${API_BASE}/image/auth/${imageId}`, {
     method: "DELETE",
+    credentials: "include",
     headers: { ...getAuthHeaders() },
   });
   if (!res.ok) throw new Error(`deleteExtra failed: ${res.status}`);

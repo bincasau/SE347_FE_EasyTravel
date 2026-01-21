@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getBlogById, saveBlog } from "@/apis/Blog";
-import { getUserFromToken } from "@/utils/auth";
+import { getCachedUser } from "@/utils/auth";
 import ExtraImagesManager from "@/components/pages/admin/Common/ExtraImagesManager";
 
 const S3_BLOG_BASE =
@@ -16,7 +16,7 @@ export default function AdminBlogUpsert() {
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
 
-  const me = useMemo(() => getUserFromToken?.(), []);
+  const me = useMemo(() => getCachedUser?.(), []);
   const myUserId = useMemo(() => (me?.sub ? Number(me.sub) : ""), [me]);
 
   const [form, setForm] = useState({

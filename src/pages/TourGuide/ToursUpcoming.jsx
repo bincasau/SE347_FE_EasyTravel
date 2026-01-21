@@ -9,17 +9,9 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { getToken } from "@/utils/auth";
 
 const API_BASE = "http://localhost:8080";
-
-function getToken() {
-  return (
-    localStorage.getItem("jwt") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken") ||
-    ""
-  );
-}
 
 async function fetchWithJwt(url, options = {}) {
   const token = getToken();
@@ -28,6 +20,7 @@ async function fetchWithJwt(url, options = {}) {
   const res = await fetch(finalUrl, {
     cache: "no-store",
     ...options,
+    credentials: "include",
     headers: {
       ...(options.headers || {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -108,7 +101,7 @@ export default function ToursUpcoming() {
       console.error(e);
       setTours([]);
       setTotalPages(1);
-      setErrMsg(e?.message || "Không tải được danh sách upcoming tours.");
+      setErrMsg(e?.message || "Failed to load upcoming tours.");
     } finally {
       setLoading(false);
     }
@@ -162,7 +155,7 @@ export default function ToursUpcoming() {
         <div className="text-center text-gray-500 py-16">Loading...</div>
       ) : empty ? (
         <div className="text-center text-gray-500 py-16">
-          Chưa có tour upcoming nào.
+          No upcoming tours yet.
         </div>
       ) : (
         <div className="space-y-4">

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { popup } from "@/utils/popup";
+import { getAccountDetail } from "@/apis/AccountAPI";
 
 export default function BookingStepTour2({
   bookingData,
@@ -22,33 +23,10 @@ export default function BookingStepTour2({
     address: false,
   });
 
-  const getToken = () =>
-    localStorage.getItem("jwt") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken");
-
   useEffect(() => {
-    const token = getToken();
-    if (!token) {
-      console.warn("⚠ No JWT token found!");
-      // Không có token => user tự nhập hết => không khóa field nào
-      return;
-    }
-
-    fetch("http://localhost:8080/account/detail", {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-      .then(async (res) => {
-        if (!res.ok) {
-          const msg = await res.text().catch(() => "");
-          throw new Error(msg || `Unauthorized (${res.status})`);
-        }
-        return res.json();
-      })
-      .then((data) => {
+    const loadUser = async () => {
+      try {
+        const data = await getAccountDetail();
         const nextUserInfo = {
           name: (data?.name || "").trim(),
           email: (data?.email || "").trim(),
@@ -57,26 +35,28 @@ export default function BookingStepTour2({
         };
 
         setUserInfo(nextUserInfo);
-
-        // Có dữ liệu thì khóa, thiếu thì mở cho nhập
         setLockedFields({
           name: !!nextUserInfo.name,
           email: !!nextUserInfo.email,
           phone: !!nextUserInfo.phone,
           address: !!nextUserInfo.address,
         });
-      })
-      .catch((err) => {
-        console.error("❌ Error fetching user:", err);
-        popup.error("Không thể lấy thông tin người dùng. Vui lòng nhập thủ công.");
-        // Lỗi fetch => không khóa field nào (user tự nhập)
+      } catch (err) {
+        if (err?.status && err.status !== 401) {
+          popup.error(
+            "Could not load user info. Please fill in the fields manually."
+          );
+        }
         setLockedFields({
           name: false,
           email: false,
           phone: false,
           address: false,
         });
-      });
+      }
+    };
+
+    loadUser();
   }, []);
 
   const handleChange = (field, value) => {
@@ -92,22 +72,22 @@ export default function BookingStepTour2({
   const validateBeforeContinue = () => {
     // Yêu cầu nhập đủ 4 field (vì bạn nói "kh đủ thì yêu cầu nhập mới qua bước")
     if (!userInfo.name.trim()) {
-      popup.error("Vui lòng nhập họ tên.");
+      popup.error("Please enter your full name.");
       return false;
     }
 
     if (!userInfo.phone.trim() || userInfo.phone.trim().length < 8) {
-      popup.error("Số điện thoại không hợp lệ (ít nhất 8 ký tự).");
+      popup.error("Phone number is invalid (minimum 8 characters).");
       return false;
     }
 
     if (!userInfo.email.trim() || !userInfo.email.includes("@")) {
-      popup.error("Email không hợp lệ.");
+      popup.error("Email is invalid.");
       return false;
     }
 
     if (!userInfo.address.trim()) {
-      popup.error("Vui lòng nhập địa chỉ.");
+      popup.error("Please enter your address.");
       return false;
     }
 
@@ -127,7 +107,7 @@ export default function BookingStepTour2({
 
   // Helper UI: placeholder khác nhau nếu field bị khóa / thiếu
   const getPlaceholder = (field) =>
-    lockedFields[field] ? "Đã tự động điền" : "Vui lòng nhập";
+    lockedFields[field] ? "Auto-filled" : "Please enter";
 
   // Helper UI: class khi disabled
   const inputClass = (disabled) =>
@@ -154,7 +134,7 @@ export default function BookingStepTour2({
         />
         {lockedFields.name && (
           <p className="text-xs text-gray-500 mt-1">
-            Thông tin được lấy từ tài khoản và không thể chỉnh sửa.
+            This information is retrieved from your account and cannot be edited.
           </p>
         )}
       </div>
@@ -172,7 +152,7 @@ export default function BookingStepTour2({
         />
         {lockedFields.phone && (
           <p className="text-xs text-gray-500 mt-1">
-            Thông tin được lấy từ tài khoản và không thể chỉnh sửa.
+            This information is retrieved from your account and cannot be edited.
           </p>
         )}
       </div>
@@ -190,7 +170,7 @@ export default function BookingStepTour2({
         />
         {lockedFields.email && (
           <p className="text-xs text-gray-500 mt-1">
-            Thông tin được lấy từ tài khoản và không thể chỉnh sửa.
+            This information is retrieved from your account and cannot be edited.
           </p>
         )}
       </div>
@@ -208,7 +188,7 @@ export default function BookingStepTour2({
         />
         {lockedFields.address && (
           <p className="text-xs text-gray-500 mt-1">
-            Thông tin được lấy từ tài khoản và không thể chỉnh sửa.
+            This information is retrieved from your account and cannot be edited.
           </p>
         )}
       </div>
@@ -232,3 +212,4 @@ export default function BookingStepTour2({
     </div>
   );
 }
+

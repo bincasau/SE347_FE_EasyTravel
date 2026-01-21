@@ -1,17 +1,19 @@
+import { getToken } from "@/utils/auth";
+
 const BASE_URL = "http://localhost:8080";
 
-const getJWT = () => localStorage.getItem("jwt");
+const getJWT = () => getToken();
 
 // fetch có JWT
 const fetchWithJWT = async (url, options = {}) => {
   const token = getJWT();
-  if (!token) throw new Error("Missing JWT");
 
   const res = await fetch(url, {
     ...options,
+    credentials: "include",
     headers: {
       ...(options.headers || {}),
-      Authorization: `Bearer ${token}`,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       "Content-Type": "application/json",
     },
   });
@@ -84,11 +86,9 @@ export const markNotificationRead = async (id) => {
  * - Sort mới nhất trước
  */
 export const getBellNotifications = async (status = "ACTIVE") => {
-  const token = getJWT();
-
   const [publicList, myList] = await Promise.all([
     getPublicNotifications().catch(() => []),
-    token ? getMyNotifications(status).catch(() => []) : Promise.resolve([]),
+    getMyNotifications(status).catch(() => []),
   ]);
 
   // merge theo id
@@ -126,7 +126,7 @@ export const getBellNotifications = async (status = "ACTIVE") => {
 };
 
 function getAuthHeaders() {
-  const token = localStorage.getItem("jwt");
+  const token = getToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -134,7 +134,7 @@ function getAuthHeaders() {
 export async function adminBroadcastNotification(message) {
   const res = await fetch(
     `${BASE_URL}/admin/notif/broadcast?message=${encodeURIComponent(message)}`,
-    { method: "POST", headers: getAuthHeaders() }
+    { method: "POST", credentials: "include", headers: getAuthHeaders() }
   );
   if (!res.ok) throw new Error(await res.text());
   return res.json();
@@ -144,7 +144,7 @@ export async function adminBroadcastNotification(message) {
 export async function adminUpdateNotificationStatus(id, status) {
   const res = await fetch(
     `${BASE_URL}/admin/notif/${id}/status?status=${status}`,
-    { method: "PATCH", headers: getAuthHeaders() }
+    { method: "PATCH", credentials: "include", headers: getAuthHeaders() }
   );
   if (!res.ok) throw new Error(await res.text());
   return res.text();
@@ -154,6 +154,7 @@ export async function adminUpdateNotificationStatus(id, status) {
 export async function adminDeleteNotification(id) {
   const res = await fetch(`${BASE_URL}/admin/notif/delete/${id}`, {
     method: "DELETE",
+    credentials: "include",
     headers: getAuthHeaders(),
   });
   if (!res.ok) throw new Error(await res.text());
@@ -167,7 +168,7 @@ export async function adminSendNotificationToUsers(message, userIds = []) {
   userIds.forEach((id) => params.append("userIds", id));
   const res = await fetch(
     `${BASE_URL}/admin/notif/send-to-specific?${params.toString()}`,
-    { method: "POST", headers: getAuthHeaders() }
+    { method: "POST", credentials: "include", headers: getAuthHeaders() }
   );
   return res.text();
 }
@@ -187,6 +188,7 @@ export async function adminGetAllNotifications({
 
   const res = await fetch(`${BASE_URL}/admin/notif/all?${params.toString()}`, {
     method: "GET",
+    credentials: "include",
     headers: getAuthHeaders(),
   });
 

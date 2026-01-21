@@ -2,17 +2,9 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
+import { getToken } from "@/utils/auth";
 
 const API_BASE = "http://localhost:8080";
-
-function getToken() {
-  return (
-    localStorage.getItem("jwt") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken") ||
-    ""
-  );
-}
 
 async function fetchWithJwt(url, options = {}) {
   const token = getToken();
@@ -21,6 +13,7 @@ async function fetchWithJwt(url, options = {}) {
   const res = await fetch(finalUrl, {
     cache: "no-store",
     ...options,
+    credentials: "include",
     headers: {
       ...(options.headers || {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -110,7 +103,7 @@ export default function TourParticipants() {
     } catch (e) {
       console.error(e);
       setParticipants([]);
-      setErrMsg(e?.message || "Không tải được danh sách participants.");
+      setErrMsg(e?.message || "Failed to load participants.");
     } finally {
       setLoading(false);
     }
@@ -122,7 +115,7 @@ export default function TourParticipants() {
 
   const exportExcel = useCallback(() => {
     if (!rows.length) {
-      setErrMsg("Không có dữ liệu để export.");
+      setErrMsg("No data to export.");
       return;
     }
 

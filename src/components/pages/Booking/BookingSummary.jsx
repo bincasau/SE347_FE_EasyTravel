@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 // Format to VND currency
 const formatVND = (n) =>
@@ -7,9 +7,8 @@ const formatVND = (n) =>
     currency: "VND",
   });
 
-// ✅ AWS S3 giống TourCard
 const S3_BASE = "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/tour";
-const buildS3TourImage = (id) => (id != null ? `${S3_BASE}/tour_${id}.jpg` : "");
+const fallbackSrc = "/fallback.jpg";
 
 export default function BookingSummary({ bookingData }) {
   const {
@@ -26,12 +25,27 @@ export default function BookingSummary({ bookingData }) {
   const [loading, setLoading] = useState(!tourInfoFromBooking && !!tourId);
 
   // ✅ ưu tiên id từ tourInfo (nếu có), fallback tourId
-  const resolvedTourId = tourInfoFromBooking?.id ?? tourInfoFromBooking?.tourId ?? tourId;
+  const resolvedTourId = useMemo(() => {
+    return tourInfoFromBooking?.tourId ??
+      tourInfoFromBooking?.id ??
+      tourInfoFromBooking?.tourID ??
+      tourId ??
+      null;
+  }, [tourInfoFromBooking, tourId]);
 
-  // ✅ main image dùng S3 theo id giống TourCard
-  const [mainImageUrl, setMainImageUrl] = useState(() => {
-    const s3Url = buildS3TourImage(resolvedTourId);
-    return s3Url;
+  // ✅ giống TourCard: build primary src từ mainImage
+  const buildPrimarySrc = (tour) => {
+    const imageName = (tour?.mainImage ?? "").trim();
+
+    if (!imageName) return ""; // không có -> để fallback
+    if (imageName.startsWith("http")) return imageName;
+    return `${S3_BASE}/${imageName}`;
+  };
+
+  // ✅ state ảnh (giống TourCard)
+  const [imgSrc, setImgSrc] = useState(() => {
+    const primary = buildPrimarySrc(tourInfoFromBooking);
+    return primary || fallbackSrc;
   });
 
   // ✅ nếu bookingData có tourInfo thì dùng luôn, khỏi fetch
@@ -39,17 +53,13 @@ export default function BookingSummary({ bookingData }) {
     if (tourInfoFromBooking) {
       setTourInfo(tourInfoFromBooking);
 
-      const id =
-        tourInfoFromBooking?.id ?? tourInfoFromBooking?.tourId ?? tourId;
-
-      const s3Url = buildS3TourImage(id);
-      setMainImageUrl(s3Url);
+      const primary = buildPrimarySrc(tourInfoFromBooking);
+      setImgSrc(primary || fallbackSrc);
 
       setLoading(false);
       return;
     }
 
-    // fallback: fetch nếu chỉ có tourId
     if (!tourId) return;
 
     const fetchTour = async () => {
@@ -61,12 +71,11 @@ export default function BookingSummary({ bookingData }) {
 
         setTourInfo(data);
 
-        const id = data?.id ?? data?.tourId ?? tourId;
-        const s3Url = buildS3TourImage(id);
-        setMainImageUrl(s3Url);
+        const primary = buildPrimarySrc(data);
+        setImgSrc(primary || fallbackSrc);
       } catch (err) {
         console.error("❌ Error fetching tour:", err);
-        setMainImageUrl();
+        setImgSrc(fallbackSrc);
       } finally {
         setLoading(false);
       }
@@ -75,16 +84,16 @@ export default function BookingSummary({ bookingData }) {
     fetchTour();
   }, [tourId, tourInfoFromBooking]);
 
-  // ✅ nếu id đổi (người dùng chọn tour khác) thì update ảnh
+  // ✅ nếu tourInfo đổi (fetch xong / đổi tour), reset ảnh theo mainImage
   useEffect(() => {
-    const s3Url = buildS3TourImage(resolvedTourId);
-    setMainImageUrl(s3Url);
-  }, [resolvedTourId]);
+    const primary = buildPrimarySrc(tourInfo);
+    setImgSrc(primary || fallbackSrc);
+  }, [tourInfo, resolvedTourId]);
 
   if (loading)
     return (
       <aside className="rounded-2xl border bg-white shadow-sm p-5 h-fit sticky top-10 text-center text-gray-400 italic">
-        Loading tour information...
+        Loading tour details...
       </aside>
     );
 
@@ -93,8 +102,7 @@ export default function BookingSummary({ bookingData }) {
   const { title, destination, priceAdult, priceChild, percentDiscount = 0 } =
     tourInfo;
 
-  const discountFactor =
-    percentDiscount > 0 ? 1 - percentDiscount / 100 : 1;
+  const discountFactor = percentDiscount > 0 ? 1 - percentDiscount / 100 : 1;
 
   const effectiveAdult = (priceAdult ?? 0) * discountFactor;
   const effectiveChild = (priceChild ?? 0) * discountFactor;
@@ -106,11 +114,16 @@ export default function BookingSummary({ bookingData }) {
       {/* 🖼️ Image + Tour details */}
       <div className="flex items-center gap-4 mb-5">
         <img
-          src={mainImageUrl}
+          src={imgSrc}
           alt={title}
           className="w-24 h-20 rounded-lg object-cover flex-shrink-0 border"
-          
+          loading="lazy"
+          onError={() => {
+            if (imgSrc === fallbackSrc) return;
+            setImgSrc(fallbackSrc);
+          }}
         />
+
         <div className="flex flex-col justify-center">
           <div className="font-semibold text-gray-800 text-sm leading-tight mb-1">
             {title}
@@ -130,32 +143,32 @@ export default function BookingSummary({ bookingData }) {
       <div className="space-y-2 text-sm">
         {adult > 0 && (
           <div className="flex justify-between items-center text-gray-700">
-            <span>
-              {adult} {adult > 1 ? "Adults" : "Adult"}
-            </span>
+            <span>{adult} {adult > 1 ? "Adults" : "Adult"}</span>
             <div className="text-right">
               {percentDiscount > 0 && (
                 <div className="text-xs text-gray-400 line-through">
                   {formatVND(adult * (priceAdult ?? 0))}
                 </div>
               )}
-              <div className="font-medium">{formatVND(adult * effectiveAdult)}</div>
+              <div className="font-medium">
+                {formatVND(adult * effectiveAdult)}
+              </div>
             </div>
           </div>
         )}
 
         {child > 0 && (
           <div className="flex justify-between items-center text-gray-700">
-            <span>
-              {child} {child > 1 ? "Children" : "Child"}
-            </span>
+            <span>{child} {child > 1 ? "Children" : "Child"}</span>
             <div className="text-right">
               {percentDiscount > 0 && (
                 <div className="text-xs text-gray-400 line-through">
                   {formatVND(child * (priceChild ?? 0))}
                 </div>
               )}
-              <div className="font-medium">{formatVND(child * effectiveChild)}</div>
+              <div className="font-medium">
+                {formatVND(child * effectiveChild)}
+              </div>
             </div>
           </div>
         )}

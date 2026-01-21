@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import {
   loginApi,
+  getAccountDetail,
   forgotPasswordRequestApi,
   forgotPasswordConfirmApi,
 } from "@/apis/AccountAPI";
@@ -61,7 +62,12 @@ export default function LoginModal({ onClose, onOpenSignup }) {
     try {
       await loginApi(payload);
 
-      const user = getUserFromToken();
+      let user = getUserFromToken();
+      if (!user) {
+        try {
+          user = await getAccountDetail();
+        } catch {}
+      }
       onClose?.();
 
       if (user?.role === "HOTEL_MANAGER")

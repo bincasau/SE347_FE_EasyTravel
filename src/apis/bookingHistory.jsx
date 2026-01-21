@@ -1,10 +1,6 @@
-const BASE_URL = "http://localhost:8080";
+import { getToken } from "@/utils/auth";
 
-const getToken = () =>
-  localStorage.getItem("jwt") ||
-  localStorage.getItem("token") ||
-  localStorage.getItem("accessToken") ||
-  "";
+const BASE_URL = "http://localhost:8080";
 
 async function fetchJSON(url, options = {}) {
   const res = await fetch(url, options);
@@ -30,8 +26,9 @@ export async function fetchHotelBookingHistory({ page = 0, size = 10, start, end
   const qs = buildQuery({ page, size, start, end });
   return fetchJSON(`${BASE_URL}/booking/history/hotels?${qs}`, {
     method: "GET",
+    credentials: "include",
     headers: {
-      Authorization: token ? `Bearer ${token}` : "",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
   });
 }
@@ -41,8 +38,9 @@ export async function fetchTourBookingHistory({ page = 0, size = 10, start, end 
   const qs = buildQuery({ page, size, start, end });
   return fetchJSON(`${BASE_URL}/booking/history/tours?${qs}`, {
     method: "GET",
+    credentials: "include",
     headers: {
-      Authorization: token ? `Bearer ${token}` : "",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
   });
 }

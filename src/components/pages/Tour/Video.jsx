@@ -6,7 +6,7 @@ export default function BookingVideo() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
         {/* Title */}
         <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold text-gray-900 mb-5">
-          Beautiful Vietnam
+          Discover Vietnam
         </h2>
 
         {/* Video */}

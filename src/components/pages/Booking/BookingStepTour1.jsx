@@ -4,6 +4,7 @@ import DatePicker from "react-datepicker";
 import Select from "react-select";
 import "react-datepicker/dist/react-datepicker.css";
 import { popup } from "@/utils/popup";
+import { useLang } from "@/contexts/LangContext";
 
 // Format VND
 const formatVND = (n) =>
@@ -41,6 +42,7 @@ export default function BookingStepTour1({
   setBookingData,
   nextStep,
 }) {
+  const { t } = useLang();
   const [localDate, setLocalDate] = useState(
     bookingData.date ? new Date(bookingData.date) : null
   );
@@ -49,7 +51,7 @@ export default function BookingStepTour1({
   const availableSeats = bookingData.availableSeats ?? 0;
 
   if (!tour) {
-    return <div className="text-gray-500">Loading tour info...</div>;
+    return <div className="text-gray-500">{t("tourPage.loading")}</div>;
   }
 
   const basePriceAdult = tour.priceAdult ?? 0;
@@ -101,7 +103,7 @@ export default function BookingStepTour1({
 
   const handleContinue = () => {
     if (adult + child === 0) {
-      popup.error("Bạn phải chọn ít nhất 1 vé.");
+      popup.error(t("tourPage.selectAtLeast"));
       return;
     }
     nextStep();
@@ -110,7 +112,7 @@ export default function BookingStepTour1({
   return (
     <div className="space-y-6">
       <div>
-        <label className="block text-sm text-gray-600 mb-2">Select a Date</label>
+        <label className="block text-sm text-gray-600 mb-2">{t("tourPage.selectDate")}</label>
         <div className="relative flex items-center border rounded-lg px-3 py-2 bg-white shadow-sm">
           <FaCalendarAlt className="text-gray-500 mr-2" />
           <DatePicker
@@ -118,7 +120,7 @@ export default function BookingStepTour1({
             onChange={handleDateChange}
             dateFormat="dd/MM/yyyy"
             minDate={new Date()}
-            placeholderText="Choose a travel date"
+            placeholderText={t("tourPage.chooseTravelDate")}
             showPopperArrow={false}
             className="w-full text-sm text-gray-800 focus:outline-none"
           />
@@ -128,7 +130,7 @@ export default function BookingStepTour1({
       <div className="space-y-4 mt-4">
         <div className="border rounded-lg p-4 flex items-center justify-between">
           <div>
-            <div className="font-semibold text-gray-800">Adult</div>
+            <div className="font-semibold text-gray-800">{t("tourPage.adult")}</div>
             <div className="text-sm text-gray-500 line-through">
               {discountPercent > 0 && formatVND(basePriceAdult)}
             </div>
@@ -151,7 +153,7 @@ export default function BookingStepTour1({
 
         <div className="border rounded-lg p-4 flex items-center justify-between">
           <div>
-            <div className="font-semibold text-gray-800">Child</div>
+            <div className="font-semibold text-gray-800">{t("tourPage.child")}</div>
             <div className="text-sm text-gray-500 line-through">
               {discountPercent > 0 && formatVND(basePriceChild)}
             </div>
@@ -173,7 +175,7 @@ export default function BookingStepTour1({
         </div>
 
         <p className="text-sm text-gray-500">
-          🎟 Số ghế còn lại: <b>{availableSeats}</b>
+          🎟 {t("tourPage.seats")} <b>{availableSeats}</b>
         </p>
       </div>
 
@@ -182,14 +184,14 @@ export default function BookingStepTour1({
           onClick={() => window.history.back()}
           className="px-4 py-2 border rounded-lg text-gray-600 hover:bg-gray-100"
         >
-          Back
+          {t("tourPage.back")}
         </button>
 
         <button
           onClick={handleContinue}
           className="px-5 py-2 rounded-lg bg-orange-500 text-white hover:bg-orange-600"
         >
-          Continue
+          {t("tourPage.continue")}
         </button>
       </div>
     </div>

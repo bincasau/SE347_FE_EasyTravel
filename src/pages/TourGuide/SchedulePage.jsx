@@ -12,6 +12,7 @@ import {
 import Pagination from "@/utils/Pagination";
 import MonthHeader from "../../components/pages/TourGuide/schedule/MonthHeader";
 import EventList from "../../components/pages/TourGuide/schedule/EventList";
+import { getToken as getCookieToken } from "@/utils/auth";
 
 const API_BASE = "http://localhost:8080";
 
@@ -31,11 +32,7 @@ export default function SchedulePage() {
   const today = new Date();
 
   // ✅ lấy token
-  const getToken = () =>
-    localStorage.getItem("jwt") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken") ||
-    "";
+  const getToken = () => getCookieToken();
 
   // ✅ fetch auto gửi JWT
   const fetchWithAuth = async (url, options = {}) => {
@@ -46,7 +43,7 @@ export default function SchedulePage() {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
 
-    const res = await fetch(url, { ...options, headers });
+    const res = await fetch(url, { ...options, headers, credentials: "include" });
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");

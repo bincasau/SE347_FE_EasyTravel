@@ -1,4 +1,5 @@
 // @/apis/booking.jsx
+import { getToken } from "@/utils/auth";
 const API_BASE = "http://localhost:8080";
 
 export const getRoomBookedDates = async (hotelId, roomId) => {
@@ -34,12 +35,13 @@ export const getRoomBookedDates = async (hotelId, roomId) => {
 };
 
 export async function createHotelBooking(payload) {
-  const token = localStorage.getItem("jwt");
+  const token = getToken();
   const res = await fetch(`${API_BASE}/booking/hotel`, {
     method: "POST",
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify(payload),
   });
@@ -69,8 +71,9 @@ export async function getVnpayPaymentUrl({
 
   const res = await fetch(url, {
     method: "GET",
+    credentials: "include",
     headers: {
-      Authorization: token ? `Bearer ${token}` : "",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
   });
 

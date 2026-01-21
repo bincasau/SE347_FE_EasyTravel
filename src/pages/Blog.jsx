@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import BlogCard from "../components/pages/Blog/BlogCard";
 import BlogSidebar from "../components/pages/Blog/BlogSiderbar";
+import { useLang } from "../contexts/LangContext";
 
 export default function Blog() {
+  const { t } = useLang();
   // ✅ sidebarBlogs: load 1 lần để sidebar recent/gallery
   const [sidebarBlogs, setSidebarBlogs] = useState([]);
 
@@ -34,7 +36,7 @@ export default function Blog() {
 
   const toDesc = (details) => {
     const text = details || "";
-    if (!text) return "Không có mô tả.";
+    if (!text) return t("blogPage.noArticles");
     return text.slice(0, 200) + (text.length > 200 ? "..." : "");
   };
 
@@ -71,7 +73,7 @@ export default function Blog() {
 
       while (page < total) {
         const res = await fetch(`${BASE_URL}/blogs?page=${page}&size=${size}`);
-        if (!res.ok) throw new Error("Không thể tải all blogs cho sidebar");
+        if (!res.ok) throw new Error("Failed to load all blogs");
 
         const data = await res.json();
         const items = data._embedded?.blogs || [];
@@ -84,7 +86,7 @@ export default function Blog() {
       const formatted = all.map((b, idx) => mapBlog(b, idx));
       setSidebarBlogs(formatted);
     } catch (err) {
-      console.error("❌ Lỗi fetch all blogs sidebar:", err);
+      console.error("Error fetching all blogs for sidebar:", err);
       setSidebarBlogs([]);
     }
   };
@@ -104,7 +106,7 @@ export default function Blog() {
       const res = await fetch(
         `${BASE_URL}/blogs?page=${page - 1}&size=${blogsPerPage}`
       );
-      if (!res.ok) throw new Error("Không thể tải danh sách blog");
+      if (!res.ok) throw new Error("Failed to load blog list");
 
       const data = await res.json();
       const items = data._embedded?.blogs || [];
@@ -114,7 +116,7 @@ export default function Blog() {
       setFilteredBlogs(formatted);
       setTotalPages(data.page?.totalPages || 1);
     } catch (err) {
-      console.error("❌ Lỗi fetch blogs:", err);
+      console.error("Error fetching blogs:", err);
       setPagedBlogs([]);
       setFilteredBlogs([]);
       setTotalPages(1);
@@ -333,23 +335,23 @@ export default function Blog() {
         {selectedTag && (
           <div className="mb-6 flex items-center gap-3">
             <div className="text-sm text-gray-600">
-              Filtered by tag: <b>{selectedTag}</b>
+              {t("blogPage.filteredByTag")}: <b>{selectedTag}</b>
             </div>
             <button
               onClick={clearTag}
               className="text-orange-600 hover:underline text-sm"
             >
-              Clear tag
+              {t("blogPage.clearTag")}
             </button>
           </div>
         )}
 
         {loading ? (
-          <div className="text-center py-10 text-gray-500">Đang tải bài viết...</div>
+          <div className="text-center py-10 text-gray-500">{t("blogPage.loading")}</div>
         ) : filteredBlogs.length > 0 ? (
           filteredBlogs.map((blog) => <BlogCard key={blog.id} {...blog} />)
         ) : (
-          <p className="text-gray-500 text-center py-8">Không tìm thấy bài viết nào.</p>
+          <p className="text-gray-500 text-center py-8">{t("blogPage.noArticles")}</p>
         )}
 
         {showPagination && (

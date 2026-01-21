@@ -1,4 +1,12 @@
 // src/apis/AccountAPI.js
+import {
+  clearAuthFlag,
+  clearCachedUser,
+  clearToken,
+  setAuthFlag,
+  setCachedUser,
+  setToken,
+} from "@/utils/auth";
 const API_BASE = "http://localhost:8080";
 
 /** ---------------- HELPERS ---------------- **/
@@ -22,6 +30,7 @@ export async function loginApi(payload) {
   const res = await fetch(`${API_BASE}/account/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify(payload),
   });
 
@@ -40,9 +49,14 @@ export async function loginApi(payload) {
     token = (await res.text()).trim();
   }
 
-  if (!token) throw new Error("Không nhận được token từ server!");
+  if (!token) {
+    setAuthFlag();
+    window.dispatchEvent(new Event("jwt-changed"));
+    return "";
+  }
 
-  localStorage.setItem("jwt", token);
+  setToken(token);
+  setAuthFlag();
   window.dispatchEvent(new Event("jwt-changed"));
 
   return token;
@@ -67,15 +81,8 @@ export async function signupApi(payload) {
 
 /** ---------------- DETAIL USER ---------------- **/
 export async function getAccountDetail() {
-  const token = localStorage.getItem("jwt");
-  if (!token) {
-    const err = new Error("NO_TOKEN");
-    err.code = "NO_TOKEN";
-    throw err;
-  }
-
   const res = await fetch(`${API_BASE}/account/detail`, {
-    headers: { Authorization: `Bearer ${token}` },
+    credentials: "include",
   });
 
   if (!res.ok) {
@@ -85,24 +92,22 @@ export async function getAccountDetail() {
     throw err;
   }
 
-  return res.json();
+  const data = await res.json();
+  setCachedUser(data);
+  setAuthFlag();
+  return data;
 }
 
 /** ---------------- CHANGE PASSWORD ---------------- **/
 export async function changePasswordApi({ oldPassword, newPassword }) {
-  const token = localStorage.getItem("jwt");
-  if (!token) {
-    const err = new Error("NO_TOKEN");
-    err.code = "NO_TOKEN";
-    throw err;
-  }
+  const headers = {
+    "Content-Type": "application/json",
+  };
 
   const res = await fetch(`${API_BASE}/account/change-password`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
+    headers,
+    credentials: "include",
     body: JSON.stringify({ oldPassword, newPassword }),
   });
 
@@ -173,7 +178,16 @@ export async function forgotPasswordConfirmApi({ email, code, newPassword }) {
 }
 
 /** ---------------- LOGOUT ---------------- **/
-export function logout() {
-  localStorage.removeItem("jwt");
+export async function logout() {
+  try {
+    await fetch(`${API_BASE}/account/logout`, {
+      method: "POST",
+      credentials: "include",
+    });
+  } catch {}
+
+  clearToken();
+  clearCachedUser();
+  clearAuthFlag();
   window.dispatchEvent(new Event("jwt-changed"));
 }

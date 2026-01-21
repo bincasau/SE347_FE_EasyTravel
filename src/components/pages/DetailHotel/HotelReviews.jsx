@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { FaStar, FaRegStar } from "react-icons/fa";
 import { popup } from "@/utils/popup";
+import { getToken, isLoggedIn } from "@/utils/auth";
 
 const API_BASE = "http://localhost:8080";
 
@@ -9,12 +10,13 @@ const S3_USER_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/user";
 
 async function fetchWithJwt(url, options = {}) {
-  const token = localStorage.getItem("jwt");
+  const token = getToken();
   const finalUrl = url.startsWith("http") ? url : `${API_BASE}${url}`;
 
   return fetch(finalUrl, {
     cache: "no-store",
     ...options,
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...(options.headers || {}),
@@ -109,7 +111,7 @@ export default function HotelReviews({ hotelId }) {
   const [savingEdit, setSavingEdit] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const isLoggedIn = !!localStorage.getItem("jwt");
+  const loggedIn = isLoggedIn();
 
   // ✅ mapping đúng JSON bạn gửi
   const getId = (r, i) => r?.reviewId ?? i;
@@ -170,7 +172,7 @@ export default function HotelReviews({ hotelId }) {
   const handleCreate = async (e) => {
     e.preventDefault();
 
-    if (!isLoggedIn) return popup.error("Bạn cần đăng nhập để review.");
+    if (!loggedIn) return popup.error("Bạn cần đăng nhập để review.");
     if (!newComment.trim()) return popup.error("Vui lòng nhập comment.");
 
     setSubmitting(true);
@@ -299,7 +301,7 @@ export default function HotelReviews({ hotelId }) {
                       </div>
                     </div>
 
-                    {isLoggedIn && (
+                    {loggedIn && (
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
@@ -390,7 +392,7 @@ export default function HotelReviews({ hotelId }) {
       >
         <h4 className="font-semibold text-gray-800 mb-3">Viết review</h4>
 
-        {!isLoggedIn && (
+        {!loggedIn && (
           <div className="text-xs text-gray-500 mb-3">
             Bạn cần đăng nhập để review khách sạn
           </div>
@@ -399,7 +401,7 @@ export default function HotelReviews({ hotelId }) {
         <StarPicker value={newRating} onChange={setNewRating} />
 
         <textarea
-          disabled={!isLoggedIn}
+          disabled={!loggedIn}
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
           rows={3}
@@ -409,9 +411,9 @@ export default function HotelReviews({ hotelId }) {
 
         <button
           type="submit"
-          disabled={!isLoggedIn || submitting}
+          disabled={!loggedIn || submitting}
           className={`mt-3 px-5 py-2 rounded-full text-white font-medium transition ${
-            !isLoggedIn || submitting
+            !loggedIn || submitting
               ? "bg-gray-400 cursor-not-allowed"
               : "bg-orange-500 hover:bg-orange-600"
           }`}

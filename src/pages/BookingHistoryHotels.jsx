@@ -3,14 +3,9 @@ import { NavLink } from "react-router-dom";
 import { fetchHotelBookingHistory } from "@/apis/bookingHistory";
 import { buildTourSlug } from "@/utils/slug";
 import { popup } from "@/utils/popup";
+import { getToken } from "@/utils/auth";
 
 const BASE_URL = "http://localhost:8080";
-
-const getToken = () =>
-  localStorage.getItem("jwt") ||
-  localStorage.getItem("token") ||
-  localStorage.getItem("accessToken") ||
-  "";
 
 async function fetchJSON(url, options = {}) {
   const res = await fetch(url, options);
@@ -36,19 +31,20 @@ async function refundByBooking(bookingType, bookingId) {
 
   return fetchJSON(`${BASE_URL}/payment/refund/${bookingType}/${bookingId}`, {
     method: "POST",
+    credentials: "include",
     headers: {
-      Authorization: `Bearer ${token}`,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       Accept: "application/json",
     },
   });
 }
 
 // ✅ random delay 1-3s
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const sleepRandom = (minMs = 1000, maxMs = 3000) => {
-  const ms = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
-  return sleep(ms);
-};
+const sleepRandom = (min, max) =>
+  new Promise((resolve) =>
+    setTimeout(resolve, Math.random() * (max - min) + min)
+  );
+
 
 const fmtDate = (d) => {
   if (!d) return "-";
@@ -99,7 +95,9 @@ function extractMessage(input, fallback = "Có lỗi xảy ra!") {
         fallback
       );
     }
-  } catch {}
+  } catch {
+    // Silently ignore JSON parse errors
+  }
 
   return s;
 }

@@ -2,6 +2,7 @@ import { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
 import { popup } from "@/utils/popup";
+import { getToken } from "@/utils/auth";
 
 const API_BASE = "http://localhost:8080";
 const MY_HOTEL_URL = `${API_BASE}/hotel_manager/my-hotel`;
@@ -36,11 +37,7 @@ function cleanNumberString(v) {
 export default function AddRoom() {
   const navigate = useNavigate();
 
-  const token =
-    localStorage.getItem("jwt") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken") ||
-    "";
+  const token = getToken();
 
   const [hotelId, setHotelId] = useState(null);
   const [loadingHotel, setLoadingHotel] = useState(true);
@@ -86,12 +83,13 @@ export default function AddRoom() {
 
   /** ===== 1) Fetch hotelId ===== */
   const fetchMyHotel = useCallback(async () => {
-    if (!token) throw new Error("NO_TOKEN (Bạn chưa đăng nhập)");
-
     const url = `${MY_HOTEL_URL}?_t=${Date.now()}`;
     const res = await fetch(url, {
       method: "GET",
-      headers: { Authorization: `Bearer ${token}` },
+      credentials: "include",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       cache: "no-store",
     });
 
@@ -305,7 +303,6 @@ export default function AddRoom() {
 
   /** ===== 5) Validate ===== */
   const validateOne = (payload) => {
-    if (!token) return "NO_TOKEN (Bạn chưa đăng nhập)";
     if (loadingHotel) return "Đang lấy hotelId...";
     if (hotelError) return hotelError;
     if (!hotelId) return "Không lấy được hotelId";
@@ -365,7 +362,10 @@ export default function AddRoom() {
 
       const res = await fetch(CREATE_ROOM_URL, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: fd,
       });
 
@@ -400,7 +400,6 @@ export default function AddRoom() {
     if (!bulkBedFile || !bulkWcFile) {
       return popup.error("Bulk create cần chọn Default Bed Image và Default WC Image.");
     }
-    if (!token) return popup.error("Bạn chưa đăng nhập.");
     if (!hotelId) return popup.error("Chưa có hotelId.");
 
     const ok = await popup.confirm(
@@ -428,7 +427,10 @@ export default function AddRoom() {
 
         const res = await fetch(CREATE_ROOM_URL, {
           method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: "include",
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
           body: fd,
         });
 

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { popup } from "@/utils/popup";
 import RoomCard from "@/components/pages/HotelManager/MyRoom/Card.jsx";
 import Pagination from "@/utils/Pagination";
+import { getToken as getCookieToken } from "@/utils/auth";
 
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
@@ -21,11 +22,7 @@ export default function MyRooms() {
   const pageSize = 5;
 
   // ✅ lấy token (tự thử nhiều key phổ biến)
-  const getToken = () =>
-    localStorage.getItem("jwt") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken") ||
-    "";
+  const getToken = () => getCookieToken();
 
   // ✅ fetch auto gửi JWT
   const fetchWithAuth = async (url, options = {}) => {

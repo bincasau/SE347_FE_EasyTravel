@@ -17,7 +17,7 @@ import {
   isAfter,
 } from "date-fns";
 
-import { getUserFromToken } from "@/utils/auth";
+import { getCachedUser, getUserFromToken, isLoggedIn } from "@/utils/auth";
 import { extractIdFromSlug, buildTourSlug } from "@/utils/slug";
 import { popup } from "@/utils/popup";
 
@@ -314,20 +314,14 @@ export default function TourDetail() {
 
   const mainImg = selectedImg || images[0] || fallbackImages[0];
 
-  const getToken = () =>
-    localStorage.getItem("jwt") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken") ||
-    "";
-
   const handleBuyNow = async () => {
     if (soldOut) {
       await popup.error("Tour đã hết chỗ. Vui lòng chọn tour khác.");
       return;
     }
 
-    const token = getToken();
-    if (!token) {
+    const loggedIn = isLoggedIn();
+    if (!loggedIn) {
       const ok = await popup.confirm(
         "Bạn cần đăng nhập để đặt tour. Mở trang đăng nhập ngay?",
         "Yêu cầu đăng nhập"
@@ -336,7 +330,7 @@ export default function TourDetail() {
       return;
     }
 
-    const jwtUser = getUserFromToken();
+    const jwtUser = getUserFromToken() || getCachedUser();
     const role = String(jwtUser?.role || "").toUpperCase();
 
     if (role === "TOUR_GUIDE") {
