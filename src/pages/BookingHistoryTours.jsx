@@ -3,7 +3,6 @@ import { NavLink } from "react-router-dom";
 import { fetchTourBookingHistory } from "@/apis/bookingHistory";
 import { buildTourSlug } from "@/utils/slug";
 import { popup } from "@/utils/popup";
-import { getToken } from "@/utils/auth";
 
 const BASE_URL = "http://localhost:8080";
 
@@ -62,13 +61,11 @@ async function fetchJSON(url, options = {}) {
   const text = await res.text();
 
   if (!res.ok) {
-    // BE hay trả JSON string => throw nguyên text
     throw new Error(text || `HTTP ${res.status}`);
   }
 
   if (!text) return null;
 
-  // BE có thể trả string thuần -> JSON.parse fail
   try {
     return JSON.parse(text);
   } catch {
@@ -76,16 +73,12 @@ async function fetchJSON(url, options = {}) {
   }
 }
 
-// ✅ Refund TOUR theo bookingId
+// ✅ Refund TOUR theo bookingId (JWT ở cookie -> chỉ cần include credentials)
 async function refundByBooking(bookingType, bookingId) {
-  const token = getToken();
-  if (!token) throw new Error("Bạn chưa đăng nhập (thiếu JWT token).");
-
   return fetchJSON(`${BASE_URL}/payment/refund/${bookingType}/${bookingId}`, {
     method: "POST",
-    credentials: "include",
+    credentials: "include", // ✅ gửi cookie
     headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       Accept: "application/json",
     },
   });
@@ -96,7 +89,6 @@ const sleepRandom = (min, max) =>
   new Promise((resolve) =>
     setTimeout(resolve, Math.random() * (max - min) + min)
   );
-
 
 const fmtDate = (d) => {
   if (!d) return "-";
@@ -154,6 +146,7 @@ export default function BookingHistoryTours() {
     const p = typeof overridePage === "number" ? overridePage : page;
     setLoading(true);
     try {
+      // ✅ NOTE: fetchTourBookingHistory cũng phải gửi cookie (xem phần 2)
       const res = await fetchTourBookingHistory({ page: p, size, start, end });
       setData({
         content: res?.content || [],
@@ -210,14 +203,12 @@ export default function BookingHistoryTours() {
 
     setRefundingId(bookingId);
 
-    // ✅ popup loading spinner
     const closeLoading =
       popup && typeof popup.loading === "function"
         ? popup.loading("Đang refund...")
         : null;
 
     try {
-      // ✅ delay random 1-3s cho thấy loading
       await sleepRandom(1000, 3000);
 
       const res = await refundByBooking("TOUR", bookingId);
@@ -228,9 +219,7 @@ export default function BookingHistoryTours() {
       load();
     } catch (e) {
       console.error(e);
-
       if (typeof closeLoading === "function") closeLoading();
-
       notifyError(e);
     } finally {
       setRefundingId(null);
@@ -381,7 +370,6 @@ export default function BookingHistoryTours() {
                       {bookingStatus}
                     </span>
                   </div>
-                  
 
                   <div className="mt-3 text-sm text-gray-600 flex flex-col gap-1">
                     <div>
@@ -416,9 +404,7 @@ export default function BookingHistoryTours() {
 
                     <button
                       disabled={!canRefund}
-                      onClick={() =>
-                        onRefund(bookingId, bookingStatus, tourStatus)
-                      }
+                      onClick={() => onRefund(bookingId, bookingStatus, tourStatus)}
                       className={`px-4 py-2 rounded-xl border text-sm font-medium disabled:opacity-50 ${
                         canRefund ? "hover:bg-gray-50" : "cursor-not-allowed"
                       }`}
