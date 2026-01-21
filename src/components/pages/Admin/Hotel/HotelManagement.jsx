@@ -1,10 +1,34 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { getHotels, getHotelManagerByHotelId } from "@/apis/Hotel";
+import { getHotels, getHotelManagerByHotelId, deleteHotel } from "@/apis/Hotel";
 import AdminHotelCard from "@/components/pages/Admin/Hotel/AdminHotelCard";
 import Pagination from "@/utils/Pagination";
 import ExportHotelsExcelButton from "@/components/pages/Admin/Hotel/HotelsExportExcel";
 import HotelsImportExcelButton from "@/components/pages/Admin/Hotel/HotelsImportExcel";
+import { popup } from "@/utils/popup";
+
+function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
+}
+
+function Spinner() {
+  return (
+    <span className="inline-block w-4 h-4 rounded-full border-2 border-white/60 border-t-transparent animate-spin" />
+  );
+}
+
+function formatDateVN(d) {
+  if (!d) return "—";
+  const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return "—";
+  return dt.toLocaleDateString("vi-VN");
+}
+
+function formatVND(v) {
+  const n = Number(v ?? 0);
+  if (Number.isNaN(n)) return "—";
+  return n.toLocaleString("vi-VN") + " đ";
+}
 
 export default function HotelManagement() {
   const [hotels, setHotels] = useState([]);
@@ -13,8 +37,18 @@ export default function HotelManagement() {
   const [searchParams, setSearchParams] = useSearchParams();
   const pageFromUrl = Number(searchParams.get("page")) || 1;
 
+  // ✅ view mode (card | table) from URL
+  const viewFromUrl =
+    (searchParams.get("view") || "card").toString().toLowerCase() === "table"
+      ? "table"
+      : "card";
+
+  const [viewMode, setViewMode] = useState(viewFromUrl);
+
   const [page, setPage] = useState(pageFromUrl - 1);
   const [totalPages, setTotalPages] = useState(1);
+
+  const [removingId, setRemovingId] = useState(null);
 
   const managerCacheRef = useRef(new Map());
 
@@ -48,6 +82,7 @@ export default function HotelManagement() {
 
   async function loadHotels(currentPage = 0) {
     setLoading(true);
+    const close = popup.loading("Đang tải danh sách khách sạn...");
     try {
       const data = await getHotels({
         page: currentPage,
@@ -62,11 +97,12 @@ export default function HotelManagement() {
       setTotalPages(data?.page?.totalPages ?? 1);
       setPage(data?.page?.number ?? 0);
     } catch (error) {
-      console.error("Error loading hotels:", error);
       setHotels([]);
       setTotalPages(1);
       setPage(0);
+      popup.error(error?.message || "Tải danh sách khách sạn thất bại");
     } finally {
+      close?.();
       setLoading(false);
     }
   }
@@ -76,53 +112,229 @@ export default function HotelManagement() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageFromUrl]);
 
+  // sync URL -> state
+  useEffect(() => setViewMode(viewFromUrl), [viewFromUrl]);
+
   const handlePageChange = (p) => {
-    setSearchParams({ page: p });
+    const next = { page: String(p), view: viewMode };
+    setSearchParams(next);
   };
+
+  const applyViewMode = (nextMode) => {
+    const v = nextMode === "table" ? "table" : "card";
+    setViewMode(v);
+    setSearchParams({ page: String(page + 1 || 1), view: v });
+  };
+
+  const handleRemove = async (hotelId) => {
+    const ok = await popup.confirm(
+      "Bạn có chắc chắn muốn xóa khách sạn này không?",
+      "Xác nhận xóa",
+    );
+    if (!ok) return;
+
+    setRemovingId(hotelId);
+    const close = popup.loading("Đang xóa khách sạn...");
+    try {
+      await deleteHotel(Number(hotelId));
+      popup.success("Đã xóa khách sạn");
+      await loadHotels(page);
+    } catch (e) {
+      popup.error(e?.message || "Xóa thất bại");
+    } finally {
+      close?.();
+      setRemovingId(null);
+    }
+  };
+
+  const safeTotalPages = Math.max(1, totalPages || 1);
+
+  // nếu current page vượt totalPages -> kéo về
+  useEffect(() => {
+    if (page + 1 > safeTotalPages) {
+      const safe = clamp(page + 1, 1, safeTotalPages);
+      setSearchParams({ page: String(safe), view: viewMode });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [safeTotalPages]);
+
+  const visibleHotels = hotels;
 
   return (
     <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
       {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <h1 className="text-2xl font-semibold">Hotel management</h1>
+      <div className="flex flex-col gap-3 sm:gap-4 mb-6">
+        <div className="flex flex-col gap-3 sm:gap-4 mb-6">
+          {/* ROW 1: Title + Toggle view */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <h1 className="text-xl sm:text-2xl font-semibold">
+              Quản lý khách sạn
+            </h1>
 
-        {/* ACTIONS: wrap on mobile */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
-          {/* Import */}
-          <div className="w-full sm:w-auto">
-            <HotelsImportExcelButton onImported={() => loadHotels(page)} />
+            {/* Toggle view */}
+            <div className="inline-flex rounded-full bg-gray-100 p-1">
+              <button
+                type="button"
+                onClick={() => applyViewMode("card")}
+                disabled={loading}
+                className={`px-4 py-2 rounded-full text-sm font-semibold transition disabled:opacity-60 ${
+                  viewMode === "card"
+                    ? "bg-white shadow text-gray-900"
+                    : "text-gray-700 hover:bg-white/60"
+                }`}
+              >
+                Thẻ
+              </button>
+              <button
+                type="button"
+                onClick={() => applyViewMode("table")}
+                disabled={loading}
+                className={`px-4 py-2 rounded-full text-sm font-semibold transition disabled:opacity-60 ${
+                  viewMode === "table"
+                    ? "bg-white shadow text-gray-900"
+                    : "text-gray-700 hover:bg-white/60"
+                }`}
+              >
+                Bảng
+              </button>
+            </div>
           </div>
 
-          {/* Export */}
-          <div className="w-full sm:w-auto">
-            <ExportHotelsExcelButton />
-          </div>
+          {/* ROW 2: Actions */}
+          <div className="flex flex-col sm:flex-row sm:justify-end gap-2 sm:gap-3">
+            <div className="w-full sm:w-auto">
+              <HotelsImportExcelButton onImported={() => loadHotels(page)} />
+            </div>
 
-          <Link to="/admin/hotels/add" className="w-full sm:w-auto">
-            <button className="w-full sm:w-auto px-5 py-2 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition">
-              + Add Hotel
-            </button>
-          </Link>
+            <div className="w-full sm:w-auto">
+              <ExportHotelsExcelButton />
+            </div>
+
+            <Link to="/admin/hotels/add" className="w-full sm:w-auto">
+              <button className="w-full sm:w-auto px-5 py-2 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition">
+                Thêm khách sạn
+              </button>
+            </Link>
+          </div>
         </div>
       </div>
 
       {/* CONTENT */}
       {loading ? (
-        <p className="text-center py-10 text-gray-600">Loading hotels...</p>
-      ) : hotels.length === 0 ? (
-        <p className="text-center py-10 text-gray-500">No hotels found.</p>
-      ) : (
+        <div className="py-10 flex items-center justify-center gap-3 text-gray-600">
+          <span className="w-4 h-4 rounded-full border-2 border-gray-300 border-t-transparent animate-spin" />
+          Đang tải danh sách khách sạn...
+        </div>
+      ) : visibleHotels.length === 0 ? (
+        <p className="text-center py-10 text-gray-500">
+          Không có khách sạn nào.
+        </p>
+      ) : viewMode === "card" ? (
         <div className="flex flex-col gap-4 sm:gap-6">
-          {hotels.map((hotel) => (
+          {visibleHotels.map((hotel) => (
             <AdminHotelCard
               key={hotel.hotelId}
               hotel={hotel}
               managerId={hotel.managerId}
               manager={hotel.manager}
-              onEdit={() => console.log("Edit:", hotel)}
-              onRemove={() => console.log("Remove:", hotel.hotelId)}
+              onEdit={() => {}}
+              onRemove={() => loadHotels(page)}
             />
           ))}
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white">
+          <table className="min-w-[980px] w-full text-sm">
+            <thead className="bg-gray-50 text-gray-700">
+              <tr className="text-left">
+                <th className="px-4 py-3 font-semibold">Mã KS</th>
+                <th className="px-4 py-3 font-semibold">Tên khách sạn</th>
+                <th className="px-4 py-3 font-semibold">Địa chỉ</th>
+                <th className="px-4 py-3 font-semibold">Hotline</th>
+                <th className="px-4 py-3 font-semibold">Email</th>
+                <th className="px-4 py-3 font-semibold">Giá thấp nhất</th>
+                <th className="px-4 py-3 font-semibold">Mã quản lý</th>
+                <th className="px-4 py-3 font-semibold">Ngày thêm</th>
+                <th className="px-4 py-3 font-semibold text-right">Thao tác</th>
+              </tr>
+            </thead>
+
+            <tbody className="divide-y divide-gray-100">
+              {visibleHotels.map((h) => {
+                const hid = h?.hotelId ?? h?.id;
+                return (
+                  <tr key={hid} className="hover:bg-gray-50/70">
+                    <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                      {hid ?? "—"}
+                    </td>
+
+                    <td className="px-4 py-3">
+                      <div className="font-semibold text-gray-900">
+                        {h?.name ?? "—"}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Cập nhật: {formatDateVN(h?.updatedAt || h?.updated_at)}
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-3 text-gray-700">
+                      {h?.address ?? "—"}
+                    </td>
+
+                    <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                      {h?.phoneNumber || h?.phone_number || "—"}
+                    </td>
+
+                    <td className="px-4 py-3 text-gray-700">
+                      {h?.email ?? "—"}
+                    </td>
+
+                    <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                      {h?.minPrice == null && h?.min_price == null
+                        ? "—"
+                        : formatVND(h?.minPrice ?? h?.min_price)}
+                    </td>
+
+                    <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                      {h?.managerId ?? h?.manager_id ?? "—"}
+                    </td>
+
+                    <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                      {formatDateVN(h?.createdAt || h?.created_at)}
+                    </td>
+
+                    <td className="px-4 py-3 whitespace-nowrap text-right">
+                      <div className="inline-flex gap-2 justify-end">
+                        <Link
+                          to={`/admin/hotels/update/${hid}`}
+                          className="px-3 py-1.5 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition"
+                          title="Sửa"
+                        >
+                          Sửa
+                        </Link>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemove(hid)}
+                          disabled={!!removingId && removingId === hid}
+                          className="px-3 py-1.5 rounded-full bg-red-600 text-white hover:bg-red-700 transition disabled:opacity-60 inline-flex items-center gap-2"
+                          title="Xóa"
+                        >
+                          {removingId === hid ? (
+                            <>
+                              <Spinner /> Đang xóa...
+                            </>
+                          ) : (
+                            "Xóa"
+                          )}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 

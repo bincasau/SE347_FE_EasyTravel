@@ -152,7 +152,7 @@ export default function ImportToursExcelButton({
       />
 
       <button onClick={pickFile} disabled={importing} className={className}>
-        {importing ? "Importing..." : "Import Excel"}
+        {importing ? "Đang nhập..." : "Nhập Excel"}
       </button>
 
       {msg ? (

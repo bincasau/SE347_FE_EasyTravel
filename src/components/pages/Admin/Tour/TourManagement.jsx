@@ -2,11 +2,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import AdminTourCard from "./AdminTourCard";
 import Pagination from "@/utils/Pagination";
-import { getAllTours, searchToursByKeyword } from "@/apis/Tour";
+import { getAllTours, searchToursByKeyword, deleteTour } from "@/apis/Tour";
 
 import { exportToursExcel } from "@/components/pages/Admin/Tour/TourExportExcel";
 import { exportTourMonthlyReportPdf } from "@/components/pages/Admin/Tour/TourMonthlyPdf";
 import TourImportExcelButton from "@/components/pages/Admin/Tour/ToursImportExcel";
+import { popup } from "@/utils/popup";
 
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
@@ -25,10 +26,33 @@ function normStatus(s) {
 function statusViLabel(s) {
   const v = normStatus(s);
   if (v === "ALL") return "Tất cả trạng thái";
-  if (v === "PASSED") return "Đã duyệt";
+  if (v === "PASSED") return "Đã qua";
   if (v === "ACTIVATED") return "Đang hoạt động";
   if (v === "CANCELLED" || v === "CANCELED") return "Đã hủy";
-  return v;
+  return v || "—";
+}
+
+function statusBadgeClass(s) {
+  const v = normStatus(s);
+  if (v === "ACTIVATED")
+    return "bg-emerald-50 text-emerald-700 ring-emerald-200";
+  if (v === "PASSED") return "bg-blue-50 text-blue-700 ring-blue-200";
+  if (v === "CANCELLED" || v === "CANCELED")
+    return "bg-red-50 text-red-700 ring-red-200";
+  return "bg-gray-100 text-gray-700 ring-gray-200";
+}
+
+function formatDate(v) {
+  if (!v) return "-";
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return String(v);
+  return d.toLocaleDateString();
+}
+
+function formatVND(v) {
+  const n = Number(v ?? 0);
+  if (Number.isNaN(n)) return String(v ?? "-");
+  return n.toLocaleString("vi-VN") + " ₫";
 }
 
 export default function TourManagement() {
@@ -48,11 +72,18 @@ export default function TourManagement() {
   const statusFromUrl = (searchParams.get("status") || "ALL").toUpperCase();
   const qFromUrl = (searchParams.get("q") || "").toString();
 
+  // view mode (card | table)
+  const viewFromUrl =
+    (searchParams.get("view") || "card").toString().toLowerCase() === "table"
+      ? "table"
+      : "card";
+
   // UI state
   const [currentPage, setCurrentPage] = useState(pageFromUrl);
   const [statusFilter, setStatusFilter] = useState(statusFromUrl);
+  const [viewMode, setViewMode] = useState(viewFromUrl);
 
-  // Search state (layout theo User)
+  // Search state
   const [q, setQ] = useState(qFromUrl);
   const [searching, setSearching] = useState(false);
 
@@ -60,12 +91,15 @@ export default function TourManagement() {
 
   const loadTours = async () => {
     setLoading(true);
+    const close = popup.loading("Đang tải danh sách tour...");
     try {
       const list = await getAllTours();
       setTours(list ?? []);
-    } catch {
+    } catch (e) {
       setTours([]);
+      popup.error(e?.message || "Tải danh sách tour thất bại");
     } finally {
+      close?.();
       setLoading(false);
     }
   };
@@ -80,14 +114,17 @@ export default function TourManagement() {
     }
 
     setLoading(true);
+    const close = popup.loading("Đang tìm kiếm...");
     setSearching(true);
+
     try {
       const list = await searchToursByKeyword(k);
       setTours(list ?? []);
     } catch (e) {
       setTours([]);
-      alert(e?.message || "Tìm kiếm thất bại");
+      popup.error(e?.message || "Tìm kiếm thất bại");
     } finally {
+      close?.();
       setLoading(false);
     }
   };
@@ -103,6 +140,7 @@ export default function TourManagement() {
   useEffect(() => setCurrentPage(pageFromUrl), [pageFromUrl]);
   useEffect(() => setStatusFilter(statusFromUrl), [statusFromUrl]);
   useEffect(() => setQ(qFromUrl), [qFromUrl]);
+  useEffect(() => setViewMode(viewFromUrl), [viewFromUrl]);
 
   const statusOptions = useMemo(() => {
     const set = new Set();
@@ -114,7 +152,7 @@ export default function TourManagement() {
     return ["ALL", ...dynamic];
   }, [tours]);
 
-  // Filter theo status (giữ nguyên)
+  // Filter theo status
   const filteredTours = useMemo(() => {
     if (statusFilter === "ALL") return tours;
     return tours.filter((t) => normStatus(t?.status) === statusFilter);
@@ -134,6 +172,7 @@ export default function TourManagement() {
         const sp = new URLSearchParams(prev);
         sp.set("page", String(next));
         sp.set("status", statusFilter);
+        sp.set("view", viewMode);
         if (qFromUrl.trim()) sp.set("q", qFromUrl.trim());
         else sp.delete("q");
         return sp;
@@ -155,6 +194,21 @@ export default function TourManagement() {
       const sp = new URLSearchParams(prev);
       sp.set("page", "1");
       sp.set("status", s);
+      sp.set("view", viewMode);
+      if (qFromUrl.trim()) sp.set("q", qFromUrl.trim());
+      else sp.delete("q");
+      return sp;
+    });
+  };
+
+  const applyViewMode = (next) => {
+    const v = next === "table" ? "table" : "card";
+    setViewMode(v);
+    setSearchParams((prev) => {
+      const sp = new URLSearchParams(prev);
+      sp.set("view", v);
+      sp.set("page", String(currentPage || 1));
+      sp.set("status", statusFilter || "ALL");
       if (qFromUrl.trim()) sp.set("q", qFromUrl.trim());
       else sp.delete("q");
       return sp;
@@ -165,8 +219,9 @@ export default function TourManagement() {
     setExportingExcel(true);
     try {
       exportToursExcel(filteredTours, "tours.xlsx");
+      popup.success("Xuất Excel thành công");
     } catch (e) {
-      alert(e?.message || "Xuất Excel thất bại");
+      popup.error(e?.message || "Xuất Excel thất bại");
     } finally {
       setExportingExcel(false);
     }
@@ -174,17 +229,19 @@ export default function TourManagement() {
 
   const handleExportPdf = async () => {
     setExportingPdf(true);
+    const close = popup.loading("Đang xuất PDF...");
     try {
       await exportTourMonthlyReportPdf(Number(pdfYear));
       setOpenPdf(false);
+      popup.success("Xuất PDF thành công");
     } catch (e) {
-      alert(e?.message || "Xuất PDF thất bại");
+      popup.error(e?.message || "Xuất PDF thất bại");
     } finally {
+      close?.();
       setExportingPdf(false);
     }
   };
 
-  // ✅ Search submit giống User
   const handleSearchSubmit = async (e) => {
     e.preventDefault();
     const kw = (q || "").trim();
@@ -194,6 +251,7 @@ export default function TourManagement() {
       const sp = new URLSearchParams(prev);
       sp.set("page", "1");
       sp.set("status", statusFilter);
+      sp.set("view", viewMode);
       if (kw) sp.set("q", kw);
       else sp.delete("q");
       return sp;
@@ -211,6 +269,7 @@ export default function TourManagement() {
       const sp = new URLSearchParams(prev);
       sp.set("page", "1");
       sp.set("status", statusFilter);
+      sp.set("view", viewMode);
       sp.delete("q");
       return sp;
     });
@@ -218,39 +277,79 @@ export default function TourManagement() {
     await loadTours();
   };
 
+  const handleRemoveTour = async (tourId) => {
+    const id = Number(tourId);
+    if (!id) return;
+
+    const ok = await popup.confirm("Bạn có chắc chắn muốn xóa tour này không?");
+    if (!ok) return;
+
+    const close = popup.loading("Đang xóa tour...");
+    try {
+      await deleteTour(id);
+      popup.success("Đã xóa tour");
+      await loadTours();
+    } catch (e) {
+      popup.error(e?.message || "Xóa tour thất bại");
+    } finally {
+      close?.();
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
-      {/* Header + toolbar (giống User) */}
       <div className="flex flex-col gap-3 sm:gap-4 mb-6">
-        {/* Row 1: Title + Status select */}
+        {/* Row 1 */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h1 className="text-xl sm:text-2xl font-semibold">Quản lý Tour</h1>
-            <div className="text-sm text-gray-500">
-              Tổng: {tours.length} tour • Đang hiển thị: {filteredTours.length}
-              {statusFilter === "ALL"
-                ? ""
-                : ` (${statusViLabel(statusFilter)})`}
-              {qFromUrl.trim() ? ` • Từ khóa: "${qFromUrl.trim()}"` : ""}
-            </div>
           </div>
 
-          <select
-            value={statusFilter}
-            onChange={(e) => applyStatusFilter(e.target.value)}
-            disabled={loading}
-            className="w-full sm:w-auto px-4 py-2 rounded-full text-sm font-semibold bg-gray-100 text-gray-700 outline-none disabled:opacity-60"
-            title="Lọc theo trạng thái"
-          >
-            {statusOptions.map((s) => (
-              <option key={s} value={s}>
-                {statusViLabel(s)}
-              </option>
-            ))}
-          </select>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <div className="inline-flex rounded-full bg-gray-100 p-1">
+              <button
+                type="button"
+                onClick={() => applyViewMode("card")}
+                disabled={loading}
+                className={`px-4 py-2 rounded-full text-sm font-semibold transition disabled:opacity-60 ${
+                  viewMode === "card"
+                    ? "bg-white shadow text-gray-900"
+                    : "text-gray-700 hover:bg-white/60"
+                }`}
+              >
+                Thẻ
+              </button>
+              <button
+                type="button"
+                onClick={() => applyViewMode("table")}
+                disabled={loading}
+                className={`px-4 py-2 rounded-full text-sm font-semibold transition disabled:opacity-60 ${
+                  viewMode === "table"
+                    ? "bg-white shadow text-gray-900"
+                    : "text-gray-700 hover:bg-white/60"
+                }`}
+              >
+                Bảng
+              </button>
+            </div>
+
+            <select
+              value={statusFilter}
+              onChange={(e) => applyStatusFilter(e.target.value)}
+              disabled={loading}
+              className="w-full sm:w-auto px-4 py-2 rounded-full text-sm font-semibold bg-gray-100 text-gray-700 outline-none disabled:opacity-60"
+              title="Lọc theo trạng thái"
+            >
+              {statusOptions.map((s) => (
+                <option key={s} value={s}>
+                  {statusViLabel(s)}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        {/* Row 2: Search bar (giống User) */}
+        {/* Row 2 */}
         <form onSubmit={handleSearchSubmit} className="flex gap-2">
           <input
             value={q}
@@ -270,7 +369,7 @@ export default function TourManagement() {
               disabled={loading}
               className="px-5 py-2 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition disabled:opacity-60"
             >
-              Clear
+              Xóa
             </button>
           )}
 
@@ -279,11 +378,11 @@ export default function TourManagement() {
             disabled={loading}
             className="px-5 py-2 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition disabled:opacity-60"
           >
-            Search
+            Tìm kiếm
           </button>
         </form>
 
-        {/* Row 3: Actions (giống User) */}
+        {/* Row 3 */}
         <div className="flex flex-col sm:flex-row sm:flex-wrap sm:justify-end gap-2 sm:gap-3">
           <button
             onClick={handleExportExcel}
@@ -313,7 +412,7 @@ export default function TourManagement() {
 
           <Link to={`/admin/tours/new`} className="w-full sm:w-auto">
             <button className="w-full sm:w-auto px-5 py-2 rounded-full bg-orange-500 text-white hover:bg-orange-600 transition">
-              + Thêm tour
+              Thêm tour
             </button>
           </Link>
         </div>
@@ -333,16 +432,102 @@ export default function TourManagement() {
             ? ""
             : ` thuộc trạng thái "${statusViLabel(statusFilter)}".`}
         </p>
-      ) : (
+      ) : viewMode === "card" ? (
         <div className="space-y-4 sm:space-y-6">
           {visibleTours.map((tour) => (
             <AdminTourCard
               key={tour.tourId}
               tour={tour}
               onEdit={() => console.log("Edit:", tour.tourId)}
-              onRemove={() => console.log("Remove:", tour.tourId)}
+              onRemove={() => loadTours()}
             />
           ))}
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white">
+          <table className="min-w-[980px] w-full text-sm">
+            <thead className="bg-gray-50 text-gray-700">
+              <tr className="text-left">
+                <th className="px-4 py-3 font-semibold">ID</th>
+                <th className="px-4 py-3 font-semibold">Tên tour</th>
+                <th className="px-4 py-3 font-semibold">Điểm đến</th>
+                <th className="px-4 py-3 font-semibold">Thời gian</th>
+                <th className="px-4 py-3 font-semibold">Giá </th>
+                <th className="px-4 py-3 font-semibold">Ghế</th>
+                <th className="px-4 py-3 font-semibold">Trạng thái</th>
+                <th className="px-4 py-3 font-semibold text-right">Thao tác</th>
+              </tr>
+            </thead>
+
+            <tbody className="divide-y divide-gray-100">
+              {visibleTours.map((t) => {
+                const st = normStatus(t?.status);
+                return (
+                  <tr key={t?.tourId} className="hover:bg-gray-50/70">
+                    <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                      {t?.tourId ?? "-"}
+                    </td>
+
+                    <td className="px-4 py-3">
+                      <div className="font-semibold text-gray-900">
+                        {t?.title ?? "-"}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Xuất phát: {t?.departureLocation ?? "-"}
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-3 text-gray-700">
+                      {t?.destination ?? "-"}
+                    </td>
+
+                    <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                      {formatDate(t?.startDate)} → {formatDate(t?.endDate)}
+                    </td>
+
+                    <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                      {formatVND(t?.priceAdult)}
+                    </td>
+
+                    <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                      {Number(t?.availableSeats ?? 0)}
+                    </td>
+
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ring-1 ${statusBadgeClass(
+                          st,
+                        )}`}
+                      >
+                        {statusViLabel(st)}
+                      </span>
+                    </td>
+
+                    <td className="px-4 py-3 whitespace-nowrap text-right">
+                      <div className="inline-flex gap-2 justify-end">
+                        <Link
+                          to={`/admin/tours/edit/${t?.tourId}`}
+                          className="px-3 py-1.5 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition"
+                          title="Sửa"
+                        >
+                          Sửa
+                        </Link>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTour(t?.tourId)}
+                          className="px-3 py-1.5 rounded-full bg-red-600 text-white hover:bg-red-700 transition"
+                          title="Xóa"
+                        >
+                          Xóa
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -357,6 +542,7 @@ export default function TourManagement() {
             const sp = new URLSearchParams(prev);
             sp.set("page", String(next));
             sp.set("status", statusFilter);
+            sp.set("view", viewMode);
             if (qFromUrl.trim()) sp.set("q", qFromUrl.trim());
             else sp.delete("q");
             return sp;

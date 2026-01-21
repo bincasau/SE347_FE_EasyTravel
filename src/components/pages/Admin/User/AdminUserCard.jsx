@@ -8,6 +8,7 @@ import {
 } from "react-icons/fa";
 import { FaPlus } from "react-icons/fa6";
 import { useNavigate } from "react-router-dom";
+import { popup } from "@/utils/popup";
 
 const S3_USER_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/user";
@@ -23,9 +24,11 @@ export default function AdminUserCard({ user, onRemove }) {
     navigate(`/admin/users/edit/${user.userId}`);
   };
 
-  const handleRemove = () => {
-    const ok = window.confirm(
-      `Are you sure you want to remove user "${user?.username}"?`,
+  // ✅ confirm bằng popup (không dùng window.confirm)
+  const handleRemove = async () => {
+    const ok = await popup.confirm(
+      `Bạn có chắc chắn muốn xóa người dùng "${user?.username}" không?`,
+      "Xác nhận xóa",
     );
     if (!ok) return;
     onRemove?.(user.userId);
@@ -52,14 +55,14 @@ export default function AdminUserCard({ user, onRemove }) {
         {/* Content */}
         <div className="min-w-0 flex-1">
           <h2 className="text-lg sm:text-2xl font-semibold mb-3 line-clamp-2">
-            {user?.name || "Unnamed User"}
+            {user?.name || "Chưa có tên"}
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 text-sm text-gray-700">
             <div className="space-y-2 min-w-0">
               <Info
                 icon={<FaUserAlt />}
-                label="Username"
+                label="Tên đăng nhập"
                 value={user?.username}
               />
               <Info
@@ -70,13 +73,13 @@ export default function AdminUserCard({ user, onRemove }) {
               />
               <Info
                 icon={<FaPhoneAlt />}
-                label="Phone"
+                label="Số điện thoại"
                 value={user?.phoneNumber}
                 href={user?.phoneNumber ? `tel:${user.phoneNumber}` : undefined}
               />
               <Info
                 icon={<FaMapMarkerAlt />}
-                label="Address"
+                label="Địa chỉ"
                 value={user?.address}
               />
             </div>
@@ -85,7 +88,7 @@ export default function AdminUserCard({ user, onRemove }) {
               <div className="flex items-start gap-2">
                 <FaUserShield className="w-5 h-5 text-orange-400 mt-0.5 flex-shrink-0" />
                 <p className="min-w-0">
-                  <span className="font-semibold">Role:</span>{" "}
+                  <span className="font-semibold">Vai trò:</span>{" "}
                   <RoleBadge value={user?.role} />
                 </p>
               </div>
@@ -93,20 +96,15 @@ export default function AdminUserCard({ user, onRemove }) {
               <div className="flex items-start gap-2">
                 <FaUserShield className="w-5 h-5 text-orange-400 mt-0.5 flex-shrink-0" />
                 <p className="min-w-0">
-                  <span className="font-semibold">Status:</span>{" "}
+                  <span className="font-semibold">Trạng thái:</span>{" "}
                   <StatusBadge value={user?.status} />
                 </p>
               </div>
 
               <Info
                 icon={<FaPlus />}
-                label="Added on"
+                label="Thêm lúc"
                 value={user?.createdAt ? formatDate(user.createdAt) : null}
-              />
-              <Info
-                icon={<FaRegClock />}
-                label="Update"
-                value={user?.updatedAt ? formatDate(user.updatedAt) : null}
               />
             </div>
           </div>
@@ -118,14 +116,14 @@ export default function AdminUserCard({ user, onRemove }) {
             onClick={handleEdit}
             className="flex-1 lg:flex-none border border-orange-500 text-orange-500 px-5 sm:px-8 py-2 rounded-full hover:bg-orange-50 transition font-medium"
           >
-            Edit
+            Sửa
           </button>
 
           <button
             onClick={handleRemove}
             className="flex-1 lg:flex-none bg-orange-500 text-white px-5 sm:px-8 py-2 rounded-full hover:bg-orange-600 transition font-medium"
           >
-            Remove
+            Xóa
           </button>
         </div>
       </div>
@@ -147,9 +145,7 @@ function Info({ icon, label, value, href }) {
           <a
             href={href}
             className="break-words text-orange-600 hover:underline"
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
+            onClick={(e) => e.stopPropagation()}
           >
             {content}
           </a>
@@ -162,7 +158,7 @@ function Info({ icon, label, value, href }) {
 }
 
 function formatDate(date) {
-  return new Date(date).toLocaleDateString("en-GB");
+  return new Date(date).toLocaleDateString("vi-VN");
 }
 
 function RoleBadge({ value }) {
@@ -177,26 +173,35 @@ function RoleBadge({ value }) {
           ? "bg-orange-100 text-orange-700"
           : "bg-gray-100 text-gray-700";
 
+  const label =
+    v === "ADMIN"
+      ? "Quản trị viên"
+      : v === "TOUR_GUIDE"
+        ? "Hướng dẫn viên"
+        : v === "HOTEL_MANAGER"
+          ? "Quản lý khách sạn"
+          : "Khách hàng";
+
   return (
     <span
       className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${cls}`}
     >
-      {v}
+      {label}
     </span>
   );
 }
 
 function StatusBadge({ value }) {
-  const raw = String(value || "ACTIVE").toUpperCase();
-  const isActive = raw === "ACTIVE" || raw === "ACTIVATED";
+  const raw = String(value || "").toUpperCase();
+  const isActivated = raw === "ACTIVATED";
 
   return (
     <span
       className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
-        isActive ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-700"
+        isActivated ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-700"
       }`}
     >
-      {isActive ? "Activated" : "Not activated"}
+      {isActivated ? "Đã kích hoạt" : "Chưa kích hoạt"}
     </span>
   );
 }
