@@ -167,7 +167,7 @@ export default function NotificationManagement() {
             onClick={() => navigate("/admin/notifications/new")}
             className="w-full sm:w-auto px-5 py-2 rounded-full bg-orange-500 text-white hover:bg-orange-600 transition"
           >
-            + Add Notification
+            Thêm thông báo
           </button>
 
           <button
@@ -176,7 +176,7 @@ export default function NotificationManagement() {
             disabled={loading}
           >
             {loading ? <Spinner /> : null}
-            Refresh
+            Làm mới
           </button>
         </div>
       </div>

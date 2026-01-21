@@ -32,11 +32,11 @@ export default function AdminBlogUpsert() {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState("");
 
-  const pageTitle = isEdit ? "Update Blog" : "Add Blog";
+  const pageTitle = isEdit ? "Cập nhật bài viết" : "Thêm bài viết mới";
   const pageDesc = isEdit
-    ? "Update blog content and images."
-    : "Create a new blog and upload thumbnail.";
-  const saveText = saving ? "Saving..." : isEdit ? "Update Blog" : "Add Blog";
+    ? "Cập nhật thông tin bài viết"
+    : "Thêm mới một bài viết";
+  const saveText = saving ? "Saving..." : isEdit ? "Cập nhật bài viết" : "Thêm bài viết";
 
   useEffect(() => {
     setForm((p) => ({ ...p, userId: myUserId }));

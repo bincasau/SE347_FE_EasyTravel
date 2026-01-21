@@ -36,10 +36,10 @@ export default function HotelManagement() {
 
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // URL state (giống UserManagement)
+  // URL state (UI page: 1..n)
   const pageRaw = searchParams.get("page");
   const pageNum = Number(pageRaw);
-  const currentPage = Number.isFinite(pageNum) && pageNum > 0 ? pageNum : 1; // UI page: 1..n
+  const currentPage = Number.isFinite(pageNum) && pageNum > 0 ? pageNum : 1;
 
   // view mode from URL
   const viewFromUrl =
@@ -49,7 +49,6 @@ export default function HotelManagement() {
   const [viewMode, setViewMode] = useState(viewFromUrl);
 
   const [totalPages, setTotalPages] = useState(1);
-
   const [removingId, setRemovingId] = useState(null);
 
   const managerCacheRef = useRef(new Map());
@@ -82,8 +81,8 @@ export default function HotelManagement() {
     return Promise.all(tasks);
   }
 
+  // ✅ trả về list + totalPages để xử lý “trang rỗng sau khi xóa”
   async function loadHotels(pageUI) {
-    // pageUI: 1..n (UI)
     const page0 = Math.max(0, Number(pageUI || 1) - 1);
 
     setLoading(true);
@@ -97,53 +96,52 @@ export default function HotelManagement() {
       const list = data?._embedded?.hotels ?? [];
       const withManagers = await attachManagers(list);
 
+      const tp = data?.page?.totalPages ?? 1;
+
       setHotels(withManagers);
-      setTotalPages(data?.page?.totalPages ?? 1);
+      setTotalPages(tp);
+
+      return { list: withManagers, totalPages: tp };
     } catch (error) {
       setHotels([]);
       setTotalPages(1);
       popup.error(error?.message || "Tải danh sách khách sạn thất bại");
+      return { list: [], totalPages: 1 };
     } finally {
       setLoading(false);
     }
   }
 
-  // ✅ giống UserManagement: load theo URL state
   useEffect(() => {
     loadHotels(currentPage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, viewFromUrl]);
 
-  // sync URL -> state
   useEffect(() => setViewMode(viewFromUrl), [viewFromUrl]);
 
   const safeTotalPages = Math.max(1, totalPages || 1);
 
-  // nếu currentPage vượt totalPages -> kéo về (giống cách xử lý an toàn)
+  // clamp URL page nếu vượt totalPages
   useEffect(() => {
     if (currentPage > safeTotalPages) {
       const safe = clamp(currentPage, 1, safeTotalPages);
-      const next = { page: String(safe), view: viewMode };
-      setSearchParams(next);
+      setSearchParams({ page: String(safe), view: viewMode });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [safeTotalPages]);
 
   const handlePageChange = (p) => {
     const safe = clamp(Number(p || 1), 1, safeTotalPages);
-    const next = { page: String(safe), view: viewMode };
-    setSearchParams(next);
+    setSearchParams({ page: String(safe), view: viewMode });
   };
 
   const applyViewMode = (nextMode) => {
     const v = nextMode === "table" ? "table" : "card";
     setViewMode(v);
-
-    const next = { page: String(currentPage || 1), view: v };
-    setSearchParams(next);
+    setSearchParams({ page: String(currentPage || 1), view: v });
   };
 
-  // ✅ Xoá + popup confirm + loading (không bị chớp) + reload list (giống user)
+  // ✅ CHỈ NƠI NÀY gọi deleteHotel + confirm + reload
   const handleRemove = async (hotelId) => {
     const hid = Number(hotelId);
     if (!hid) return;
@@ -158,16 +156,34 @@ export default function HotelManagement() {
     const close = popup.loading("Đang xóa khách sạn...");
 
     try {
+      // ✅ optimistic remove để card biến mất ngay
+      setHotels((prev) =>
+        (prev || []).filter((x) => (x?.hotelId ?? x?.id) !== hid),
+      );
+
+      // ✅ clear cache manager để tránh “ảo”
+      managerCacheRef.current.delete(hid);
+
       await deleteHotel(hid);
 
       close?.();
       popup.success("Đã xóa khách sạn");
 
-      // ✅ reload list theo đúng currentPage (cách user)
-      await loadHotels(currentPage);
+      // ✅ reload lại đúng trang hiện tại
+      const rs = await loadHotels(currentPage);
+
+      // ✅ nếu sau khi xóa trang hiện tại rỗng (hay gặp ở trang cuối) -> lùi trang
+      if ((rs?.list?.length ?? 0) === 0 && currentPage > 1) {
+        const prevPage = currentPage - 1;
+        setSearchParams({ page: String(prevPage), view: viewMode });
+        // effect sẽ tự loadHotels(prevPage)
+      }
     } catch (e) {
       close?.();
       popup.error(e?.message || "Xóa thất bại");
+
+      // (tuỳ chọn) lỗi thì reload lại để khôi phục UI nếu optimistic remove đã chạy
+      await loadHotels(currentPage);
     } finally {
       setRemovingId(null);
     }
@@ -179,13 +195,11 @@ export default function HotelManagement() {
     <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
       {/* HEADER */}
       <div className="flex flex-col gap-3 sm:gap-4 mb-6">
-        {/* ROW 1: Title + Toggle view */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h1 className="text-xl sm:text-2xl font-semibold">
             Quản lý khách sạn
           </h1>
 
-          {/* Toggle view */}
           <div className="inline-flex rounded-full bg-gray-100 p-1">
             <button
               type="button"
@@ -214,12 +228,10 @@ export default function HotelManagement() {
           </div>
         </div>
 
-        {/* ROW 2: Actions */}
         <div className="flex flex-col sm:flex-row sm:justify-end gap-2 sm:gap-3">
           <div className="w-full sm:w-auto">
             <HotelsImportExcelButton
               onImported={async () => {
-                // ✅ sau import: reload list theo current page (cách user)
                 await loadHotels(currentPage);
               }}
             />
@@ -255,10 +267,8 @@ export default function HotelManagement() {
               <AdminHotelCard
                 key={hid}
                 hotel={hotel}
-                managerId={hotel?.managerId}
-                manager={hotel?.manager}
                 onEdit={() => {}}
-                onRemove={() => handleRemove(hid)}
+                onRemove={(id) => handleRemove(id)}
               />
             );
           })}
@@ -360,7 +370,6 @@ export default function HotelManagement() {
         </div>
       )}
 
-      {/* PAGINATION */}
       <Pagination
         totalPages={safeTotalPages}
         currentPage={clamp(currentPage, 1, safeTotalPages)}

@@ -9,8 +9,6 @@ import {
   ClockIcon,
 } from "@heroicons/react/24/outline";
 import { useNavigate } from "react-router-dom";
-import { deleteHotel } from "@/apis/Hotel";
-import { popup } from "@/utils/popup";
 
 const S3_HOTEL_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/hotel";
@@ -26,27 +24,18 @@ export default function AdminHotelCard({ hotel, onEdit, onRemove }) {
 
   // trang edit chỉ cần id (không truyền state)
   const handleEdit = () => {
-    navigate(`/admin/hotels/update/${hotel.hotelId}`);
+    const hid = hotel?.hotelId ?? hotel?.id;
+    if (!hid) return;
+    navigate(`/admin/hotels/update/${hid}`);
     if (typeof onEdit === "function") onEdit(hotel);
   };
 
-  const handleRemove = async () => {
-    const ok = await popup.confirm(
-      "Bạn có chắc chắn muốn xóa khách sạn này không?",
-      "Xác nhận xóa",
-    );
-    if (!ok) return;
-
-    const close = popup.loading("Đang xóa khách sạn...");
-    try {
-      await deleteHotel(hotel.hotelId);
-      popup.success("Đã xóa khách sạn");
-      if (typeof onRemove === "function") onRemove(hotel.hotelId);
-    } catch (e) {
-      popup.error(e?.message || "Xóa thất bại");
-    } finally {
-      close?.();
-    }
+  // ✅ Card chỉ “phát sự kiện” remove, KHÔNG gọi API, KHÔNG confirm ở đây
+  // (confirm + delete + reload sẽ do HotelManagement xử lý)
+  const handleRemove = () => {
+    const hid = hotel?.hotelId ?? hotel?.id;
+    if (!hid) return;
+    if (typeof onRemove === "function") onRemove(hid);
   };
 
   const formatDate = (d) => {
@@ -81,12 +70,12 @@ export default function AdminHotelCard({ hotel, onEdit, onRemove }) {
             {hotel?.name || "—"}
           </h2>
 
-          {/* INFO GRID: 1 col on mobile, 2 cols from md */}
+          {/* INFO GRID */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6 text-sm text-gray-700">
             <InfoRow
               icon={<BuildingOffice2Icon className="w-5 h-5 text-orange-400" />}
               label="Mã khách sạn"
-              value={hotel?.hotelId ?? "—"}
+              value={hotel?.hotelId ?? hotel?.id ?? "—"}
             />
 
             <InfoRow

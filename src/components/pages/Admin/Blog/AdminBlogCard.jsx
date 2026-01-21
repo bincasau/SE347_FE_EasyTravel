@@ -1,6 +1,5 @@
 import { FaRegClock } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
-import { deleteBlog } from "@/apis/Blog";
 
 const S3_BLOG_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/blog";
@@ -9,7 +8,7 @@ const S3_BLOG_BASE =
 const formatDate = (d) => {
   if (!d) return "—";
   const date = new Date(d);
-  return isNaN(date) ? "—" : date.toLocaleDateString("en-GB");
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("en-GB");
 };
 
 export default function AdminBlogCard({ blog, onEdit, onRemove }) {
@@ -19,20 +18,15 @@ export default function AdminBlogCard({ blog, onEdit, onRemove }) {
   const imageSrc = blog?.thumbnail ? `${S3_BLOG_BASE}/${blog.thumbnail}` : "";
 
   const handleEdit = () => {
+    if (!blogId) return;
     navigate(`/admin/blogs/edit/${blogId}`, { state: blog });
     if (typeof onEdit === "function") onEdit(blog);
   };
 
-  const handleRemove = async () => {
-    const ok = window.confirm("Bạn có chắc chắn muốn xóa blog này không?");
-    if (!ok) return;
-
-    try {
-      await deleteBlog(blogId);
-      if (typeof onRemove === "function") onRemove(blogId);
-    } catch (e) {
-      alert(e?.message || "Xóa thất bại");
-    }
+  // ✅ Card chỉ bắn callback, không xoá API ở đây
+  const handleRemove = () => {
+    if (!blogId) return;
+    if (typeof onRemove === "function") onRemove(blogId);
   };
 
   return (
@@ -53,21 +47,20 @@ export default function AdminBlogCard({ blog, onEdit, onRemove }) {
 
         {/* MAIN CONTENT */}
         <div className="flex flex-col flex-1 min-w-0">
-          {/* TITLE */}
           <h2 className="text-lg sm:text-2xl font-semibold leading-snug line-clamp-2 break-words">
             {blog?.title || "—"}
           </h2>
 
-          {/* DETAILS */}
           <p className="mt-2 sm:mt-3 text-sm text-gray-700 line-clamp-4 break-words">
             {blog?.details || blog?.content || "—"}
           </p>
 
-          {/* CREATED AT */}
           <div className="mt-3 sm:mt-4 text-sm text-gray-700 flex items-center gap-2">
             <FaRegClock className="text-orange-500 shrink-0" />
-            <span className="font-semibold">Created:</span>
-            <span className="whitespace-nowrap">{formatDate(blog?.createdAt)}</span>
+            <span className="font-semibold">Tạo lúc:</span>
+            <span className="whitespace-nowrap">
+              {formatDate(blog?.createdAt)}
+            </span>
           </div>
 
           {/* ACTIONS (mobile) */}
@@ -76,14 +69,14 @@ export default function AdminBlogCard({ blog, onEdit, onRemove }) {
               onClick={handleEdit}
               className="w-full border border-orange-500 text-orange-500 px-6 py-2 rounded-full hover:bg-orange-50 transition font-medium"
             >
-              Edit
+              Sửa
             </button>
 
             <button
               onClick={handleRemove}
               className="w-full bg-orange-500 text-white px-6 py-2 rounded-full hover:bg-orange-600 transition font-medium"
             >
-              Remove
+              Xóa
             </button>
           </div>
         </div>
@@ -94,14 +87,14 @@ export default function AdminBlogCard({ blog, onEdit, onRemove }) {
             onClick={handleEdit}
             className="border border-orange-500 text-orange-500 px-8 py-2 rounded-full hover:bg-orange-50 transition font-medium whitespace-nowrap"
           >
-            Edit
+            Sửa
           </button>
 
           <button
             onClick={handleRemove}
             className="bg-orange-500 text-white px-8 py-2 rounded-full hover:bg-orange-600 transition font-medium whitespace-nowrap"
           >
-            Remove
+            Xóa
           </button>
         </div>
       </div>

@@ -153,7 +153,7 @@ export default function AdminHotelEdit() {
     }
   };
 
-  const pageTitle = `Update Hotel #${id}`;
+  const pageTitle = `Cập nhật #${id}`;
 
   if (loading) {
     return (
@@ -220,14 +220,7 @@ export default function AdminHotelEdit() {
               onClick={() => navigate(-1)}
               className="flex-1 sm:flex-none px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50"
             >
-              Back
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/admin/hotels")}
-              className="flex-1 sm:flex-none px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50"
-            >
-              List
+              Quay lại
             </button>
           </div>
         </div>
