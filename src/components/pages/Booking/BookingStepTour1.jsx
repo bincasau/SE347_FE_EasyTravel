@@ -122,6 +122,10 @@ export default function BookingStepTour1({
             minDate={new Date()}
             placeholderText={t("tourPage.chooseTravelDate")}
             showPopperArrow={false}
+            disabled // ✅ không cho chọn + không focus
+            onFocus={(e) => e.target.blur()} // ✅ chắc chắn unfocus
+            onInputClick={(e) => e.target.blur()} // ✅ chặn click vào input
+            preventOpenOnFocus // ✅ không mở lịch khi focus
             className="w-full text-sm text-gray-800 focus:outline-none"
           />
         </div>

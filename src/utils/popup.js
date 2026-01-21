@@ -13,21 +13,20 @@ export const popup = {
     }),
 
   /* =====================
-     ERROR (❗ chỉ message text)
-     - KHÔNG icon
-     - KHÔNG spinner
+     ERROR
+     - có icon lỗi
   ===================== */
   error: (text, title = "Lỗi") =>
     Swal.fire({
+      icon: "error",
       title,
       text,
-      icon: undefined, // ❗ không icon
       confirmButtonText: "OK",
       confirmButtonColor: "#f97316",
     }),
 
   /* =====================
-     CONFIRM
+     CONFIRM (thường)
   ===================== */
   confirm: (text, title = "Xác nhận") =>
     Swal.fire({
@@ -41,6 +40,22 @@ export const popup = {
     }).then((r) => r.isConfirmed),
 
   /* =====================
+     CONFIRM DANGER (❗ XOÁ / NGUY HIỂM)
+  ===================== */
+  confirmDanger: (text, title = "Cảnh báo") =>
+    Swal.fire({
+      icon: "warning",
+      title,
+      text,
+      showCancelButton: true,
+      confirmButtonText: "Xoá",
+      cancelButtonText: "Huỷ",
+      confirmButtonColor: "#dc2626", // đỏ
+      cancelButtonColor: "#9ca3af", // xám
+      reverseButtons: true,
+    }).then((r) => r.isConfirmed),
+
+  /* =====================
      LOADING (spinner)
      - Trả về hàm close()
   ===================== */
@@ -51,11 +66,10 @@ export const popup = {
       allowEscapeKey: false,
       showConfirmButton: false,
       didOpen: () => {
-        Swal.showLoading(); // ✅ vòng xoay tròn
+        Swal.showLoading();
       },
     });
 
-    // ✅ trả về hàm đóng loading
     return () => Swal.close();
   },
 };

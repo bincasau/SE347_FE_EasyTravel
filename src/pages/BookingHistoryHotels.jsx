@@ -1,413 +1,493 @@
-import { useState, useMemo } from "react";
-import {
-  loginApi,
-  getAccountDetail,
-  forgotPasswordRequestApi,
-  forgotPasswordConfirmApi,
-} from "@/apis/AccountAPI";
-import { getUserFromToken } from "@/utils/auth";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink } from "react-router-dom";
+import { fetchHotelBookingHistory } from "@/apis/bookingHistory";
+import { buildTourSlug } from "@/utils/slug";
 import { popup } from "@/utils/popup";
 
-/** ===== Password Rules =====
- * - >= 8 chars
- * - at least 1 uppercase, 1 lowercase, 1 number, 1 special char
- */
-function validatePassword(password) {
-  if (!password || password.length < 8) {
-    return "Mật khẩu phải có ít nhất 8 ký tự.";
+const BASE_URL = "http://localhost:8080";
+
+async function fetchJSON(url, options = {}) {
+  const res = await fetch(url, options);
+  const text = await res.text();
+
+  if (!res.ok) {
+    throw new Error(text || `HTTP ${res.status}`);
   }
-  if (!/[A-Z]/.test(password)) {
-    return "Mật khẩu phải chứa ít nhất 1 chữ hoa (A-Z).";
+
+  if (!text) return null;
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
   }
-  if (!/[a-z]/.test(password)) {
-    return "Mật khẩu phải chứa ít nhất 1 chữ thường (a-z).";
-  }
-  if (!/[0-9]/.test(password)) {
-    return "Mật khẩu phải chứa ít nhất 1 số (0-9).";
-  }
-  if (!/[!@#$%^&*(),.?\":{}|<>_\-+=/\\[\]~`;'@]/.test(password)) {
-    return "Mật khẩu phải chứa ít nhất 1 ký tự đặc biệt (ví dụ: !@#$%^&*).";
-  }
-  return "";
 }
 
-export default function LoginModal({ onClose, onOpenSignup }) {
-  const [err, setErr] = useState("");
-  const [loading, setLoading] = useState(false);
+// ✅ Refund HOTEL theo bookingId (JWT ở cookie -> chỉ cần include credentials)
+async function refundByBooking(bookingType, bookingId) {
+  return fetchJSON(`${BASE_URL}/payment/refund/${bookingType}/${bookingId}`, {
+    method: "POST",
+    credentials: "include", // ✅ gửi cookie
+    headers: {
+      Accept: "application/json",
+    },
+  });
+}
 
-  // forgot password state
-  const [showForgot, setShowForgot] = useState(false);
-  const [fpEmail, setFpEmail] = useState("");
-  const [fpCode, setFpCode] = useState("");
-  const [fpNewPass, setFpNewPass] = useState("");
-  const [fpConfirmPass, setFpConfirmPass] = useState(""); // ✅ NEW
-  const [fpStep, setFpStep] = useState(1); // 1=request, 2=confirm
-  const [resetting, setResetting] = useState(false);
+// ✅ random delay 1-3s
+const sleepRandom = (min, max) =>
+  new Promise((resolve) =>
+    setTimeout(resolve, Math.random() * (max - min) + min)
+  );
 
-  const navigate = useNavigate();
+const fmtDate = (d) => {
+  if (!d) return "-";
+  const s = String(d);
+  return s.length >= 10 ? s.slice(0, 10) : s;
+};
 
-  function handleGoogleLogin() {
-    window.location.href = "http://localhost:8080/oauth2/authorization/google";
+const formatVND = (n) =>
+  Number(n ?? 0).toLocaleString("vi-VN", { style: "currency", currency: "VND" });
+
+/* =========================
+   ✅ Extract message helper
+========================= */
+function extractMessage(input, fallback = "Có lỗi xảy ra!") {
+  if (input == null) return fallback;
+
+  if (typeof input === "object" && !(input instanceof Error)) {
+    return (
+      input?.message ||
+      input?.msg ||
+      input?.error ||
+      input?.detail ||
+      input?.title ||
+      fallback
+    );
   }
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setErr("");
+  const raw =
+    input instanceof Error
+      ? input.message
+      : typeof input === "string"
+      ? input
+      : "";
 
-    const fd = new FormData(e.currentTarget);
-    const payload = Object.fromEntries(fd.entries());
+  const s = String(raw || "").trim();
+  if (!s) return fallback;
 
+  try {
+    const obj = JSON.parse(s);
+    if (typeof obj === "string") return obj;
+    if (obj && typeof obj === "object") {
+      return (
+        obj?.message ||
+        obj?.msg ||
+        obj?.error ||
+        obj?.detail ||
+        obj?.title ||
+        fallback
+      );
+    }
+  } catch {
+    // ignore
+  }
+
+  return s;
+}
+
+/* =========================
+   ✅ Date compare: checkOut < today ?
+   - so sánh theo NGÀY (00:00)
+========================= */
+function parseDateOnly(value) {
+  if (!value) return null;
+  const s = String(value).trim();
+
+  const ymd = s.length >= 10 ? s.slice(0, 10) : s;
+  const parts = ymd.split("-");
+  if (parts.length !== 3) return null;
+
+  const y = Number(parts[0]);
+  const m = Number(parts[1]);
+  const d = Number(parts[2]);
+  if (!y || !m || !d) return null;
+
+  const dt = new Date(y, m - 1, d, 0, 0, 0, 0);
+  if (Number.isNaN(dt.getTime())) return null;
+  return dt;
+}
+
+function startOfToday() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+}
+
+function isCheckoutPast(checkOutDate) {
+  const co = parseDateOnly(checkOutDate);
+  if (!co) return false;
+  return co.getTime() < startOfToday().getTime();
+}
+
+export default function BookingHistoryHotels() {
+  const [loading, setLoading] = useState(false);
+
+  const [page, setPage] = useState(0);
+  const [size] = useState(5);
+
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+
+  const [refundingId, setRefundingId] = useState(null);
+
+  const [data, setData] = useState({
+    content: [],
+    totalPages: 0,
+    totalElements: 0,
+    number: 0,
+  });
+
+  // ✅ sort: booking gần nhất lên đầu
+  const rows = [...(data.content || [])].sort((a, b) => {
+    const da = new Date(
+      a?.createdAt || a?.bookingDate || a?.checkInDate || 0
+    ).getTime();
+    const db = new Date(
+      b?.createdAt || b?.bookingDate || b?.checkInDate || 0
+    ).getTime();
+    return db - da;
+  });
+
+  const notifySuccess = (msg) => {
+    const text = extractMessage(msg, "Thành công!");
+    if (popup && typeof popup.success === "function") popup.success(text);
+    else alert(text);
+  };
+
+  const notifyError = (msg) => {
+    const text = extractMessage(msg, "Có lỗi xảy ra!");
+    if (popup && typeof popup.error === "function") popup.error(text);
+    else alert(text);
+  };
+
+  const confirmRefund = async (msg) => {
+    if (popup && typeof popup.confirm === "function")
+      return await popup.confirm(msg);
+    return window.confirm(msg);
+  };
+
+  const load = async (overridePage) => {
+    const p = typeof overridePage === "number" ? overridePage : page;
     setLoading(true);
     try {
-      await loginApi(payload);
-
-      let user = getUserFromToken();
-      if (!user) {
-        try {
-          user = await getAccountDetail();
-        } catch {}
-      }
-
-      onClose?.();
-
-      if (user?.role === "HOTEL_MANAGER")
-        navigate("/hotel-manager/hotels/addroom");
-      else if (user?.role === "TOUR_GUIDE") navigate("/guide/schedule");
-      else if (user?.role === "ADMIN") navigate("/admin/dashboard");
-      else navigate("/");
-
-      window.dispatchEvent(new Event("jwt-changed"));
-    } catch (error) {
-      const msg = error?.message || "Đăng nhập thất bại!";
-      setErr(msg);
-      await popup.error(msg, "Đăng nhập thất bại"); // ✅ popup khi login fail
+      const res = await fetchHotelBookingHistory({ page: p, size, start, end });
+      setData({
+        content: res?.content || [],
+        totalPages: res?.totalPages ?? 0,
+        totalElements: res?.totalElements ?? 0,
+        number: res?.number ?? p,
+      });
+    } catch (e) {
+      console.error(e);
+      setData({ content: [], totalPages: 0, totalElements: 0, number: 0 });
+      notifyError(e);
     } finally {
       setLoading(false);
     }
-  }
+  };
 
-  async function handleForgotRequest() {
-    setErr("");
-    setResetting(true);
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, size]);
 
-    try {
-      const msg = await forgotPasswordRequestApi(fpEmail);
+  const onApplyFilter = () => {
+    setPage(0);
+    load(0);
+  };
 
-      await popup.success(msg || "Đã gửi mã xác nhận về email!", "Thành công");
+  const onClearFilter = () => {
+    setStart("");
+    setEnd("");
+    setPage(0);
+    setTimeout(() => load(0), 0);
+  };
 
-      // ✅ sang step 2 và clear code/newPass/confirm cho sạch
-      setFpStep(2);
-      setFpCode("");
-      setFpNewPass("");
-      setFpConfirmPass("");
-    } catch (e) {
-      const msg = e?.message || "Gửi mã reset thất bại!";
-      setErr(msg);
-      await popup.error(msg, "Thất bại");
-    } finally {
-      setResetting(false);
-    }
-  }
+  // ✅ CHỈ SUCCESS + checkOut >= today mới refund
+  // ✅ refund xong vẫn ở nguyên trang hiện tại (reload đúng page hiện tại)
+  const onRefund = async (bookingId, status, checkOutDate) => {
+    if (!bookingId) return;
 
-  // ✅ validate new password realtime
-  const pwdError = useMemo(() => {
-    if (!showForgot || fpStep !== 2) return "";
-    return validatePassword(fpNewPass);
-  }, [showForgot, fpStep, fpNewPass]);
-
-  // ✅ validate confirm password realtime
-  const confirmError = useMemo(() => {
-    if (!showForgot || fpStep !== 2) return "";
-    if (!fpConfirmPass) return "";
-    return fpNewPass === fpConfirmPass ? "" : "Mật khẩu xác nhận không khớp.";
-  }, [showForgot, fpStep, fpNewPass, fpConfirmPass]);
-
-  async function handleForgotConfirm() {
-    setErr("");
-
-    const msgErr = validatePassword(fpNewPass);
-    if (msgErr) {
-      setErr(msgErr);
-      await popup.error(msgErr, "Thất bại");
+    const st = String(status || "").trim().toLowerCase();
+    if (st !== "success") {
+      notifyError("Chỉ booking có trạng thái SUCCESS mới được refund.");
       return;
     }
 
-    if (!fpConfirmPass || fpNewPass !== fpConfirmPass) {
-      const msg = "Mật khẩu xác nhận không khớp.";
-      setErr(msg);
-      await popup.error(msg, "Thất bại");
+    if (isCheckoutPast(checkOutDate)) {
+      notifyError("Booking đã quá ngày check-out nên không thể refund.");
       return;
     }
 
-    setResetting(true);
+    const ok = await confirmRefund(
+      `Bạn có chắc muốn refund tiền cho booking #${bookingId} không?`
+    );
+    if (!ok) return;
+
+    setRefundingId(bookingId);
+
+    const closeLoading =
+      popup && typeof popup.loading === "function"
+        ? popup.loading("Đang refund...")
+        : null;
+
     try {
-      const msg = await forgotPasswordConfirmApi({
-        email: fpEmail,
-        code: fpCode,
-        newPassword: fpNewPass,
-      });
+      await sleepRandom(1000, 3000);
 
-      await popup.success(msg || "Đổi mật khẩu thành công!", "Thành công");
+      const res = await refundByBooking("HOTEL", bookingId);
 
-      // ✅ xong thì quay về login
-      setShowForgot(false);
-      setFpStep(1);
-      setFpEmail("");
-      setFpCode("");
-      setFpNewPass("");
-      setFpConfirmPass("");
-      setErr("");
+      if (typeof closeLoading === "function") closeLoading();
+
+      notifySuccess(extractMessage(res, "Refund khách sạn thành công!"));
+
+      // ✅ reload lại đúng trang hiện tại
+      load(page);
     } catch (e) {
-      const msg = e?.message || "Xác nhận reset thất bại!";
-      setErr(msg);
-      await popup.error(msg, "Thất bại");
+      console.error(e);
+
+      if (typeof closeLoading === "function") closeLoading();
+
+      notifyError(e);
+
+      // ✅ nếu muốn: vẫn reload lại trang hiện tại để sync dữ liệu
+      // load(page);
     } finally {
-      setResetting(false);
+      setRefundingId(null);
     }
-  }
+  };
 
-  function handleGoSignup() {
-    onClose?.();
-    onOpenSignup?.();
-  }
-
-  const disableResetBtn =
-    resetting ||
-    !fpEmail ||
-    (fpStep === 2 &&
-      (!fpCode ||
-        !fpNewPass ||
-        !fpConfirmPass ||
-        !!pwdError ||
-        fpNewPass !== fpConfirmPass));
+  const canPrev = page > 0;
+  const canNext = page + 1 < (data.totalPages || 0);
 
   return (
-    <div className="w-[92%] max-w-md rounded-2xl bg-white p-6 shadow-2xl relative animate-fadeIn">
-      <button
-        onClick={onClose}
-        className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-        aria-label="Close"
-        type="button"
-      >
-        ✕
-      </button>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <h1 className="text-2xl font-semibold">Hotel booking history</h1>
 
-      <h3 className="text-2xl font-semibold text-gray-900 mb-6 text-center">
-        {showForgot ? "Reset Password" : "Sign In to EasyTravel"}
-      </h3>
-
-      {err && <p className="text-sm text-red-600 mb-3">{err}</p>}
-
-      {!showForgot ? (
-        <>
-          {/* ✅ LOGIN FORM */}
-          <form className="space-y-5" onSubmit={handleSubmit}>
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-800">
-                Username
-              </label>
-              <input
-                name="username"
-                type="text"
-                required
-                placeholder="Enter your username"
-                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:ring-2 focus:ring-orange-400"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-800">
-                Password
-              </label>
-              <input
-                name="password"
-                type="password"
-                required
-                placeholder="Enter your password"
-                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:ring-2 focus:ring-orange-400"
-              />
-            </div>
-
-            <div className="text-right">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowForgot(true);
-                  setFpStep(1);
-                  setErr("");
-                  setFpEmail("");
-                  setFpCode("");
-                  setFpNewPass("");
-                  setFpConfirmPass("");
-                }}
-                className="text-sm font-semibold text-orange-500 hover:underline"
-              >
-                Forgot password?
-              </button>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-full bg-orange-500 text-white font-semibold py-3 hover:bg-orange-400 transition disabled:opacity-60"
-            >
-              {loading ? "Signing in..." : "Sign In"}
-            </button>
-
-            <p className="text-center text-sm text-gray-600">
-              Don't have an account?
-              <button
-                type="button"
-                onClick={handleGoSignup}
-                className="font-semibold text-orange-500 hover:underline ml-1"
-              >
-                Sign Up
-              </button>
-            </p>
-          </form>
-
-          {/* ✅ GOOGLE LOGIN Ở DƯỚI CÙNG */}
-          <div className="flex items-center gap-3 my-4">
-            <div className="h-px flex-1 bg-gray-200" />
-            <span className="text-xs text-gray-400">OR</span>
-            <div className="h-px flex-1 bg-gray-200" />
-          </div>
-
-          <button
-            type="button"
-            onClick={handleGoogleLogin}
-            className="w-full rounded-full border border-gray-300 bg-white text-gray-900 font-semibold py-3 hover:bg-gray-50 transition flex items-center justify-center gap-2"
+        <div className="flex items-center gap-2">
+          <NavLink
+            to="/booking-history/tours"
+            className={({ isActive }) =>
+              `px-4 py-2 rounded-xl border ${
+                isActive
+                  ? "bg-orange-500 text-white border-orange-500"
+                  : "bg-white"
+              }`
+            }
           >
-            <span>G</span>
-            Continue with Google
-          </button>
-        </>
-      ) : (
-        <div className="space-y-4">
-          {/* EMAIL */}
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-800">Email</label>
+            Tours
+          </NavLink>
+          <NavLink
+            to="/booking-history/hotels"
+            className={({ isActive }) =>
+              `px-4 py-2 rounded-xl border ${
+                isActive
+                  ? "bg-orange-500 text-white border-orange-500"
+                  : "bg-white"
+              }`
+            }
+          >
+            Hotels
+          </NavLink>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="mt-5 bg-white border rounded-2xl p-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div className="flex flex-col md:flex-row gap-3">
+          <div>
+            <div className="text-xs text-gray-500 mb-1">Start date</div>
             <input
-              value={fpEmail}
-              onChange={(e) => setFpEmail(e.target.value)}
-              type="email"
-              required
-              disabled={fpStep === 2}
-              placeholder="Enter your email"
-              className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:ring-2 focus:ring-orange-400 disabled:bg-gray-100 disabled:text-gray-500"
+              type="date"
+              value={start}
+              onChange={(e) => setStart(e.target.value)}
+              className="border rounded-xl px-3 py-2"
             />
-
-            {fpStep === 2 && (
-              <button
-                type="button"
-                className="text-xs font-semibold text-gray-500 hover:underline mt-2"
-                onClick={() => {
-                  setFpStep(1);
-                  setFpCode("");
-                  setFpNewPass("");
-                  setFpConfirmPass("");
-                  setErr("");
-                }}
-              >
-                Change email
-              </button>
-            )}
+          </div>
+          <div>
+            <div className="text-xs text-gray-500 mb-1">End date</div>
+            <input
+              type="date"
+              value={end}
+              onChange={(e) => setEnd(e.target.value)}
+              className="border rounded-xl px-3 py-2"
+            />
           </div>
 
-          {fpStep === 2 && (
-            <>
-              {/* CODE */}
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-800">Code</label>
-                <input
-                  value={fpCode}
-                  onChange={(e) => setFpCode(e.target.value)}
-                  type="text"
-                  required
-                  placeholder="Enter code from email"
-                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:ring-2 focus:ring-orange-400"
-                />
-              </div>
-
-              {/* NEW PASS */}
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-800">
-                  New password
-                </label>
-                <input
-                  value={fpNewPass}
-                  onChange={(e) => setFpNewPass(e.target.value)}
-                  type="password"
-                  required
-                  placeholder="Enter new password"
-                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:ring-2 focus:ring-orange-400"
-                />
-              </div>
-
-              {/* CONFIRM PASS */}
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-800">
-                  Confirm password
-                </label>
-                <input
-                  value={fpConfirmPass}
-                  onChange={(e) => setFpConfirmPass(e.target.value)}
-                  type="password"
-                  required
-                  placeholder="Re-enter new password"
-                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:ring-2 focus:ring-orange-400"
-                />
-                {fpConfirmPass && confirmError && (
-                  <p className="text-xs text-red-600 mt-1">{confirmError}</p>
-                )}
-              </div>
-
-              {/* PASSWORD RULES */}
-              <div className="text-xs text-gray-500 space-y-1 mt-1">
-                <p className="font-medium text-gray-600">Yêu cầu mật khẩu:</p>
-                <ul className="list-disc ml-5">
-                  <li>Ít nhất 8 ký tự</li>
-                  <li>Có chữ hoa (A-Z)</li>
-                  <li>Có chữ thường (a-z)</li>
-                  <li>Có số (0-9)</li>
-                  <li>Có ký tự đặc biệt (ví dụ: !@#$%^&*)</li>
-                </ul>
-                {fpNewPass && pwdError && (
-                  <p className="text-red-600 mt-1">{pwdError}</p>
-                )}
-              </div>
-            </>
-          )}
-
-          {/* ACTION BUTTON */}
           <button
-            type="button"
-            disabled={disableResetBtn}
-            onClick={fpStep === 1 ? handleForgotRequest : handleForgotConfirm}
-            className="w-full rounded-full bg-orange-500 text-white font-semibold py-3 hover:bg-orange-400 transition disabled:opacity-60"
+            onClick={onApplyFilter}
+            className="bg-orange-500 hover:bg-orange-600 text-white rounded-xl px-4 py-2"
           >
-            {resetting
-              ? "Processing..."
-              : fpStep === 1
-              ? "Send reset code"
-              : "Confirm & change password"}
+            Apply
           </button>
 
           <button
-            type="button"
-            className="w-full text-sm font-semibold text-gray-500 hover:underline"
-            onClick={() => {
-              setShowForgot(false);
-              setFpStep(1);
-              setErr("");
-              setFpEmail("");
-              setFpCode("");
-              setFpNewPass("");
-              setFpConfirmPass("");
-            }}
+            onClick={onClearFilter}
+            className="border rounded-xl px-4 py-2"
           >
-            Back to sign in
+            Clear
+          </button>
+        </div>
+
+        <div className="text-sm text-gray-600">
+          {loading ? "Loading..." : `${data.totalElements || 0} record(s)`}
+        </div>
+      </div>
+
+      {/* Cards */}
+      <div className="mt-6">
+        {loading ? (
+          <div className="p-6 text-gray-500">Loading...</div>
+        ) : rows.length === 0 ? (
+          <div className="p-6 bg-white border rounded-2xl text-gray-500">
+            No hotel bookings yet.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4">
+            {rows.map((r, idx) => {
+              const hotel = r?.hotel;
+              const room = r?.room;
+
+              const bookingId = r?.bookingId ?? null;
+
+              const hotelName = hotel?.name || "Hotel";
+              const hotelId = hotel?.hotelId ?? hotel?.id ?? null;
+              const roomType = room?.roomType || room?.type || "Room";
+
+              const checkIn = fmtDate(r?.checkInDate);
+              const checkOutRaw = r?.checkOutDate;
+              const checkOut = fmtDate(checkOutRaw);
+
+              const total = r?.totalPrice ?? 0;
+              const status = r?.status || "Pending";
+
+              const isSuccess =
+                String(status).trim().toLowerCase() === "success";
+              const isPastCheckout = isCheckoutPast(checkOutRaw);
+
+              const hotelSlug = hotelId
+                ? buildTourSlug(Number(hotelId), String(hotelName))
+                : null;
+
+              const isRefunding = refundingId === bookingId;
+
+              // ✅ điều kiện refund (đồng bộ với disabled)
+              const canRefund =
+                Boolean(bookingId) &&
+                isSuccess &&
+                !isPastCheckout &&
+                !isRefunding &&
+                !loading;
+
+              const refundTitle = !bookingId
+                ? "Thiếu bookingId"
+                : !isSuccess
+                ? "Chỉ booking trạng thái SUCCESS mới được refund"
+                : isPastCheckout
+                ? "Đã quá ngày check-out nên không thể refund"
+                : "Refund booking";
+
+              return (
+                <div
+                  key={bookingId ?? `${hotelId || "hotel"}-${idx}`}
+                  className="bg-white border rounded-2xl p-4 sm:p-5 shadow-sm"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="text-lg font-semibold text-gray-800">
+                      {hotelName}
+                    </div>
+
+                    <span className="text-xs px-3 py-1 rounded-full bg-orange-50 text-orange-600 border border-orange-200">
+                      {status}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 text-sm text-gray-600">
+                    Room: <span className="font-medium">{roomType}</span>
+                  </div>
+
+                  <div className="mt-2 text-sm text-gray-600 flex flex-col gap-1">
+                    <div>
+                      <span className="font-medium">Check-in:</span> {checkIn}
+                    </div>
+                    <div>
+                      <span className="font-medium">Check-out:</span> {checkOut}
+                      {isPastCheckout ? (
+                        <span className="ml-2 text-xs text-red-600 font-medium">
+                          (Past)
+                        </span>
+                      ) : null}
+                    </div>
+                    <div>
+                      <span className="font-medium">Total:</span>{" "}
+                      <span className="text-orange-600 font-semibold">
+                        {formatVND(total)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between gap-3">
+                    {hotelSlug ? (
+                      <a
+                        href={`/detailhotel/${hotelSlug}`}
+                        className="text-orange-600 hover:underline text-sm font-medium"
+                      >
+                        View hotel detail →
+                      </a>
+                    ) : (
+                      <span />
+                    )}
+
+                    <button
+                      disabled={!canRefund}
+                      onClick={() => onRefund(bookingId, status, checkOutRaw)}
+                      className={`px-4 py-2 rounded-xl border text-sm font-medium disabled:opacity-50 ${
+                        canRefund ? "hover:bg-gray-50" : "cursor-not-allowed"
+                      }`}
+                      title={refundTitle}
+                    >
+                      {isRefunding ? "Refunding..." : "Refund"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Pagination */}
+      {data.totalPages > 1 && (
+        <div className="mt-8 flex items-center justify-center gap-3">
+          <button
+            disabled={!canPrev || loading}
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            className="px-4 py-2 rounded-xl border disabled:opacity-50"
+          >
+            Prev
+          </button>
+
+          <div className="text-sm text-gray-700">
+            Page <span className="font-semibold">{page + 1}</span> /{" "}
+            <span className="font-semibold">{data.totalPages}</span>
+          </div>
+
+          <button
+            disabled={!canNext || loading}
+            onClick={() => setPage((p) => p + 1)}
+            className="px-4 py-2 rounded-xl border disabled:opacity-50"
+          >
+            Next
           </button>
         </div>
       )}

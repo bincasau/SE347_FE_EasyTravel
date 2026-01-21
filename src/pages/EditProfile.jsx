@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getAccountDetail, changePasswordApi } from "@/apis/AccountAPI";
+import { getAccountDetail, changePasswordApi, logout } from "@/apis/AccountAPI";
 import { updateMyProfileApi, deleteMineApi } from "@/apis/ProfileAPI";
-import { logout } from "@/apis/AccountAPI";
 import { popup } from "@/utils/popup";
 
 const S3_USER_BASE =
@@ -39,6 +38,9 @@ export default function EditProfile() {
   // ✅ thêm modal change password
   const [openChangePw, setOpenChangePw] = useState(false);
 
+  // ✅ thêm state deleting để disable nút
+  const [deleting, setDeleting] = useState(false);
+
   // ✅ form dùng đúng field entity
   const [form, setForm] = useState({
     username: "",
@@ -53,27 +55,24 @@ export default function EditProfile() {
 
   const [file, setFile] = useState(null);
 
-  // ✅ cache-busting version cho avatar (để đổi xong thấy liền, không cần reload)
+  // ✅ cache-busting version cho avatar
   const [avatarVersion, setAvatarVersion] = useState(() => Date.now());
 
-  // ✅ giữ objectURL để revoke đúng (tránh leak)
+  // ✅ giữ objectURL để revoke đúng
   const objectUrlRef = useRef(null);
 
   const previewUrl = useMemo(() => {
-    // nếu có file mới chọn -> dùng objectURL preview ngay
     if (file) {
       const url = URL.createObjectURL(file);
       objectUrlRef.current = url;
       return url;
     }
 
-    // nếu dùng avatar từ S3 -> thêm ?v=... để bust cache
     return form.avatar
       ? `${S3_USER_BASE}/${form.avatar}?v=${avatarVersion}`
       : `${S3_USER_BASE}/user_default.jpg`;
   }, [file, form.avatar, avatarVersion]);
 
-  // ✅ revoke objectURL khi file đổi / unmount
   useEffect(() => {
     return () => {
       if (objectUrlRef.current) {
@@ -93,14 +92,13 @@ export default function EditProfile() {
           username: data.username || "",
           email: data.email || "",
           name: data.name || "",
-          phoneNumber: data.phone || "", // ✅ phone -> phoneNumber
+          phoneNumber: data.phone || "",
           address: data.address || "",
           gender: data.gender || "",
-          dob: data.birth ? String(data.birth).slice(0, 10) : "", // ✅ birth -> dob
+          dob: data.birth ? String(data.birth).slice(0, 10) : "",
           avatar: data.avatar || "",
         });
 
-        // ✅ set version để chắc chắn load ảnh mới nhất lần đầu vào
         setAvatarVersion(Date.now());
       } catch (e) {
         console.error(e);
@@ -131,14 +129,10 @@ export default function EditProfile() {
 
     setSaving(true);
     try {
-      // ✅ update profile (có thể upload avatar)
       await updateMyProfileApi({ user: payloadUser, file });
 
-      // ✅ bust cache ngay lập tức để khi quay lại vẫn thấy avatar mới
       setAvatarVersion(Date.now());
 
-      // ✅ nếu bạn muốn chắc chắn lấy avatar filename mới (nếu BE đổi tên file)
-      // thì refetch lại account detail để sync form.avatar
       try {
         const fresh = await getAccountDetail();
         setForm((p) => ({
@@ -152,33 +146,33 @@ export default function EditProfile() {
         }));
         setAvatarVersion(Date.now());
       } catch (e2) {
-        // không sao, chỉ là không refetch được
         console.warn("Refetch account detail failed:", e2);
       }
 
-      // ✅ báo Header/app biết profile đã update để fetch lại (nếu Header đang nghe jwt-changed)
       window.dispatchEvent(new Event("jwt-changed"));
-
-      // ✅ reset file để không còn dùng objectURL nữa
       setFile(null);
 
       await popup.success("Cập nhật profile thành công!");
       navigate("/profile");
     } catch (err) {
       console.error(err);
-      popup.error(err?.message || "Cập nhật thất bại!");
+      await popup.error(err?.message || "Cập nhật thất bại!");
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async () => {
-    const ok = await popup.confirmDanger(
+    if (deleting) return;
+
+    // ✅ dùng confirm thường cho chắc (nếu bạn không có confirmDanger)
+    const ok = await popup.confirm(
       "Bạn chắc chắn muốn xoá tài khoản? Hành động này không thể hoàn tác.",
       "Xoá tài khoản"
     );
     if (!ok) return;
 
+    setDeleting(true);
     try {
       await deleteMineApi();
       logout();
@@ -186,7 +180,9 @@ export default function EditProfile() {
       navigate("/");
     } catch (err) {
       console.error(err);
-      popup.error(err?.message || "Xoá tài khoản thất bại!");
+      await popup.error(err?.message || "Xoá tài khoản thất bại!");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -208,7 +204,7 @@ export default function EditProfile() {
         <form onSubmit={handleSubmit} className="space-y-7">
           <div className="flex items-center gap-6">
             <img
-              key={previewUrl} // ✅ ép remount để chắc chắn đổi ảnh ngay
+              key={previewUrl}
               src={previewUrl}
               className="w-24 h-24 rounded-full border object-cover"
               alt="avatar"
@@ -299,7 +295,7 @@ export default function EditProfile() {
               type="button"
               onClick={() => navigate("/profile")}
               className="px-6 py-3 rounded-full border hover:bg-gray-50"
-              disabled={saving}
+              disabled={saving || deleting}
             >
               Cancel
             </button>
@@ -307,14 +303,14 @@ export default function EditProfile() {
             <button
               type="submit"
               className="px-6 py-3 rounded-full bg-orange-500 text-white hover:bg-orange-400 disabled:opacity-60"
-              disabled={saving}
+              disabled={saving || deleting}
             >
               {saving ? "Saving..." : "Save Changes"}
             </button>
           </div>
         </form>
 
-        {/* ✅ Security: Change password */}
+        {/* Security */}
         <div className="mt-10 pt-6 border-t">
           <div className="flex items-center justify-between gap-4">
             <div>
@@ -325,8 +321,10 @@ export default function EditProfile() {
             </div>
 
             <button
+              type="button"
               onClick={() => setOpenChangePw(true)}
               className="px-5 py-2.5 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-50"
+              disabled={deleting}
             >
               Change Password
             </button>
@@ -339,21 +337,24 @@ export default function EditProfile() {
             <div>
               <div className="font-semibold text-gray-900">Danger Zone</div>
               <div className="text-sm text-gray-500">
-                Xoá tài khoản sẽ mất dữ liệu liên quan (booking/payment).
+                Xoá tài khoản sẽ mất dữ liệu liên quan 
               </div>
             </div>
 
             <button
+              type="button" 
               onClick={handleDelete}
-              className="px-5 py-2.5 rounded-full border border-red-400 text-red-500 hover:bg-red-50"
+              disabled={deleting}
+              className={`px-5 py-2.5 rounded-full border border-red-400 text-red-500 hover:bg-red-50 ${
+                deleting ? "opacity-60 cursor-not-allowed" : ""
+              }`}
             >
-              Delete Account
+              {deleting ? "Deleting..." : "Delete Account"}
             </button>
           </div>
         </div>
       </div>
 
-      {/* ✅ Modal Change Password */}
       {openChangePw && (
         <ChangePasswordModal onClose={() => setOpenChangePw(false)} />
       )}
