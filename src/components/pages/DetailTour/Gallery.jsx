@@ -9,20 +9,12 @@ const buildS3Url = (fileOrUrl) => {
   const s = String(fileOrUrl).trim();
   if (!s) return "";
   if (s.startsWith("http://") || s.startsWith("https://")) return s;
-  
-  // Try different S3 paths
-  const paths = [
-    `${S3_BASE}/${s.replace(/^\/+/, "")}`,
-    `${S3_BASE}/tour/${s.replace(/^\/+/, "")}`,
-    `https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/${s.replace(/^\/+/, "")}`,
-  ];
-  
-  return paths[0]; // Default to first path
+  return `${S3_BASE}/${s.replace(/^\/+/, "")}`;
 };
 
 export default function TourGallery({ tourId }) {
-  const [images, setImages] = useState([]); // ✅ urls từ backend
-  const [index, setIndex] = useState(0);
+  const [images, setImages] = useState([]);
+  const [page, setPage] = useState(0); // ✅ page index (mỗi page = 3 ảnh)
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,7 +25,9 @@ export default function TourGallery({ tourId }) {
 
       setLoading(true);
       try {
-        const res = await fetch(`${BASE_URL}/tours/${tourId}/images`);
+        const res = await fetch(`${BASE_URL}/tours/${tourId}/images`, {
+          cache: "no-store",
+        });
         if (!res.ok) throw new Error("Không thể tải danh sách ảnh tour");
 
         const data = await res.json();
@@ -49,7 +43,6 @@ export default function TourGallery({ tourId }) {
               .filter((x) => x.url)
           : [];
 
-        // sort ổn định
         mapped.sort((a, b) => {
           const ia = Number(a.imageId || 0);
           const ib = Number(b.imageId || 0);
@@ -63,11 +56,12 @@ export default function TourGallery({ tourId }) {
 
         if (!alive) return;
         setImages(urls);
-        setIndex(0);
+        setPage(0);
       } catch (e) {
         console.error(e);
         if (!alive) return;
         setImages([]);
+        setPage(0);
       } finally {
         if (alive) setLoading(false);
       }
@@ -79,30 +73,34 @@ export default function TourGallery({ tourId }) {
     };
   }, [tourId]);
 
-  const total = images.length;
+  // ✅ tạo pages, chỉ lấy những page đủ 3 ảnh
+  const pages = useMemo(() => {
+    const res = [];
+    for (let i = 0; i < images.length; i += 3) {
+      const chunk = images.slice(i, i + 3);
+      if (chunk.length === 3) res.push(chunk); // ✅ chỉ nhận đủ 3
+      else {
+        // ✅ dồn phần lẻ vào trang trước (nếu có)
+        if (res.length > 0) {
+          res[res.length - 1] = [...res[res.length - 1], ...chunk].slice(0, 3);
+        }
+      }
+    }
+    return res;
+  }, [images]);
 
-  const atStart = index === 0;
-  const atEnd = index >= total - 1;
+  const totalPages = pages.length;
+  const safePage = Math.max(0, Math.min(page, totalPages - 1));
 
-  const next = () => {
-    if (!atEnd) setIndex((i) => i + 1);
-  };
+  const atStart = safePage === 0;
+  const atEnd = safePage >= totalPages - 1;
+
   const prev = () => {
-    if (!atStart) setIndex((i) => i - 1);
+    if (!atStart) setPage((p) => p - 1);
   };
-
-  // ✅ chỉ cần 3 tấm: current (lớn), next1, next2
-  const current = images[index];
-  const next1 = images[index + 1] || null;
-  const next2 = images[index + 2] || null;
-
-  // ✅ danh sách ảnh nhỏ: chỉ push cái nào tồn tại (không đủ ảnh thì không hiện ô)
-  const sideImages = useMemo(() => {
-    const arr = [];
-    if (next1) arr.push(next1);
-    if (next2) arr.push(next2);
-    return arr;
-  }, [next1, next2]);
+  const next = () => {
+    if (!atEnd) setPage((p) => p + 1);
+  };
 
   if (!tourId) return null;
 
@@ -110,13 +108,10 @@ export default function TourGallery({ tourId }) {
     return <p className="text-center text-gray-500 mt-10">Đang tải ảnh...</p>;
   }
 
-  if (images.length === 0) {
-    return (
-      <p className="text-center text-gray-500 mt-10">
-        Không có ảnh cho tour này.
-      </p>
-    );
-  }
+  // ✅ không có ảnh hoặc không đủ page
+  if (pages.length === 0) return null;
+
+  const [current, ...sideImages] = pages[safePage]; // current=ảnh lớn, sideImages tối đa 2
 
   return (
     <section className="max-w-6xl mx-auto px-6 mt-10">
@@ -125,65 +120,59 @@ export default function TourGallery({ tourId }) {
         <h2 className="text-4xl font-semibold text-gray-800">Gallery Tour</h2>
 
         {/* Nút điều hướng */}
-        <div className="flex gap-3">
-          <button
-            onClick={prev}
-            disabled={atStart}
-            aria-label="Previous"
-            className={`w-9 h-9 rounded-full flex items-center justify-center transition
-              ${
-                atStart
-                  ? "bg-gray-300 text-white cursor-not-allowed"
-                  : "bg-gray-200 text-gray-700 hover:bg-orange-500 hover:text-white"
-              }`}
-          >
-            <FaChevronLeft size={16} />
-          </button>
+        {totalPages > 1 && (
+          <div className="flex gap-3">
+            <button
+              onClick={prev}
+              disabled={atStart}
+              aria-label="Previous"
+              className={`w-9 h-9 rounded-full flex items-center justify-center transition
+                ${
+                  atStart
+                    ? "bg-gray-300 text-white cursor-not-allowed"
+                    : "bg-gray-200 text-gray-700 hover:bg-orange-500 hover:text-white"
+                }`}
+            >
+              <FaChevronLeft size={16} />
+            </button>
 
-          <button
-            onClick={next}
-            disabled={atEnd}
-            aria-label="Next"
-            className={`w-9 h-9 rounded-full flex items-center justify-center transition
-              ${
-                atEnd
-                  ? "bg-gray-300 text-white cursor-not-allowed"
-                  : "bg-gray-200 text-gray-700 hover:bg-orange-500 hover:text-white"
-              }`}
-          >
-            <FaChevronRight size={16} />
-          </button>
-        </div>
+            <button
+              onClick={next}
+              disabled={atEnd}
+              aria-label="Next"
+              className={`w-9 h-9 rounded-full flex items-center justify-center transition
+                ${
+                  atEnd
+                    ? "bg-gray-300 text-white cursor-not-allowed"
+                    : "bg-gray-200 text-gray-700 hover:bg-orange-500 hover:text-white"
+                }`}
+            >
+              <FaChevronRight size={16} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Layout */}
       <div className="flex flex-col md:flex-row gap-4 items-stretch">
-        {/* Ảnh lớn - scale responsively based on available images */}
+        {/* Ảnh lớn */}
         <div className={sideImages.length > 0 ? "w-full md:w-2/3" : "w-full"}>
           <img
             src={current}
-            alt={`tour-${tourId}-img-${index + 1}`}
+            alt={`tour-${tourId}-img-page-${safePage}-main`}
             className="w-full h-[400px] object-cover rounded-2xl shadow-md hover:scale-[1.01] transition"
-            onError={(e) => {
-              e.currentTarget.onerror = null;
-              e.currentTarget.src = "/images/tour/fallback.jpg";
-            }}
           />
         </div>
 
-        {/* Ảnh nhỏ: chỉ hiện nếu tồn tại */}
+        {/* Ảnh nhỏ */}
         {sideImages.length > 0 && (
           <div className="flex flex-col gap-4 w-full md:w-1/3">
-            {sideImages.map((src, i) => (
+            {sideImages.slice(0, 2).map((src, i) => (
               <img
-                key={`${tourId}-${index}-${i}`}
+                key={`${tourId}-page-${safePage}-side-${i}`}
                 src={src}
-                alt={`tour-${tourId}-preview-${i + 1}`}
+                alt={`tour-${tourId}-page-${safePage}-side-${i + 1}`}
                 className="h-[195px] w-full object-cover rounded-2xl shadow-md hover:scale-[1.01] transition"
-                onError={(e) => {
-                  e.currentTarget.onerror = null;
-                  e.currentTarget.src = "/images/tour/fallback.jpg";
-                }}
               />
             ))}
           </div>

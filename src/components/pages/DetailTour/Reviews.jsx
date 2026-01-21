@@ -451,7 +451,7 @@ export default function Reviews({ tourId }) {
           disabled={!isLoggedInState || submitting}
           className={`mt-3 px-5 py-2 rounded-full text-white font-medium transition ${
             !isLoggedInState || submitting
-              ? "bg-gray-400 cursor-not-allowed"
+              ? "bg-gray-300 text-gray-900 cursor-not-allowed"
               : "bg-orange-500 hover:bg-orange-600"
           }`}
         >

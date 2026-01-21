@@ -68,6 +68,7 @@ export default function LoginModal({ onClose, onOpenSignup }) {
           user = await getAccountDetail();
         } catch {}
       }
+
       onClose?.();
 
       if (user?.role === "HOTEL_MANAGER")
@@ -78,7 +79,9 @@ export default function LoginModal({ onClose, onOpenSignup }) {
 
       window.dispatchEvent(new Event("jwt-changed"));
     } catch (error) {
-      setErr(error?.message || "Đăng nhập thất bại!");
+      const msg = error?.message || "Đăng nhập thất bại!";
+      setErr(msg);
+      await popup.error(msg, "Đăng nhập thất bại"); // ✅ popup khi login fail
     } finally {
       setLoading(false);
     }
@@ -99,7 +102,9 @@ export default function LoginModal({ onClose, onOpenSignup }) {
       setFpNewPass("");
       setFpConfirmPass("");
     } catch (e) {
-      setErr(e?.message || "Gửi mã reset thất bại!");
+      const msg = e?.message || "Gửi mã reset thất bại!";
+      setErr(msg);
+      await popup.error(msg, "Thất bại");
     } finally {
       setResetting(false);
     }
@@ -124,11 +129,14 @@ export default function LoginModal({ onClose, onOpenSignup }) {
     const msgErr = validatePassword(fpNewPass);
     if (msgErr) {
       setErr(msgErr);
+      await popup.error(msgErr, "Thất bại");
       return;
     }
 
     if (!fpConfirmPass || fpNewPass !== fpConfirmPass) {
-      setErr("Mật khẩu xác nhận không khớp.");
+      const msg = "Mật khẩu xác nhận không khớp.";
+      setErr(msg);
+      await popup.error(msg, "Thất bại");
       return;
     }
 
@@ -151,7 +159,9 @@ export default function LoginModal({ onClose, onOpenSignup }) {
       setFpConfirmPass("");
       setErr("");
     } catch (e) {
-      setErr(e?.message || "Xác nhận reset thất bại!");
+      const msg = e?.message || "Xác nhận reset thất bại!";
+      setErr(msg);
+      await popup.error(msg, "Thất bại");
     } finally {
       setResetting(false);
     }
@@ -283,12 +293,11 @@ export default function LoginModal({ onClose, onOpenSignup }) {
               onChange={(e) => setFpEmail(e.target.value)}
               type="email"
               required
-              disabled={fpStep === 2} // ✅ khóa email ở step 2
+              disabled={fpStep === 2}
               placeholder="Enter your email"
               className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:ring-2 focus:ring-orange-400 disabled:bg-gray-100 disabled:text-gray-500"
             />
 
-            {/* ✅ Change email button ở step 2 */}
             {fpStep === 2 && (
               <button
                 type="button"
@@ -336,7 +345,7 @@ export default function LoginModal({ onClose, onOpenSignup }) {
                 />
               </div>
 
-              {/* ✅ CONFIRM PASS */}
+              {/* CONFIRM PASS */}
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-800">
                   Confirm password

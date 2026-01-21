@@ -32,20 +32,12 @@ export default function TourDetail() {
   const id = useMemo(() => extractIdFromSlug(slugId), [slugId]);
 
   const [tour, setTour] = useState(null);
-  const [images, setImages] = useState([]);
+  const [images, setImages] = useState([]); // only real images from backend
   const [selectedImg, setSelectedImg] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ✅ month state cho calendar
+  // month state for calendar
   const [currentMonth, setCurrentMonth] = useState(null);
-
-  const fallbackImages = useMemo(
-    () => [
-      "https://placehold.co/1200x800?text=Tour+Image",
-      "https://placehold.co/600x400?text=Preview",
-    ],
-    []
-  );
 
   const buildS3Url = (fileOrUrl) => {
     if (!fileOrUrl) return "";
@@ -61,32 +53,26 @@ export default function TourDetail() {
 
     const data = await res.json();
     const list = data?._embedded?.images;
-
     if (!Array.isArray(list)) return [];
 
-    // map ra url S3 + sort theo imageId/createdAt nếu cần
     const mapped = list
       .map((it) => ({
         imageId: it?.imageId ?? 0,
         createdAt: it?.createdAt,
         url: buildS3Url(it?.url),
-        title: it?.title,
-        altText: it?.altText,
       }))
       .filter((x) => x.url);
 
-    // sort: ưu tiên imageId tăng dần (1,2,3...) hoặc createdAt
     mapped.sort((a, b) => {
       const ia = Number(a.imageId || 0);
       const ib = Number(b.imageId || 0);
       if (ia && ib) return ia - ib;
+
       const ta = new Date(a.createdAt || 0).getTime();
       const tb = new Date(b.createdAt || 0).getTime();
       return (ta || 0) - (tb || 0);
     });
 
-    // chỉ lấy url (UI đang dùng url string)
-    // nếu bạn muốn dùng alt/title theo ảnh, mình sẽ sửa UI cho dùng object
     const urls = mapped.map((x) => x.url);
 
     // remove duplicate
@@ -116,7 +102,7 @@ export default function TourDetail() {
           navigate(`/detailtour/${correctSlugId}`, { replace: true });
         }
 
-        // init month = tháng của startDate
+        // init month = month of startDate
         if (data?.startDate) {
           const s = parseISO(data.startDate);
           setCurrentMonth(startOfMonth(s));
@@ -125,11 +111,11 @@ export default function TourDetail() {
         // 2) fetch images list by tour id
         const urls = await fetchTourImages(id);
 
+        // ✅ only show what backend returns
         if (urls.length > 0) {
           setImages(urls);
           setSelectedImg(urls[0]);
         } else {
-          // không có ảnh => dùng fallback
           setImages([]);
           setSelectedImg(null);
         }
@@ -184,11 +170,11 @@ export default function TourDetail() {
   const start = parseISO(startDate);
   const end = parseISO(endDate);
 
-  // ✅ kiểm tra tour đã qua hay chưa (endDate < hôm nay)
+  // check tour passed (endDate < today)
   const now = new Date();
   const tourPassed = isBefore(end, now);
 
-  // ✅ giới hạn month có thể chuyển
+  // limit month can navigate
   const minMonth = startOfMonth(start);
   const maxMonth = startOfMonth(end);
 
@@ -309,10 +295,9 @@ export default function TourDetail() {
     return <div>{rows}</div>;
   };
 
-  // ✅ preview theo đúng số ảnh backend trả về (không đủ thì không hiện thêm ô nào)
+  // ✅ show exactly what backend returns
   const previewImages = images.slice(0, 3);
-
-  const mainImg = selectedImg || images[0] || fallbackImages[0];
+  const mainImg = selectedImg || images[0]; // ✅ no fallback
 
   const handleBuyNow = async () => {
     if (soldOut) {
@@ -359,19 +344,18 @@ export default function TourDetail() {
           ← Back
         </button>
 
-        <div className="w-full rounded-2xl overflow-hidden shadow-md bg-gray-100">
-          <img
-            src={mainImg}
-            alt={title}
-            className="w-full h-[320px] sm:h-[420px] lg:h-[560px] object-cover transition-transform duration-200 hover:scale-[1.01]"
-            onError={(e) => {
-              e.currentTarget.onerror = null;
-              e.currentTarget.src = fallbackImages[0];
-            }}
-          />
-        </div>
+        {/* ✅ only render if has image */}
+        {mainImg && (
+          <div className="w-full rounded-2xl overflow-hidden shadow-md bg-gray-100">
+            <img
+              src={mainImg}
+              alt={title}
+              className="w-full h-[320px] sm:h-[420px] lg:h-[560px] object-cover transition-transform duration-200 hover:scale-[1.01]"
+            />
+          </div>
+        )}
 
-        {/* ✅ chỉ render preview nếu có ảnh */}
+        {/* ✅ preview only if has images */}
         {previewImages.length > 0 && (
           <div className="grid grid-cols-3 gap-3 sm:gap-4 mt-3 sm:mt-4">
             {previewImages.map((img, i) => {
@@ -395,10 +379,6 @@ export default function TourDetail() {
                     src={img}
                     alt={`preview-${i}`}
                     className="w-full h-full object-cover hover:scale-[1.03] transition-transform duration-200"
-                    onError={(e) => {
-                      e.currentTarget.onerror = null;
-                      e.currentTarget.src = fallbackImages[1];
-                    }}
                   />
                 </button>
               );

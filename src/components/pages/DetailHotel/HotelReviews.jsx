@@ -101,6 +101,7 @@ export default function HotelReviews({ hotelId }) {
   const [reviews, setReviews] = useState([]);
   const [visibleCount, setVisibleCount] = useState(4);
   const [loading, setLoading] = useState(true);
+  const [loggedIn, setLoggedIn] = useState(isLoggedIn());
 
   const [newRating, setNewRating] = useState(5);
   const [newComment, setNewComment] = useState("");
@@ -111,7 +112,12 @@ export default function HotelReviews({ hotelId }) {
   const [savingEdit, setSavingEdit] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const loggedIn = isLoggedIn();
+  useEffect(() => {
+    const syncLogin = () => setLoggedIn(isLoggedIn());
+    const onJwtChanged = () => syncLogin();
+    window.addEventListener("jwt-changed", onJwtChanged);
+    return () => window.removeEventListener("jwt-changed", onJwtChanged);
+  }, []);
 
   // ✅ mapping đúng JSON bạn gửi
   const getId = (r, i) => r?.reviewId ?? i;
@@ -202,6 +208,10 @@ export default function HotelReviews({ hotelId }) {
 
   // ✅ UPDATE
   const startEdit = (r, i) => {
+    if (!loggedIn) {
+      popup.error("Bạn cần đăng nhập để sửa review.");
+      return;
+    }
     const id = getId(r, i);
     setEditingId(id);
     setEditRating(getRating(r) || 5);
@@ -215,6 +225,10 @@ export default function HotelReviews({ hotelId }) {
   };
 
   const handleUpdate = async () => {
+    if (!loggedIn) {
+      popup.error("Bạn cần đăng nhập để cập nhật review.");
+      return;
+    }
     if (!editingId) return;
     if (!editComment.trim()) return popup.error("Vui lòng nhập comment.");
 
@@ -242,6 +256,10 @@ export default function HotelReviews({ hotelId }) {
 
   // ✅ DELETE
   const handleDelete = async (id) => {
+    if (!loggedIn) {
+      popup.error("Bạn cần đăng nhập để xoá review.");
+      return;
+    }
     const ok = await popup.confirm("Xoá review này?");
     if (!ok) return;
 
@@ -412,7 +430,7 @@ export default function HotelReviews({ hotelId }) {
           disabled={!loggedIn || submitting}
           className={`mt-3 px-5 py-2 rounded-full text-white font-medium transition ${
             !loggedIn || submitting
-              ? "bg-gray-400 cursor-not-allowed"
+              ? "bg-gray-300 text-gray-900 cursor-not-allowed"
               : "bg-orange-500 hover:bg-orange-600"
           }`}
         >
