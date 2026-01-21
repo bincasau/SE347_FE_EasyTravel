@@ -301,8 +301,6 @@ export default function MyRooms() {
                 >
                   <option value="price_asc">Giá: Thấp → Cao</option>
                   <option value="price_desc">Giá: Cao → Thấp</option>
-                  <option value="date_desc">Ngày tạo: Mới → Cũ</option>
-                  <option value="date_asc">Ngày tạo: Cũ → Mới</option>
                 </select>
 
                 <button

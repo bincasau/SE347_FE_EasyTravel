@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getToken } from "@/utils/auth";
+import { popup } from "@/utils/popup";
 
 const API_BASE = "http://localhost:8080";
 
@@ -33,7 +34,6 @@ export default function RoomCard({ room, onDeleted }) {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
 
-  // ✅ support both snake_case & camelCase
   const {
     room_id,
     roomId,
@@ -77,30 +77,29 @@ export default function RoomCard({ room, onDeleted }) {
     return toUrl(bed) || toUrl(wc) || FALLBACK_IMAGE;
   }, [image_bed, imageBed, image_wc, imageWC]);
 
-  const goView = () =>
-    navigate("/hotel-manager/rooms/view", { state: { room } });
-  const goEdit = () =>
-    navigate("/hotel-manager/rooms/edit", { state: { room } });
+  const goView = () => navigate("/hotel-manager/rooms/view", { state: { room } });
+  const goEdit = () => navigate("/hotel-manager/rooms/edit", { state: { room } });
 
   const doDelete = async () => {
     setDeleteError("");
 
     if (!id) {
-      setDeleteError("Thieu room id (room_id/roomId)");
+      const msg = "Thiếu room id (room_id/roomId)";
+      setDeleteError(msg);
+      popup.error(msg);
       return;
     }
 
-    const token = getToken();
-    const ok = window.confirm(
-      `Xoa phong ${showRoomNumber || id}? Hanh dong nay khong the hoan tac.`
-    );
+    const ok = await popup.confirmDanger("Bạn chắc chắn muốn xoá phòng này?", "Xoá phòng");
     if (!ok) return;
+
+    const token = getToken();
+    const closeLoading = popup.loading("Đang xoá phòng...");
 
     try {
       setDeleting(true);
 
       const url = `${API_BASE}/hotel_manager/rooms/${id}`;
-
       const res = await fetch(url, {
         method: "DELETE",
         credentials: "include",
@@ -122,18 +121,25 @@ export default function RoomCard({ room, onDeleted }) {
         throw new Error(typeof raw === "string" ? raw : JSON.stringify(raw));
       }
 
+      popup.success("Đã xoá phòng!");
       onDeleted?.(id);
     } catch (e) {
-      setDeleteError(e?.message || "Delete failed");
+      const msg = e?.message || "Xoá phòng thất bại";
+      setDeleteError(msg);
+      popup.error(msg);
     } finally {
+      closeLoading();
       setDeleting(false);
     }
   };
 
   return (
-    <div className="bg-white border rounded-2xl shadow-sm hover:shadow-md transition overflow-hidden">
+    <div className="
+  bg-white border rounded-2xl shadow-sm hover:shadow-md transition overflow-hidden
+  h-[260px] sm:h-[200px]
+">
+
       <div className="flex flex-col sm:flex-row">
-        {/* IMAGE */}
         <div className="w-full sm:w-[220px] bg-gray-100 shrink-0">
           <img
             src={imageUrl}
@@ -145,7 +151,6 @@ export default function RoomCard({ room, onDeleted }) {
           />
         </div>
 
-        {/* INFO */}
         <div className="flex-1 px-4 sm:px-5 py-4 flex flex-col justify-between min-w-0">
           <div className="min-w-0">
             <div className="flex justify-between items-start gap-3">
@@ -173,7 +178,7 @@ export default function RoomCard({ room, onDeleted }) {
             </div>
 
             <div className="mt-3 text-sm">
-              <Info label="So khach" value={showGuests} />
+              <Info label="Số khách" value={showGuests} />
             </div>
 
             <p className="text-sm text-gray-600 mt-3 line-clamp-2 break-words">
@@ -181,13 +186,10 @@ export default function RoomCard({ room, onDeleted }) {
             </p>
 
             {!!deleteError && (
-              <p className="text-xs text-red-600 mt-2 break-words">
-                {deleteError}
-              </p>
+              <p className="text-xs text-red-600 mt-2 break-words">{deleteError}</p>
             )}
           </div>
 
-          {/* ACTIONS */}
           <div className="mt-4 flex flex-wrap justify-end gap-2">
             <button
               onClick={goView}
@@ -200,7 +202,7 @@ export default function RoomCard({ room, onDeleted }) {
               onClick={goEdit}
               className="px-4 py-2 text-sm rounded-lg bg-orange-500 text-white hover:bg-orange-600"
             >
-              Sua
+              Sửa
             </button>
 
             <button
@@ -209,11 +211,11 @@ export default function RoomCard({ room, onDeleted }) {
               className={[
                 "px-4 py-2 text-sm rounded-lg border",
                 deleting
-                  ? "border-gray-200 text-gray-400"
+                  ? "border-gray-200 text-gray-400 cursor-not-allowed"
                   : "border-red-200 text-red-600 hover:bg-red-50",
               ].join(" ")}
             >
-              {deleting ? "Dang xoa..." : "Xoa"}
+              {deleting ? "Đang xoá..." : "Xoá"}
             </button>
           </div>
         </div>

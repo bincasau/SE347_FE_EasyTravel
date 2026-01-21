@@ -30,16 +30,28 @@ function validatePassword(password) {
   return "";
 }
 
+// helper: lấy role từ nhiều format (role / roles)
+function extractRoleString(data) {
+  if (!data) return "";
+  if (typeof data.role === "string" && data.role) return data.role;
+  if (Array.isArray(data.roles) && data.roles.length) return data.roles.join(",");
+  if (typeof data.roles === "string") return data.roles;
+  return "";
+}
+
 export default function EditProfile() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // ✅ thêm modal change password
+  // ✅ modal change password
   const [openChangePw, setOpenChangePw] = useState(false);
 
-  // ✅ thêm state deleting để disable nút
+  // ✅ state deleting để disable nút
   const [deleting, setDeleting] = useState(false);
+
+  // ✅ role user
+  const [userRole, setUserRole] = useState("");
 
   // ✅ form dùng đúng field entity
   const [form, setForm] = useState({
@@ -82,11 +94,23 @@ export default function EditProfile() {
     };
   }, [file]);
 
+  // ✅ TOUR_GUIDE + HOTEL_MANAGER không được xoá
+  const canDeleteAccount = useMemo(() => {
+    const blocked = ["TOUR_GUIDE", "HOTEL_MANAGER"];
+    const r = String(userRole || "").toUpperCase();
+    const parts = r.split(",").map((x) => x.trim()).filter(Boolean);
+    if (!parts.length) return true;
+    return !parts.some((x) => blocked.includes(x));
+  }, [userRole]);
+
   useEffect(() => {
     async function load() {
       setLoading(true);
       try {
         const data = await getAccountDetail();
+
+        // role
+        setUserRole(extractRoleString(data));
 
         setForm({
           username: data.username || "",
@@ -135,6 +159,10 @@ export default function EditProfile() {
 
       try {
         const fresh = await getAccountDetail();
+
+        // refresh role luôn (nếu backend đổi role)
+        setUserRole(extractRoleString(fresh));
+
         setForm((p) => ({
           ...p,
           avatar: fresh.avatar || p.avatar,
@@ -165,21 +193,31 @@ export default function EditProfile() {
   const handleDelete = async () => {
     if (deleting) return;
 
-    // ✅ dùng confirm thường cho chắc (nếu bạn không có confirmDanger)
-    const ok = await popup.confirm(
+    // ✅ chặn theo role
+    if (!canDeleteAccount) {
+      return popup.error(
+        "Tài khoản TOUR_GUIDE hoặc HOTEL_MANAGER không thể tự xoá. Vui lòng liên hệ admin/hỗ trợ.",
+        "Không thể xoá"
+      );
+    }
+
+    const ok = await popup.confirmDanger(
       "Bạn chắc chắn muốn xoá tài khoản? Hành động này không thể hoàn tác.",
       "Xoá tài khoản"
     );
     if (!ok) return;
 
     setDeleting(true);
+    const close = popup.loading("Đang xoá tài khoản...");
     try {
       await deleteMineApi();
       logout();
+      close();
       await popup.success("Đã xoá tài khoản.");
       navigate("/");
     } catch (err) {
       console.error(err);
+      close();
       await popup.error(err?.message || "Xoá tài khoản thất bại!");
     } finally {
       setDeleting(false);
@@ -332,27 +370,50 @@ export default function EditProfile() {
         </div>
 
         {/* Danger Zone */}
-        <div className="mt-6 pt-6 border-t">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <div className="font-semibold text-gray-900">Danger Zone</div>
-              <div className="text-sm text-gray-500">
-                Xoá tài khoản sẽ mất dữ liệu liên quan 
+        {canDeleteAccount ? (
+          <div className="mt-6 pt-6 border-t">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="font-semibold text-gray-900">Danger Zone</div>
+                <div className="text-sm text-gray-500">
+                  Xoá tài khoản sẽ mất dữ liệu liên quan
+                </div>
               </div>
-            </div>
 
-            <button
-              type="button" 
-              onClick={handleDelete}
-              disabled={deleting}
-              className={`px-5 py-2.5 rounded-full border border-red-400 text-red-500 hover:bg-red-50 ${
-                deleting ? "opacity-60 cursor-not-allowed" : ""
-              }`}
-            >
-              {deleting ? "Deleting..." : "Delete Account"}
-            </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                className={`px-5 py-2.5 rounded-full border border-red-400 text-red-500 hover:bg-red-50 ${
+                  deleting ? "opacity-60 cursor-not-allowed" : ""
+                }`}
+              >
+                {deleting ? "Deleting..." : "Delete Account"}
+              </button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="mt-6 pt-6 border-t">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="font-semibold text-gray-900">Danger Zone</div>
+                <div className="text-sm text-gray-500">
+                  Tài khoản <b>TOUR_GUIDE</b> và <b>HOTEL_MANAGER</b> không thể tự xoá.
+                  Vui lòng liên hệ admin/hỗ trợ.
+                </div>
+              </div>
+
+              <button
+                type="button"
+                disabled
+                className="px-5 py-2.5 rounded-full border border-gray-200 text-gray-400 cursor-not-allowed"
+                title="Role TOUR_GUIDE / HOTEL_MANAGER không thể tự xoá"
+              >
+                Delete Account
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {openChangePw && (

@@ -34,6 +34,21 @@ function cleanNumberString(v) {
   return s.replace(/[^\d]/g, "");
 }
 
+/** ===== FIX: normalize header (bỏ dấu tiếng Việt + chuẩn hoá) ===== */
+function stripDiacritics(str) {
+  return String(str ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function normalizeHeader(headerRaw) {
+  return stripDiacritics(headerRaw)
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/[_-]/g, "_");
+}
+
 export default function AddRoom() {
   const navigate = useNavigate();
 
@@ -133,53 +148,104 @@ export default function AddRoom() {
   }, [fetchMyHotel]);
 
   /** ===== 2) Helper cho form ===== */
-  const setField = (key, value) =>
-    setForm((p) => ({ ...p, [key]: value ?? "" }));
+  const setField = (key, value) => setForm((p) => ({ ...p, [key]: value ?? "" }));
   const handleChange = (e) => setField(e.target.name, e.target.value);
 
   /** ===== 3) Import Excel ===== */
   const normalizedHeaders = useMemo(
     () => ({
-      room_id: ["room_id", "id", "roomid"],
-      description: ["description", "desc", "details"],
-      image_bed: ["image_bed", "bed_image", "bed", "image bed"],
-      image_wc: ["image_wc", "wc_image", "toilet", "image wc"],
+      // room_id
+      room_id: [
+        "room_id",
+        "id",
+        "roomid",
+        "ma phong",
+        "ma_phong",
+        "mã phòng",
+        "mã_phòng",
+      ],
+      // room_number
+      room_number: [
+        "room_number",
+        "roomnumber",
+        "room no",
+        "room_no",
+        "number",
+        "so phong",
+        "so_phong",
+        "số phòng",
+        "số_phòng",
+        "phong",
+      ],
+      // room_type
+      room_type: [
+        "room_type",
+        "roomtype",
+        "type",
+        "loai phong",
+        "loai_phong",
+        "loại phòng",
+        "loại_phòng",
+      ],
+      // number_of_guests
       number_of_guests: [
         "number_of_guest",
         "number_of_guests",
         "guests",
         "guest",
         "max_guests",
+        "so khach",
+        "so_khach",
+        "số khách",
+        "số_khách",
       ],
-      price: ["price", "room_price", "cost"],
-      room_number: ["room_number", "roomnumber", "room no", "room_no", "number"],
-      room_type: ["room_type", "roomtype", "type"],
+      // price
+      price: [
+        "price",
+        "room_price",
+        "cost",
+        "gia",
+        "giá",
+        "gia (vnd)",
+        "giá (vnd)",
+        "gia_vnd",
+        "giá_vnd",
+      ],
+      // description
+      description: ["description", "desc", "details", "mo ta", "mota", "mô tả", "mô_tả"],
+      // images
+      image_bed: ["image_bed", "bed_image", "bed", "image bed", "anh giuong", "ảnh giường"],
+      image_wc: ["image_wc", "wc_image", "toilet", "image wc", "anh wc", "ảnh wc"],
     }),
     []
   );
 
   const handlePickExcel = () => excelInputRef.current?.click();
 
+  /** ===== FIX: findHeaderKey dùng normalizeHeader + match tiếng Việt ===== */
   const findHeaderKey = (headerRaw) => {
-    const h = String(headerRaw ?? "")
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, " ")
-      .replace(/[_-]/g, "_");
+    const h = normalizeHeader(headerRaw);
 
+    // match exact theo list
     for (const targetKey of Object.keys(normalizedHeaders)) {
-      if (normalizedHeaders[targetKey].includes(h)) return targetKey;
+      const variants = normalizedHeaders[targetKey].map(normalizeHeader);
+      if (variants.includes(h)) return targetKey;
     }
 
-    if (h.includes("room") && h.includes("number")) return "room_number";
-    if (h.includes("room") && h.includes("type")) return "room_type";
-    if (h.includes("guest")) return "number_of_guests";
-    if (h.includes("price")) return "price";
-    if (h.includes("image") && h.includes("bed")) return "image_bed";
-    if (h.includes("image") && (h.includes("wc") || h.includes("toilet")))
+    // fallback theo contains
+    const has = (...parts) => parts.every((p) => h.includes(p));
+
+    if (has("so", "phong") || (h.includes("room") && h.includes("number"))) return "room_number";
+    if (has("loai", "phong") || (h.includes("room") && h.includes("type"))) return "room_type";
+    if (has("so", "khach") || h.includes("guest")) return "number_of_guests";
+    if (h.includes("gia") || h.includes("price") || h.includes("vnd")) return "price";
+    if (h.includes("mo ta") || h.includes("mota") || h.includes("desc") || h.includes("description"))
+      return "description";
+    if (has("anh", "giuong") || (h.includes("image") && h.includes("bed"))) return "image_bed";
+    if (has("anh", "wc") || (h.includes("image") && (h.includes("wc") || h.includes("toilet"))))
       return "image_wc";
-    if (h.includes("desc")) return "description";
-    if (h.includes("id")) return "room_id";
+    if ((h.includes("ma") && h.includes("phong")) || h === "id") return "room_id";
+
     return null;
   };
 
@@ -204,10 +270,8 @@ export default function AddRoom() {
     setPreview(URL.createObjectURL(file));
   };
 
-  const clearBed = () =>
-    setSingleImage(null, setBedFile, bedPreview, setBedPreview);
-  const clearWc = () =>
-    setSingleImage(null, setWcFile, wcPreview, setWcPreview);
+  const clearBed = () => setSingleImage(null, setBedFile, bedPreview, setBedPreview);
+  const clearWc = () => setSingleImage(null, setWcFile, wcPreview, setWcPreview);
 
   const clearBulkBed = () =>
     setSingleImage(null, setBulkBedFile, bulkBedPreview, setBulkBedPreview);
@@ -225,7 +289,9 @@ export default function AddRoom() {
       if (!sheetName) throw new Error("Không tìm thấy sheet trong file Excel.");
 
       const ws = wb.Sheets[sheetName];
-      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true });
+
+      // FIX: defval để ô trống => ""
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: "" });
 
       if (!rows || rows.length < 2) {
         throw new Error("Excel phải có 1 dòng tiêu đề và ít nhất 1 dòng dữ liệu.");
@@ -236,8 +302,18 @@ export default function AddRoom() {
       const colIndexByField = {};
       headerRow.forEach((h, idx) => {
         const key = findHeaderKey(h);
-        if (key) colIndexByField[key] = idx;
+        if (key && colIndexByField[key] === undefined) colIndexByField[key] = idx;
       });
+
+      // FIX: báo thiếu cột bắt buộc rõ ràng
+      const requiredCols = ["room_number", "room_type", "number_of_guests", "price"];
+      const missing = requiredCols.filter((k) => colIndexByField[k] === undefined);
+      if (missing.length) {
+        throw new Error(
+          `Excel thiếu cột bắt buộc: ${missing.join(", ")}. ` +
+            `Header hiện có: ${headerRow.filter(Boolean).join(" | ")}`
+        );
+      }
 
       const parsed = rows
         .slice(1)
@@ -269,11 +345,12 @@ export default function AddRoom() {
               return;
             }
 
-            rec[field] =
-              value === null || value === undefined ? "" : String(value).trim();
+            rec[field] = value === null || value === undefined ? "" : String(value).trim();
           });
 
+          // chỉ cần có room_number là coi như hợp lệ
           if (!String(rec.room_number || "").trim()) return null;
+
           return rec;
         })
         .filter(Boolean);
@@ -287,9 +364,7 @@ export default function AddRoom() {
       clearWc();
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
-      popup.error(
-        err?.message || "Import thất bại. Vui lòng kiểm tra định dạng Excel."
-      );
+      popup.error(err?.message || "Import thất bại. Vui lòng kiểm tra định dạng Excel.");
     } finally {
       e.target.value = "";
     }
@@ -309,8 +384,7 @@ export default function AddRoom() {
 
     if (!String(payload.room_number).trim()) return "Vui lòng nhập số phòng.";
     if (!String(payload.room_type).trim()) return "Vui lòng nhập loại phòng.";
-    if (!String(payload.number_of_guests).trim())
-      return "Vui lòng nhập số lượng khách.";
+    if (!String(payload.number_of_guests).trim()) return "Vui lòng nhập số lượng khách.";
     if (!String(payload.price).trim()) return "Vui lòng nhập giá phòng.";
     return null;
   };
@@ -331,10 +405,7 @@ export default function AddRoom() {
     };
 
     const fd = new FormData();
-    fd.append(
-      "room",
-      new Blob([JSON.stringify(roomPayload)], { type: "application/json" })
-    );
+    fd.append("room", new Blob([JSON.stringify(roomPayload)], { type: "application/json" }));
     if (bed) fd.append("bedFile", bed);
     if (wc) fd.append("wcFile", wc);
     return fd;
@@ -402,10 +473,7 @@ export default function AddRoom() {
     }
     if (!hotelId) return popup.error("Chưa có hotelId.");
 
-    const ok = await popup.confirm(
-      `Tạo ${excelRows.length} phòng từ Excel?`,
-      "Tạo hàng loạt"
-    );
+    const ok = await popup.confirm(`Tạo ${excelRows.length} phòng từ Excel?`, "Tạo hàng loạt");
     if (!ok) return;
 
     try {
@@ -504,9 +572,7 @@ export default function AddRoom() {
         <div className="bg-white rounded-2xl shadow-sm border p-6">
           <div className="mb-3 text-sm">
             {loadingHotel ? (
-              <span className="text-gray-500">
-                Đang lấy thông tin khách sạn...
-              </span>
+              <span className="text-gray-500">Đang lấy thông tin khách sạn...</span>
             ) : hotelError ? (
               <span className="text-red-600">Lỗi: {hotelError}</span>
             ) : (
@@ -564,12 +630,7 @@ export default function AddRoom() {
                   inputRef={bulkBedInputRef}
                   onChange={(e) => {
                     const f = e.target.files?.[0] || null;
-                    setSingleImage(
-                      f,
-                      setBulkBedFile,
-                      bulkBedPreview,
-                      setBulkBedPreview
-                    );
+                    setSingleImage(f, setBulkBedFile, bulkBedPreview, setBulkBedPreview);
                     e.target.value = "";
                   }}
                 />
@@ -582,12 +643,7 @@ export default function AddRoom() {
                   inputRef={bulkWcInputRef}
                   onChange={(e) => {
                     const f = e.target.files?.[0] || null;
-                    setSingleImage(
-                      f,
-                      setBulkWcFile,
-                      bulkWcPreview,
-                      setBulkWcPreview
-                    );
+                    setSingleImage(f, setBulkWcFile, bulkWcPreview, setBulkWcPreview);
                     e.target.value = "";
                   }}
                 />
@@ -595,12 +651,8 @@ export default function AddRoom() {
 
               <div className="mt-4 bg-white border rounded-2xl overflow-hidden">
                 <div className="px-4 py-3 border-b flex items-center justify-between">
-                  <div className="font-semibold">
-                    Danh sách phòng đã import ({excelRows.length})
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    Bấm “Dùng” để đổ dữ liệu vào form.
-                  </div>
+                  <div className="font-semibold">Danh sách phòng đã import ({excelRows.length})</div>
+                  <div className="text-xs text-gray-500">Bấm “Dùng” để đổ dữ liệu vào form.</div>
                 </div>
 
                 <div className="overflow-auto">
@@ -648,10 +700,7 @@ export default function AddRoom() {
 
                       {excelRows.length === 0 && (
                         <tr>
-                          <td
-                            colSpan={8}
-                            className="p-6 text-center text-gray-500"
-                          >
+                          <td colSpan={8} className="p-6 text-center text-gray-500">
                             Không có dòng nào.
                           </td>
                         </tr>
@@ -813,13 +862,7 @@ function SingleImage({ title, preview, onPick, onClear, inputRef, onChange }) {
           )}
         </div>
 
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={onChange}
-        />
+        <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={onChange} />
       </div>
 
       <div className="mt-3">
