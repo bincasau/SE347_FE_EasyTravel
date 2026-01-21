@@ -112,7 +112,7 @@ export default function BookingStepTour1({
   return (
     <div className="space-y-6">
       <div>
-        <label className="block text-sm text-gray-600 mb-2">{t("tourPage.selectDate")}</label>
+        <label className="block text-sm text-gray-600 mb-2">Start Date</label>
         <div className="relative flex items-center border rounded-lg px-3 py-2 bg-white shadow-sm">
           <FaCalendarAlt className="text-gray-500 mr-2" />
           <DatePicker
