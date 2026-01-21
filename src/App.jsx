@@ -1,3 +1,12 @@
+import { useEffect, useState } from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+
+import { LangProvider } from "@/contexts/LangContext";
+import ScrollToTop from "./utils/ScrollToTop";
+
+import Header from "./components/layout/Header";
+import Footer from "./components/layout/Footer";
+
 import { Home } from "./pages/Home";
 import { AboutUs } from "./pages/AboutUs";
 import { ContactUs } from "./pages/ContactUs";
@@ -6,10 +15,6 @@ import HotelDetailPage from "./pages/HotelDetail";
 import RoomBooking from "./pages/RoomBooking";
 import Blog from "./pages/Blog";
 import BlogDetail from "./pages/BlogDetail";
-import Header from "./components/layout/Header";
-import Footer from "./components/layout/Footer";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { LangProvider } from "@/contexts/LangContext";
 import Tour from "./pages/Tour";
 import DetailTour from "./pages/DetailTour";
 import Booking from "./pages/BookingTour";
@@ -20,7 +25,16 @@ import BookingHistoryTours from "./pages/BookingHistoryTours";
 import BookingHistoryHotels from "./pages/BookingHistoryHotels";
 import TermsPage from "./pages/Terms";
 import PrivacyPage from "./pages/Privacy";
+import PaymentResult from "@/pages/PaymentResult";
 
+import OAuth2Redirect from "./pages/OAuth2Redirect";
+import Forbidden403 from "./pages/Forbidden403";
+import NotFound404 from "./pages/NotFound404";
+
+import LoginModal from "./pages/Login";
+import SignupModal from "./pages/SignUp";
+
+// TourGuide
 import RequireRole from "./pages/TourGuide/RequireRole";
 import PastTours from "./pages/TourGuide/PastTours";
 import SchedulePage from "./pages/TourGuide/SchedulePage";
@@ -30,7 +44,7 @@ import TourScheduleDetail from "./pages/TourGuide/TourScheduleDetail";
 import ToursUpcoming from "./pages/TourGuide/ToursUpcoming";
 import TourParticipants from "./pages/TourGuide/TourParticipants";
 
-//  ADMIN
+// ADMIN
 import AdminDashboardPage from "./pages/Admin/AdminDashboardPage";
 import AdminUserManagementPage from "./pages/Admin/UserManagementPage";
 import AdminUserUpsertPage from "./pages/Admin/AdminUserUpsertPage";
@@ -44,7 +58,7 @@ import AdminBlogUpsertPage from "./pages/Admin/AdminBlogUpsertPage";
 import AdminNotificationManagementPage from "./pages/Admin/NotificationManagementPage";
 import AdminNotificationCreatePage from "./pages/Admin/NotificationCreatePage";
 
-// ✅ HOTEL MANAGER
+// HOTEL MANAGER
 import AddRoom from "./pages/HotelManager/AddRoom";
 import Rooms from "./pages/HotelManager/Rooms";
 import HotelRevenue from "./pages/HotelManager/HotelRevenue";
@@ -53,18 +67,6 @@ import RoomEdit from "@/pages/HotelManager/RoomEdit";
 import RoomView from "@/pages/HotelManager/RoomView";
 import ListBooking from "@/pages/HotelManager/ListBooking";
 import MyHotel from "@/pages/HotelManager/MyHotel";
-
-import PaymentResult from "@/pages/PaymentResult";
-
-import ScrollToTop from "./utils/ScrollToTop";
-import LoginModal from "./pages/Login";
-import { useEffect, useState } from "react";
-import SignupModal from "./pages/SignUp";
-
-import Forbidden403 from "./pages/Forbidden403";
-import NotFound404 from "./pages/NotFound404";
-
-import OAuth2Redirect from "./pages/OAuth2Redirect";
 
 export default function App() {
   const [openLogin, setOpenLogin] = useState(false);
@@ -79,339 +81,333 @@ export default function App() {
       <BrowserRouter>
         <ScrollToTop />
 
-        <Header
-          onOpenLogin={() => setOpenLogin(true)}
-          onOpenSignup={() => setOpenSignup(true)}
-        />
-
-        <Routes>
-          <Route path="/oauth2-redirect" element={<OAuth2Redirect />} />
-          <Route path="/" element={<Home />} />
-          <Route path="/about-us" element={<AboutUs />} />
-          <Route path="/contact-us" element={<ContactUs />} />
-          <Route path="/detailtour/:slugId" element={<DetailTour />} />
-          <Route path="/tours" element={<Tour />} />
-          <Route path="/booking/:tourId" element={<Booking />} />
-          <Route path="/hotels" element={<Hotel />} />
-          <Route path="/detailhotel/:slugId" element={<HotelDetailPage />} />
-          <Route path="/booking-room" element={<RoomBooking />} />
-          <Route path="/blog" element={<Blog />} />
-          <Route path="/detailblog/:slugId" element={<BlogDetail />} />
-          <Route path="/home" element={<Navigate to="/" replace />} />
-          <Route path="/verify" element={<Verify />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/profile/edit" element={<EditProfile />} />
-          <Route path="/terms" element={<TermsPage />} />
-          <Route path="/privacy" element={<PrivacyPage />} />
-          <Route
-            path="/booking-history/tours"
-            element={<BookingHistoryTours />}
-          />
-          <Route
-            path="/booking-history/hotels"
-            element={<BookingHistoryHotels />}
-          />
-          <Route path="/403" element={<Forbidden403 />} />
-
-          {/* TourGuide */}
-          <Route
-            path="/guide/past-tours"
-            element={
-              <RequireRole role="TOUR_GUIDE">
-                <PastTours />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/guide/schedule"
-            element={
-              <RequireRole role="TOUR_GUIDE">
-                <SchedulePage />
-              </RequireRole>
-            }
+        {/* ✅ Wrapper để Footer luôn nằm dưới */}
+        <div className="min-h-screen flex flex-col">
+          <Header
+            onOpenLogin={() => setOpenLogin(true)}
+            onOpenSignup={() => setOpenSignup(true)}
           />
 
-          {/* ✅ Upcoming tours + participants + export */}
-          <Route
-            path="/guide/upcoming-tours"
-            element={
-              <RequireRole role="TOUR_GUIDE">
-                <ToursUpcoming />
-              </RequireRole>
-            }
-          />
+          {/* ✅ Main ăn hết phần còn lại để đẩy Footer xuống */}
+          <main className="flex-1">
+            <Routes>
+              <Route path="/oauth2-redirect" element={<OAuth2Redirect />} />
+              <Route path="/" element={<Home />} />
+              <Route path="/about-us" element={<AboutUs />} />
+              <Route path="/contact-us" element={<ContactUs />} />
+              <Route path="/detailtour/:slugId" element={<DetailTour />} />
+              <Route path="/tours" element={<Tour />} />
+              <Route path="/booking/:tourId" element={<Booking />} />
+              <Route path="/hotels" element={<Hotel />} />
+              <Route path="/detailhotel/:slugId" element={<HotelDetailPage />} />
+              <Route path="/booking-room" element={<RoomBooking />} />
+              <Route path="/blog" element={<Blog />} />
+              <Route path="/detailblog/:slugId" element={<BlogDetail />} />
+              <Route path="/home" element={<Navigate to="/" replace />} />
+              <Route path="/verify" element={<Verify />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/profile/edit" element={<EditProfile />} />
+              <Route path="/terms" element={<TermsPage />} />
+              <Route path="/privacy" element={<PrivacyPage />} />
+              <Route
+                path="/booking-history/tours"
+                element={<BookingHistoryTours />}
+              />
+              <Route
+                path="/booking-history/hotels"
+                element={<BookingHistoryHotels />}
+              />
+              <Route path="/403" element={<Forbidden403 />} />
 
-          <Route
-            path="/guide/tour/:tourId/participants"
-            element={
-              <RequireRole role="TOUR_GUIDE">
-                <TourParticipants />
-              </RequireRole>
-            }
-          />
+              {/* TourGuide */}
+              <Route
+                path="/guide/past-tours"
+                element={
+                  <RequireRole role="TOUR_GUIDE">
+                    <PastTours />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/guide/schedule"
+                element={
+                  <RequireRole role="TOUR_GUIDE">
+                    <SchedulePage />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/guide/upcoming-tours"
+                element={
+                  <RequireRole role="TOUR_GUIDE">
+                    <ToursUpcoming />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/guide/tour/:tourId/participants"
+                element={
+                  <RequireRole role="TOUR_GUIDE">
+                    <TourParticipants />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/guide/available-days"
+                element={
+                  <RequireRole role="TOUR_GUIDE">
+                    <DaysAvailable />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/guide/profile"
+                element={
+                  <RequireRole role="TOUR_GUIDE">
+                    <GuideProfile />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/guide/tour/:tourId/schedule"
+                element={
+                  <RequireRole role="TOUR_GUIDE">
+                    <TourScheduleDetail />
+                  </RequireRole>
+                }
+              />
 
-          <Route
-            path="/guide/available-days"
-            element={
-              <RequireRole role="TOUR_GUIDE">
-                <DaysAvailable />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/guide/profile"
-            element={
-              <RequireRole role="TOUR_GUIDE">
-                <GuideProfile />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/guide/tour/:tourId/schedule"
-            element={
-              <RequireRole role="TOUR_GUIDE">
-                <TourScheduleDetail />
-              </RequireRole>
-            }
-          />
+              {/* Hotel Manager */}
+              <Route
+                path="/hotel-manager"
+                element={<Navigate to="/hotel-manager/hotels" replace />}
+              />
+              <Route
+                path="/hotel-manager/hotels/addroom/new"
+                element={
+                  <RequireRole role="HOTEL_MANAGER">
+                    <AddRoom />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/hotel-manager/hotels/addroom"
+                element={
+                  <RequireRole role="HOTEL_MANAGER">
+                    <Rooms />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/hotel-manager/revenue"
+                element={
+                  <RequireRole role="HOTEL_MANAGER">
+                    <HotelRevenue />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/hotel-manager/revenue/bookings"
+                element={<ListBooking />}
+              />
+              <Route
+                path="/hotel-manager/reports/revenue"
+                element={
+                  <RequireRole role="HOTEL_MANAGER">
+                    <ReportRevenue />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/hotel-manager/rooms/edit"
+                element={
+                  <RequireRole role="HOTEL_MANAGER">
+                    <RoomEdit />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/hotel-manager/rooms/view"
+                element={
+                  <RequireRole role="HOTEL_MANAGER">
+                    <RoomView />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/hotel-manager/myhotel"
+                element={
+                  <RequireRole role="HOTEL_MANAGER">
+                    <MyHotel />
+                  </RequireRole>
+                }
+              />
 
-          {/*  Hotel Manager  */}
-          <Route
-            path="/hotel-manager"
-            element={<Navigate to="/hotel-manager/hotels" replace />}
-          />
+              {/* Admin */}
+              <Route
+                path="/Admin/Dashboard"
+                element={
+                  <RequireRole role="ADMIN">
+                    <AdminDashboardPage />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/Admin/Tours"
+                element={
+                  <RequireRole role="ADMIN">
+                    <AdminTourManagementPage />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/Admin/Tours/new"
+                element={
+                  <RequireRole role="ADMIN">
+                    <AdminTourUpsertPage />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/Admin/Tours/edit/:id"
+                element={
+                  <RequireRole role="ADMIN">
+                    <AdminTourUpsertPage />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/Admin/hotels"
+                element={
+                  <RequireRole role="ADMIN">
+                    <AdminHotelManagementPage />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/Admin/hotels/add"
+                element={
+                  <RequireRole role="ADMIN">
+                    <AddHotel />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/Admin/hotels/update/:id"
+                element={
+                  <RequireRole role="ADMIN">
+                    <UpdateHotel />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/Admin/users"
+                element={
+                  <RequireRole role="ADMIN">
+                    <AdminUserManagementPage />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/Admin/users/new"
+                element={
+                  <RequireRole role="ADMIN">
+                    <AdminUserUpsertPage />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/Admin/users/edit/:id"
+                element={
+                  <RequireRole role="ADMIN">
+                    <AdminUserUpsertPage />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/Admin/blogs"
+                element={
+                  <RequireRole role="ADMIN">
+                    <AdminBlogManagementPage />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/admin/blogs/new"
+                element={
+                  <RequireRole role="ADMIN">
+                    <AdminBlogUpsertPage />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/admin/blogs/edit/:id"
+                element={
+                  <RequireRole role="ADMIN">
+                    <AdminBlogUpsertPage />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/admin/notifications"
+                element={
+                  <RequireRole role="ADMIN">
+                    <AdminNotificationManagementPage />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/admin/notifications/new"
+                element={
+                  <RequireRole role="ADMIN">
+                    <AdminNotificationCreatePage />
+                  </RequireRole>
+                }
+              />
 
-          <Route
-            path="/hotel-manager/hotels/addroom/new"
-            element={
-              <RequireRole role="HOTEL_MANAGER">
-                <AddRoom />
-              </RequireRole>
-            }
-          />
+              <Route path="/payment-result" element={<PaymentResult />} />
+              <Route path="*" element={<NotFound404 />} />
+            </Routes>
+          </main>
 
-          <Route
-            path="/hotel-manager/hotels/addroom"
-            element={
-              <RequireRole role="HOTEL_MANAGER">
-                <Rooms />
-              </RequireRole>
-            }
-          />
+          <Footer />
 
-          <Route
-            path="/hotel-manager/revenue"
-            element={
-              <RequireRole role="HOTEL_MANAGER">
-                <HotelRevenue />
-              </RequireRole>
-            }
-          />
+          {/* LOGIN MODAL */}
+          {openLogin && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+              onClick={(e) =>
+                e.target === e.currentTarget && setOpenLogin(false)
+              }
+            >
+              <LoginModal
+                onClose={() => setOpenLogin(false)}
+                onOpenSignup={() => {
+                  setOpenLogin(false);
+                  setOpenSignup(true);
+                }}
+              />
+            </div>
+          )}
 
-          <Route
-            path="/hotel-manager/revenue/bookings"
-            element={<ListBooking />}
-          />
-
-          <Route
-            path="/hotel-manager/reports/revenue"
-            element={
-              <RequireRole role="HOTEL_MANAGER">
-                <ReportRevenue />
-              </RequireRole>
-            }
-          />
-
-          <Route
-            path="/hotel-manager/rooms/edit"
-            element={
-              <RequireRole role="HOTEL_MANAGER">
-                <RoomEdit />
-              </RequireRole>
-            }
-          />
-
-          <Route
-            path="/hotel-manager/rooms/view"
-            element={
-              <RequireRole role="HOTEL_MANAGER">
-                <RoomView />
-              </RequireRole>
-            }
-          />
-
-          <Route
-            path="/hotel-manager/myhotel"
-            element={
-              <RequireRole role="HOTEL_MANAGER">
-                <MyHotel />
-              </RequireRole>
-            }
-          />
-
-          {/* Admin */}
-          <Route
-            path="/Admin/Dashboard"
-            element={
-              <RequireRole role="ADMIN">
-                <AdminDashboardPage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/Admin/Tours"
-            element={
-              <RequireRole role="ADMIN">
-                <AdminTourManagementPage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/Admin/Tours/new"
-            element={
-              <RequireRole role="ADMIN">
-                <AdminTourUpsertPage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/Admin/Tours/edit/:id"
-            element={
-              <RequireRole role="ADMIN">
-                <AdminTourUpsertPage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/Admin/hotels"
-            element={
-              <RequireRole role="ADMIN">
-                <AdminHotelManagementPage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/Admin/hotels/add"
-            element={
-              <RequireRole role="ADMIN">
-                <AddHotel />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/Admin/hotels/update/:id"
-            element={
-              <RequireRole role="ADMIN">
-                <UpdateHotel />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/Admin/users"
-            element={
-              <RequireRole role="ADMIN">
-                <AdminUserManagementPage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/Admin/users/new"
-            element={
-              <RequireRole role="ADMIN">
-                <AdminUserUpsertPage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/Admin/users/edit/:id"
-            element={
-              <RequireRole role="ADMIN">
-                <AdminUserUpsertPage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/Admin/blogs"
-            element={
-              <RequireRole role="ADMIN">
-                <AdminBlogManagementPage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/admin/blogs/new"
-            element={
-              <RequireRole role="ADMIN">
-                <AdminBlogUpsertPage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/admin/blogs/edit/:id"
-            element={
-              <RequireRole role="ADMIN">
-                <AdminBlogUpsertPage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/admin/notifications"
-            element={
-              <RequireRole role="ADMIN">
-                <AdminNotificationManagementPage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/admin/notifications/new"
-            element={
-              <RequireRole role="ADMIN">
-                <AdminNotificationCreatePage />
-              </RequireRole>
-            }
-          />
-
-          <Route path="/payment-result" element={<PaymentResult />} />
-
-          <Route path="*" element={<NotFound404 />} />
-        </Routes>
-
-        <Footer />
-
-        {/* LOGIN MODAL */}
-        {openLogin && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-            onClick={(e) => e.target === e.currentTarget && setOpenLogin(false)}
-          >
-            <LoginModal
-              onClose={() => setOpenLogin(false)}
-              onOpenSignup={() => {
-                setOpenLogin(false);
-                setOpenSignup(true);
-              }}
-            />
-          </div>
-        )}
-
-        {/* SIGNUP MODAL */}
-        {openSignup && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-            onClick={(e) =>
-              e.target === e.currentTarget && setOpenSignup(false)
-            }
-          >
-            <SignupModal
-              onClose={() => setOpenSignup(false)}
-              onOpenLogin={() => {
-                setOpenSignup(false);
-                setOpenLogin(true);
-              }}
-            />
-          </div>
-        )}
+          {/* SIGNUP MODAL */}
+          {openSignup && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+              onClick={(e) =>
+                e.target === e.currentTarget && setOpenSignup(false)
+              }
+            >
+              <SignupModal
+                onClose={() => setOpenSignup(false)}
+                onOpenLogin={() => {
+                  setOpenSignup(false);
+                  setOpenLogin(true);
+                }}
+              />
+            </div>
+          )}
+        </div>
       </BrowserRouter>
     </LangProvider>
   );
