@@ -86,13 +86,13 @@ export default function RoomCard({ room, onDeleted }) {
     setDeleteError("");
 
     if (!id) {
-      setDeleteError("Missing room id (room_id/roomId)");
+      setDeleteError("Thieu room id (room_id/roomId)");
       return;
     }
 
     const token = getToken();
     const ok = window.confirm(
-      `Delete room ${showRoomNumber || id}? This action cannot be undone.`
+      `Xoa phong ${showRoomNumber || id}? Hanh dong nay khong the hoan tac.`
     );
     if (!ok) return;
 
@@ -151,14 +151,14 @@ export default function RoomCard({ room, onDeleted }) {
             <div className="flex justify-between items-start gap-3">
               <div className="min-w-0">
                 <h3 className="text-base sm:text-lg font-semibold text-gray-900 break-words">
-                  Room{" "}
+                  Phòng{" "}
                   <span className="text-orange-600 font-semibold">
                     {showRoomNumber || "--"}
                   </span>
                 </h3>
 
                 <div className="text-sm text-gray-600 mt-1 break-words">
-                  Type:{" "}
+                  Loại:{" "}
                   <span className="text-orange-600 font-medium">
                     {showRoomType || "--"}
                   </span>
@@ -173,7 +173,7 @@ export default function RoomCard({ room, onDeleted }) {
             </div>
 
             <div className="mt-3 text-sm">
-              <Info label="Guests" value={showGuests} />
+              <Info label="So khach" value={showGuests} />
             </div>
 
             <p className="text-sm text-gray-600 mt-3 line-clamp-2 break-words">
@@ -193,14 +193,14 @@ export default function RoomCard({ room, onDeleted }) {
               onClick={goView}
               className="px-4 py-2 text-sm rounded-lg border hover:bg-gray-50"
             >
-              View
+              Xem
             </button>
 
             <button
               onClick={goEdit}
               className="px-4 py-2 text-sm rounded-lg bg-orange-500 text-white hover:bg-orange-600"
             >
-              Edit
+              Sua
             </button>
 
             <button
@@ -213,7 +213,7 @@ export default function RoomCard({ room, onDeleted }) {
                   : "border-red-200 text-red-600 hover:bg-red-50",
               ].join(" ")}
             >
-              {deleting ? "Deleting..." : "Delete"}
+              {deleting ? "Dang xoa..." : "Xoa"}
             </button>
           </div>
         </div>

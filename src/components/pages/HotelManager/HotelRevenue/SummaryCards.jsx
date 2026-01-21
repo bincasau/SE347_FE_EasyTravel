@@ -11,9 +11,9 @@ export default function SummaryCards({ data = [] }) {
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-      <Card title="Total Revenue" value={totalRevenue.toLocaleString()} />
-      <Card title="Total Bookings" value={totalBookings} />
-      <Card title="Avg / Booking" value={avgRevenue.toLocaleString()} />
+      <Card title="Tổng doanh thu" value={totalRevenue.toLocaleString()} />
+      <Card title="Tổng lượt đặt" value={totalBookings} />
+      <Card title="TB / lượt đặt" value={avgRevenue.toLocaleString()} />
     </div>
   );
 }

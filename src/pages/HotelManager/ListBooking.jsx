@@ -1,14 +1,35 @@
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import Pagination from "@/utils/Pagination"; // ✅ dùng file có sẵn của bạn
+import Pagination from "@/utils/Pagination";
+
+function formatDateVN(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return String(dateStr);
+  return d.toLocaleDateString("vi-VN");
+}
+
+function formatMoneyVND(value) {
+  const n = Number(value ?? 0);
+  const safe = Number.isFinite(n) ? n : 0;
+  return `${safe.toLocaleString("vi-VN")}₫`;
+}
+
+function statusText(status) {
+  const s = String(status || "").toUpperCase();
+  if (s === "PAID") return "Đã thanh toán";
+  if (s === "PENDING") return "Chờ thanh toán";
+  if (s === "CANCELLED") return "Đã huỷ";
+  return s || "-";
+}
 
 export default function ListBooking() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const room = location.state?.room; // ✅ data từ RevenueTable
+  const room = location.state?.room;
 
-  // ✅ mock booking list (sau thay bằng API)
+  // Demo data (bạn thay bằng API sau)
   const [bookings] = useState([
     {
       booking_id: 1001,
@@ -16,7 +37,7 @@ export default function ListBooking() {
       check_in: "2024-09-02",
       check_out: "2024-09-05",
       nights: 3,
-      total: 300,
+      total: 3000000,
       status: "PAID",
     },
     {
@@ -25,13 +46,11 @@ export default function ListBooking() {
       check_in: "2024-09-10",
       check_out: "2024-09-12",
       nights: 2,
-      total: 220,
+      total: 2200000,
       status: "PENDING",
     },
-    // thêm nhiều item nữa thì pagination sẽ thấy rõ
   ]);
 
-  // ✅ pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 5;
 
@@ -39,11 +58,10 @@ export default function ListBooking() {
     return Math.max(1, Math.ceil(bookings.length / pageSize));
   }, [bookings.length]);
 
-  // nếu data đổi làm currentPage vượt totalPages thì kéo về trang cuối hợp lệ
-  useMemo(() => {
+  // Nếu số trang giảm (do filter/xoá), đảm bảo currentPage không vượt quá totalPages
+  useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [totalPages]);
+  }, [totalPages, currentPage]);
 
   const pagedBookings = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
@@ -55,7 +73,6 @@ export default function ListBooking() {
     return bookings.reduce((sum, b) => sum + Number(b.total ?? 0), 0);
   }, [bookings]);
 
-  // ✅ phòng không có state (user refresh)
   if (!room) {
     return (
       <div className="min-h-[calc(100vh-64px)] bg-gray-50">
@@ -64,12 +81,13 @@ export default function ListBooking() {
             onClick={() => navigate(-1)}
             className="mb-6 border border-orange-500 text-orange-600 px-4 py-2 rounded-lg hover:bg-orange-50"
           >
-            ← Back
+            Quay lại
           </button>
 
           <div className="bg-white border rounded-xl p-6 text-center text-gray-600">
-            Không có dữ liệu phòng (bạn vừa refresh trang). <br />
-            Vui lòng quay lại Revenue và bấm View lại.
+            Không có dữ liệu phòng (bạn vừa refresh trang).
+            <br />
+            Vui lòng quay lại trang Doanh thu và bấm <b>Xem</b> lại.
           </div>
         </div>
       </div>
@@ -78,7 +96,6 @@ export default function ListBooking() {
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-gray-50">
-      {/* ===== HEADER ===== */}
       <div className="bg-white border-b">
         <div className="max-w-6xl mx-auto px-6 py-6">
           <div className="flex items-center justify-between gap-4">
@@ -86,15 +103,16 @@ export default function ListBooking() {
               onClick={() => navigate(-1)}
               className="border border-orange-500 text-orange-600 px-4 py-2 rounded-lg hover:bg-orange-50"
             >
-              ← Back
+              Quay lại
             </button>
 
             <div className="text-center flex-1">
               <h1 className="text-2xl font-semibold text-gray-900">
-                Bookings Detail
+                Chi tiết đặt phòng
               </h1>
               <p className="text-sm text-gray-500 mt-1">
-                Room <span className="font-semibold">{room.room_number}</span> •{" "}
+                Phòng{" "}
+                <span className="font-semibold">{room.room_number}</span> —{" "}
                 {room.room_type}
               </p>
             </div>
@@ -104,37 +122,36 @@ export default function ListBooking() {
         </div>
       </div>
 
-      {/* ===== CONTENT ===== */}
       <div className="max-w-6xl mx-auto px-6 py-8 space-y-6">
-        {/* Summary */}
         <div className="bg-white border rounded-xl p-5 flex items-center justify-between">
           <div>
-            <div className="text-sm text-gray-500">Total bookings</div>
+            <div className="text-sm text-gray-500">Tổng lượt đặt</div>
             <div className="text-xl font-semibold text-gray-900">
               {bookings.length}
             </div>
           </div>
 
           <div>
-            <div className="text-sm text-gray-500 text-right">Total revenue</div>
+            <div className="text-sm text-gray-500 text-right">
+              Tổng doanh thu
+            </div>
             <div className="text-xl font-semibold text-orange-600 text-right">
-              ${totalRevenue.toLocaleString()}
+              {formatMoneyVND(totalRevenue)}
             </div>
           </div>
         </div>
 
-        {/* Table */}
         <div className="bg-white border rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="px-4 py-3 text-left">Booking ID</th>
-                <th className="px-4 py-3 text-left">Guest</th>
-                <th className="px-4 py-3 text-left">Check-in</th>
-                <th className="px-4 py-3 text-left">Check-out</th>
-                <th className="px-4 py-3 text-right">Nights</th>
-                <th className="px-4 py-3 text-right">Total</th>
-                <th className="px-4 py-3 text-right">Status</th>
+                <th className="px-4 py-3 text-left">Mã đặt phòng</th>
+                <th className="px-4 py-3 text-left">Khách</th>
+                <th className="px-4 py-3 text-left">Nhận phòng</th>
+                <th className="px-4 py-3 text-left">Trả phòng</th>
+                <th className="px-4 py-3 text-right">Số đêm</th>
+                <th className="px-4 py-3 text-right">Tổng tiền</th>
+                <th className="px-4 py-3 text-right">Trạng thái</th>
               </tr>
             </thead>
 
@@ -143,22 +160,22 @@ export default function ListBooking() {
                 <tr key={b.booking_id} className="border-b last:border-none">
                   <td className="px-4 py-3 font-medium">{b.booking_id}</td>
                   <td className="px-4 py-3">{b.guest_name}</td>
-                  <td className="px-4 py-3">{b.check_in}</td>
-                  <td className="px-4 py-3">{b.check_out}</td>
+                  <td className="px-4 py-3">{formatDateVN(b.check_in)}</td>
+                  <td className="px-4 py-3">{formatDateVN(b.check_out)}</td>
                   <td className="px-4 py-3 text-right">{b.nights}</td>
                   <td className="px-4 py-3 text-right font-semibold">
-                    ${Number(b.total ?? 0).toLocaleString()}
+                    {formatMoneyVND(b.total)}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <span
                       className={[
                         "px-2 py-1 rounded-full text-xs font-semibold border",
-                        b.status === "PAID"
+                        String(b.status).toUpperCase() === "PAID"
                           ? "bg-green-50 text-green-700 border-green-200"
                           : "bg-yellow-50 text-yellow-800 border-yellow-200",
                       ].join(" ")}
                     >
-                      {b.status}
+                      {statusText(b.status)}
                     </span>
                   </td>
                 </tr>
@@ -168,12 +185,11 @@ export default function ListBooking() {
 
           {bookings.length === 0 && (
             <div className="p-6 text-center text-gray-500">
-              No bookings found.
+              Không có đặt phòng nào.
             </div>
           )}
         </div>
 
-        {/* ✅ Pagination */}
         {bookings.length > pageSize && (
           <Pagination
             currentPage={currentPage}

@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useState, useCallback, useRef, useReducer } from "react";
+﻿import { useMemo, useEffect, useState, useCallback, useRef, useReducer } from "react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { getToken, isLoggedIn } from "@/utils/auth";
@@ -9,7 +9,6 @@ import { popup } from "@/utils/popup";
 
 const API_BASE = "http://localhost:8080";
 
-/** ===== Helpers ===== */
 function safeNumber(v, fallback = 0) {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
@@ -20,7 +19,6 @@ function clampInt(n, min, max, fallback) {
   return Math.min(max, Math.max(min, x));
 }
 
-// normalize response /hotel_manager/stats
 function normalizeStats(raw) {
   return {
     allTypeRevenue: safeNumber(raw?.allTypeRevenue, 0),
@@ -29,13 +27,11 @@ function normalizeStats(raw) {
   };
 }
 
-/** ✅ current month/year */
 function getNowYM() {
   const d = new Date();
   return { month: d.getMonth() + 1, year: d.getFullYear() };
 }
 
-/** ✅ reducer month+year atomically */
 function ymReducer(state, action) {
   switch (action.type) {
     case "PREV": {
@@ -64,12 +60,15 @@ function ymReducer(state, action) {
   }
 }
 
+function formatMoneyVND(v) {
+  const n = safeNumber(v, 0);
+  return `${Math.round(n).toLocaleString("vi-VN")}₫`;
+}
+
 export default function RevenueReport() {
-  /** ✅ init = current month/year */
   const nowYM = useMemo(() => getNowYM(), []);
   const [{ month, year }, dispatch] = useReducer(ymReducer, nowYM);
 
-  // ✅ draft year (string để nhập không bị giật)
   const [draftYear, setDraftYear] = useState(String(nowYM.year));
 
   const [stats, setStats] = useState(null);
@@ -78,50 +77,42 @@ export default function RevenueReport() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // ✅ vùng để chụp PDF
   const exportRef = useRef(null);
-
-  // ✅ bật layout riêng cho PDF
   const [pdfMode, setPdfMode] = useState(false);
 
   const token = getToken();
 
-  const safeMonth = useMemo(() => clampInt(month, 1, 12, nowYM.month), [month, nowYM.month]);
-  const safeYear = useMemo(() => clampInt(year, 1970, 2100, nowYM.year), [year, nowYM.year]);
-
-  /** ✅ giới hạn không cho vượt quá tháng hiện tại */
-  const isCurrentOrFuture = useMemo(() => {
-    // true nếu đang là tháng hiện tại hoặc tương lai (tương lai thì chặn)
-    if (safeYear > nowYM.year) return true;
-    if (safeYear === nowYM.year && safeMonth >= nowYM.month) return true;
-    return false;
-  }, [safeMonth, safeYear, nowYM.month, nowYM.year]);
+  const safeMonth = useMemo(
+    () => clampInt(month, 1, 12, nowYM.month),
+    [month, nowYM.month]
+  );
+  const safeYear = useMemo(
+    () => clampInt(year, 1970, 2100, nowYM.year),
+    [year, nowYM.year]
+  );
 
   const canGoNext = useMemo(() => {
-    // chỉ cho next nếu vẫn < tháng hiện tại
     if (safeYear < nowYM.year) return true;
     if (safeYear === nowYM.year) return safeMonth < nowYM.month;
     return false;
   }, [safeMonth, safeYear, nowYM.month, nowYM.year]);
 
-  // ✅ commit draftYear -> year (và nếu vượt hiện tại thì kéo month về tháng hiện tại)
   const commitDraftYear = useCallback(() => {
     const trimmed = String(draftYear ?? "").trim();
     if (trimmed === "") {
       setDraftYear(String(safeYear));
       return;
     }
+
     const n = Number(trimmed);
     if (!Number.isFinite(n)) {
       setDraftYear(String(safeYear));
       return;
     }
+
     const y = clampInt(n, 1970, 2100, safeYear);
 
-    // nếu user nhập year tương lai -> clamp về year hiện tại
     const finalYear = Math.min(y, nowYM.year);
-
-    // nếu cùng year hiện tại mà month đang > current month -> kéo về current month
     const finalMonth =
       finalYear === nowYM.year ? Math.min(safeMonth, nowYM.month) : safeMonth;
 
@@ -129,13 +120,12 @@ export default function RevenueReport() {
     setDraftYear(String(finalYear));
   }, [draftYear, safeYear, safeMonth, nowYM.year, nowYM.month]);
 
-  // ✅ sync draftYear khi year change
   useEffect(() => {
     setDraftYear(String(safeYear));
   }, [safeYear]);
 
   const monthLabel = useMemo(() => {
-    return new Date(safeYear, safeMonth - 1).toLocaleString("en-US", {
+    return new Date(safeYear, safeMonth - 1).toLocaleString("vi-VN", {
       month: "long",
       year: "numeric",
     });
@@ -151,7 +141,6 @@ export default function RevenueReport() {
     return { pm, py };
   }, [safeMonth, safeYear]);
 
-  /** ✅ Prev/Next month */
   const goPrevMonth = useCallback(() => {
     dispatch({ type: "PREV" });
   }, []);
@@ -161,7 +150,6 @@ export default function RevenueReport() {
     dispatch({ type: "NEXT" });
   }, [canGoNext]);
 
-  /** ✅ fetch stats by month/year */
   const fetchStatsByMonth = useCallback(
     async ({ month, year }) => {
       const url = `${API_BASE}/hotel_manager/stats?month=${month}&year=${year}&_t=${Date.now()}`;
@@ -191,7 +179,6 @@ export default function RevenueReport() {
     [token]
   );
 
-  /** ===== load current + prev ===== */
   useEffect(() => {
     let alive = true;
 
@@ -213,7 +200,7 @@ export default function RevenueReport() {
           if (alive) setPrevStats(null);
         }
       } catch (e) {
-        if (alive) setError(e?.message || "Fetch failed");
+        if (alive) setError(e?.message || "Tải dữ liệu thất bại");
         if (alive) {
           setStats(null);
           setPrevStats(null);
@@ -227,20 +214,23 @@ export default function RevenueReport() {
     return () => {
       alive = false;
     };
-  }, [token, safeMonth, safeYear, prevParams.pm, prevParams.py, fetchStatsByMonth]);
+  }, [safeMonth, safeYear, prevParams.pm, prevParams.py, fetchStatsByMonth]);
 
-  const revenueText = useMemo(() => {
-    const r = safeNumber(stats?.allTypeRevenue, 0);
-    return `${r.toLocaleString("vi-VN")}₫`;
-  }, [stats]);
+  const revenueText = useMemo(
+    () => formatMoneyVND(stats?.allTypeRevenue),
+    [stats]
+  );
 
-  const bookings = useMemo(() => safeNumber(stats?.allTypeBookings, 0), [stats]);
+  const bookings = useMemo(
+    () => safeNumber(stats?.allTypeBookings, 0),
+    [stats]
+  );
 
   const avgRevenueText = useMemo(() => {
     const r = safeNumber(stats?.allTypeRevenue, 0);
     const b = safeNumber(stats?.allTypeBookings, 0);
     const avg = b > 0 ? Math.round(r / b) : 0;
-    return `${avg.toLocaleString("vi-VN")}₫`;
+    return formatMoneyVND(avg);
   }, [stats]);
 
   const changePercent = useMemo(() => {
@@ -251,51 +241,63 @@ export default function RevenueReport() {
     return Number.isFinite(pct) ? Number(pct.toFixed(1)) : null;
   }, [stats, prevStats]);
 
-  // ✅ Export CSV
   const exportCSV = async () => {
-    if (!isLoggedIn()) return popup.error("You are not logged in!");
-    if (loading) return popup.error("Loading data, please try again!");
-    if (!stats) return popup.error("No data to export.");
+    if (!isLoggedIn()) return popup.error("Bạn chưa đăng nhập!");
+    if (loading) return popup.error("Đang tải dữ liệu, thử lại sau!");
+    if (!stats) return popup.error("Không có dữ liệu để xuất.");
 
-    const ok = await popup.confirm(`Export revenue report for ${monthLabel} to CSV?`, "Confirm");
+    const ok = await popup.confirm(
+      `Xuất báo cáo doanh thu tháng ${monthLabel} ra CSV?`,
+      "Xác nhận"
+    );
     if (!ok) return;
 
     const curRevenue = safeNumber(stats?.allTypeRevenue, 0);
     const curBookings = safeNumber(stats?.allTypeBookings, 0);
+    const avg = curBookings > 0 ? Math.round(curRevenue / curBookings) : 0;
 
-    let csv = "Metric,Value\n";
-    csv += `Month,${monthLabel}\n`;
-    csv += `Bookings,${curBookings}\n`;
-    csv += `Total Revenue,${curRevenue}\n`;
-    csv += `Avg/Booking,${curBookings > 0 ? Math.round(curRevenue / curBookings) : 0}\n`;
-    csv += `Change vs last month,${changePercent ?? "N/A"}%\n`;
+    // ✅ CSV tiếng Việt có dấu
+    let csv = "Chỉ số,Giá trị\n";
+    csv += `Tháng,${monthLabel}\n`;
+    csv += `Số lượt đặt,${curBookings}\n`;
+    csv += `Tổng doanh thu (₫),${Math.round(curRevenue)}\n`;
+    csv += `Doanh thu trung bình / lượt (₫),${avg}\n`;
+    csv += `So với tháng trước (%),${changePercent ?? "Không có"}\n`;
 
-    csv += `\nRoomType,Count,Revenue\n`;
+    csv += `\nLoại phòng,Số lượt,Doanh thu (₫)\n`;
     (stats?.details || []).forEach((d) => {
-      csv += `${d.roomType},${safeNumber(d.count, 0)},${safeNumber(d.revenue, 0)}\n`;
+      csv += `${d.roomType ?? ""},${safeNumber(d.count, 0)},${Math.round(
+        safeNumber(d.revenue, 0)
+      )}\n`;
     });
 
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
+    // ✅ thêm UTF-8 BOM để Excel đọc tiếng Việt không lỗi
+    const bom = "\uFEFF";
+    const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8" });
 
+    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `Revenue_Report_${monthLabel}.csv`;
+
+    // ✅ tên file không dấu để hạn chế lỗi hệ điều hành
+    a.download = `BaoCaoDoanhThu_${safeYear}-${String(safeMonth).padStart(2, "0")}.csv`;
     a.click();
 
     URL.revokeObjectURL(url);
-    popup.success("CSV export successful!");
+    popup.success("Xuất CSV thành công!");
   };
 
-  /** ✅ Export PDF */
   const exportPDF = async () => {
     try {
-      if (!isLoggedIn()) return popup.error("You are not logged in!");
-      if (loading) return popup.error("Loading data, please try again!");
-      if (!stats) return popup.error("No data to export.");
-      if (!exportRef.current) return popup.error("Cannot find export region!");
+      if (!isLoggedIn()) return popup.error("Bạn chưa đăng nhập!");
+      if (loading) return popup.error("Đang tải dữ liệu, thử lại sau!");
+      if (!stats) return popup.error("Không có dữ liệu để xuất.");
+      if (!exportRef.current) return popup.error("Không tìm thấy vùng export!");
 
-      const ok = await popup.confirm(`Export revenue report for ${monthLabel} to PDF?`, "Confirm");
+      const ok = await popup.confirm(
+        `Xuất báo cáo doanh thu tháng ${monthLabel} ra PDF?`,
+        "Xác nhận"
+      );
       if (!ok) return;
 
       setPdfMode(true);
@@ -333,11 +335,12 @@ export default function RevenueReport() {
         heightLeft -= pageHeight;
       }
 
-      pdf.save(`Revenue_Report_${monthLabel}.pdf`);
-      popup.success("PDF export successful!");
+      // ✅ tên file không dấu
+      pdf.save(`BaoCaoDoanhThu_${safeYear}-${String(safeMonth).padStart(2, "0")}.pdf`);
+      popup.success("Xuất PDF thành công!");
     } catch (e) {
       console.error(e);
-      popup.error(e?.message || "Export PDF failed!");
+      popup.error(e?.message || "Xuất PDF thất bại!");
     } finally {
       setPdfMode(false);
     }
@@ -348,10 +351,13 @@ export default function RevenueReport() {
       <div ref={exportRef} className="bg-white">
         {pdfMode && (
           <div className="px-4 sm:px-6 pt-8 pb-4 text-center">
-            <h1 className="text-2xl font-semibold text-gray-900">REVENUE REPORT</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">
+              BÁO CÁO DOANH THU
+            </h1>
             <div className="text-sm text-gray-600 mt-1">{monthLabel}</div>
             <div className="text-xs text-gray-500 mt-1">
-              Total Revenue: {revenueText} · Bookings: {bookings} · Avg/Booking: {avgRevenueText}
+              Tổng doanh thu: {revenueText} · Lượt đặt: {bookings} · TB/lượt đặt:{" "}
+              {avgRevenueText}
             </div>
             <div className="mt-4 h-px bg-gray-200" />
           </div>
@@ -360,9 +366,11 @@ export default function RevenueReport() {
         {!pdfMode && (
           <div className="bg-white border-b">
             <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-              <h1 className="text-2xl font-semibold text-gray-900 text-center">Revenue Report</h1>
+              <h1 className="text-2xl font-semibold text-gray-900 text-center">
+                Báo cáo doanh thu
+              </h1>
               <p className="text-sm text-gray-500 text-center mt-1">
-                Room distribution & monthly comparison
+                Phân bổ loại phòng và so sánh theo tháng
               </p>
 
               <div className="mt-6 flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
@@ -371,7 +379,7 @@ export default function RevenueReport() {
                     onClick={goPrevMonth}
                     className="px-3 py-2 border rounded-lg text-sm hover:bg-gray-50"
                   >
-                    ← Prev
+                    Trước
                   </button>
 
                   <span className="font-medium text-sm sm:text-base whitespace-nowrap">
@@ -382,9 +390,9 @@ export default function RevenueReport() {
                     onClick={goNextMonth}
                     disabled={!canGoNext}
                     className="px-3 py-2 border rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50"
-                    title={!canGoNext ? "Cannot view future months" : ""}
+                    title={!canGoNext ? "Không xem được tháng tương lai" : ""}
                   >
-                    Next →
+                    Sau
                   </button>
                 </div>
 
@@ -394,8 +402,6 @@ export default function RevenueReport() {
                     value={safeMonth}
                     onChange={(e) => {
                       const m = Number(e.target.value);
-
-                      // nếu chọn month vượt current month trong current year -> clamp về current month
                       if (safeYear === nowYM.year && m > nowYM.month) {
                         dispatch({ type: "SET_MONTH", month: nowYM.month });
                         return;
@@ -408,7 +414,7 @@ export default function RevenueReport() {
                       const disabled = safeYear === nowYM.year && m > nowYM.month;
                       return (
                         <option key={m} value={m} disabled={disabled}>
-                          Month {m}
+                          Tháng {m}
                         </option>
                       );
                     })}
@@ -430,7 +436,7 @@ export default function RevenueReport() {
                       }
                     }}
                     onBlur={commitDraftYear}
-                    placeholder="Year"
+                    placeholder="Năm"
                   />
 
                   <button
@@ -438,7 +444,7 @@ export default function RevenueReport() {
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm disabled:opacity-60 w-full sm:w-auto"
                     disabled={!stats || loading}
                   >
-                    Export CSV
+                    Xuất CSV
                   </button>
 
                   <button
@@ -446,7 +452,7 @@ export default function RevenueReport() {
                     className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm disabled:opacity-60 w-full sm:w-auto"
                     disabled={!stats || loading}
                   >
-                    Export PDF
+                    Xuất PDF
                   </button>
                 </div>
               </div>
@@ -458,7 +464,9 @@ export default function RevenueReport() {
           className={[
             "max-w-6xl mx-auto px-4 sm:px-6",
             pdfMode ? "py-6" : "py-8 sm:py-10",
-            pdfMode ? "grid grid-cols-1 gap-6" : "grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8",
+            pdfMode
+              ? "grid grid-cols-1 gap-6"
+              : "grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8",
           ].join(" ")}
         >
           {loading ? (
@@ -476,7 +484,9 @@ export default function RevenueReport() {
           ) : error ? (
             <div className="bg-white border rounded-2xl p-6 shadow-sm">
               <div className="text-lg font-semibold text-gray-900">Lỗi</div>
-              <div className="text-sm text-gray-600 mt-2 break-words">{error}</div>
+              <div className="text-sm text-gray-600 mt-2 break-words">
+                {error}
+              </div>
             </div>
           ) : (
             <ComparisonText
@@ -490,7 +500,7 @@ export default function RevenueReport() {
 
         {pdfMode && (
           <div className="px-4 sm:px-6 pb-6 text-center text-xs text-gray-400">
-            Generated by EasyTravel · {new Date().toLocaleString("vi-VN")}
+            Tạo bởi EasyTravel · {new Date().toLocaleString("vi-VN")}
           </div>
         )}
       </div>

@@ -24,6 +24,7 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
 
   const location = useLocation();
   const navigate = useNavigate();
+  const isHotelManagerPage = location.pathname.startsWith("/hotel-manager");
 
   // prevent redirect loop (chỉ dùng cho root redirect)
   const didRedirectRef = useRef(false);
@@ -67,10 +68,10 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
   ];
 
   const hotelManagerMenu = [
-    { to: "/hotel-manager/hotels/addroom", label: "Add Rooms" },
-    { to: "/hotel-manager/revenue", label: "Hotel Revenue" },
-    { to: "/hotel-manager/reports/revenue", label: "Revenue Reports" },
-    { to: "/hotel-manager/myhotel", label: "My Hotel" },
+    { to: "/hotel-manager/hotels/addroom", label: "Thêm phòng" },
+    { to: "/hotel-manager/revenue", label: "Doanh thu khách sạn" },
+    { to: "/hotel-manager/reports/revenue", label: "Báo cáo doanh thu" },
+    { to: "/hotel-manager/myhotel", label: "Khách sạn của tôi" },
   ];
 
   const fetchUser = async () => {
@@ -121,6 +122,13 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
       window.removeEventListener("jwt-changed", handleJWT);
     };
   }, []);
+
+  // Force Vietnamese on hotel manager pages
+  useEffect(() => {
+    if (isHotelManagerPage && lang !== "vi") {
+      setLang("vi");
+    }
+  }, [isHotelManagerPage, lang, setLang]);
 
   // ✅ auto redirect by role (redirect ONLY on root pages)
   useEffect(() => {
@@ -559,37 +567,39 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
 
           <div className="hidden md:flex items-center gap-4">
             {/* Language (desktop) */}
-            <div className="relative" ref={langDesktopRef}>
-              <button
-                className="flex items-center gap-2 border px-3 py-2 rounded-xl bg-gray-50 hover:bg-gray-100"
-                onClick={() => setOpenLang((v) => !v)}
-              >
-                <Flag code={lang} />
-              </button>
+            {!isHotelManagerPage && (
+              <div className="relative" ref={langDesktopRef}>
+                <button
+                  className="flex items-center gap-2 border px-3 py-2 rounded-xl bg-gray-50 hover:bg-gray-100"
+                  onClick={() => setOpenLang((v) => !v)}
+                >
+                  <Flag code={lang} />
+                </button>
 
-              {openLang && (
-                <div className="absolute right-0 mt-2 bg-white border w-32 rounded-xl shadow overflow-hidden">
-                  <button
-                    className="flex w-full px-3 py-2 hover:bg-gray-50"
-                    onClick={() => {
-                      setLang("vi");
-                      setOpenLang(false);
-                    }}
-                  >
-                    <Flag code="vi" />
-                  </button>
-                  <button
-                    className="flex w-full px-3 py-2 hover:bg-gray-50"
-                    onClick={() => {
-                      setLang("en");
-                      setOpenLang(false);
-                    }}
-                  >
-                    <Flag code="en" />
-                  </button>
-                </div>
-              )}
-            </div>
+                {openLang && (
+                  <div className="absolute right-0 mt-2 bg-white border w-32 rounded-xl shadow overflow-hidden">
+                    <button
+                      className="flex w-full px-3 py-2 hover:bg-gray-50"
+                      onClick={() => {
+                        setLang("vi");
+                        setOpenLang(false);
+                      }}
+                    >
+                      <Flag code="vi" />
+                    </button>
+                    <button
+                      className="flex w-full px-3 py-2 hover:bg-gray-50"
+                      onClick={() => {
+                        setLang("en");
+                        setOpenLang(false);
+                      }}
+                    >
+                      <Flag code="en" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
             {/* ✅ Notifications (desktop) - via NotificationPanel */}
             <NotificationPanel user={user} loadingNoti={loadingNoti} setLoadingNoti={setLoadingNoti} />
 
@@ -637,38 +647,40 @@ export default function Header({ onOpenLogin, onOpenSignup }) {
             <div className="text-xs font-semibold text-gray-500">PREFERENCES</div>
 
             {/* Language (mobile) */}
-            <div className="relative" ref={langMobileRef}>
-              <button
-                className="w-full flex items-center justify-between gap-2 border px-3 py-2 rounded-xl bg-gray-50 hover:bg-gray-100"
-                onClick={() => setOpenLang((v) => !v)}
-              >
-                <Flag code={lang} />
-                <span className="text-xs text-gray-500">▼</span>
-              </button>
+            {!isHotelManagerPage && (
+              <div className="relative" ref={langMobileRef}>
+                <button
+                  className="w-full flex items-center justify-between gap-2 border px-3 py-2 rounded-xl bg-gray-50 hover:bg-gray-100"
+                  onClick={() => setOpenLang((v) => !v)}
+                >
+                  <Flag code={lang} />
+                  <span className="text-xs text-gray-500">▼</span>
+                </button>
 
-              {openLang && (
-                <div className="mt-2 bg-white border rounded-xl overflow-hidden">
-                  <button
-                    className="flex w-full px-3 py-2 hover:bg-gray-50"
-                    onClick={() => {
-                      setLang("vi");
-                      setOpenLang(false);
-                    }}
-                  >
-                    <Flag code="vi" />
-                  </button>
-                  <button
-                    className="flex w-full px-3 py-2 hover:bg-gray-50"
-                    onClick={() => {
-                      setLang("en");
-                      setOpenLang(false);
-                    }}
-                  >
-                    <Flag code="en" />
-                  </button>
-                </div>
-              )}
-            </div>
+                {openLang && (
+                  <div className="mt-2 bg-white border rounded-xl overflow-hidden">
+                    <button
+                      className="flex w-full px-3 py-2 hover:bg-gray-50"
+                      onClick={() => {
+                        setLang("vi");
+                        setOpenLang(false);
+                      }}
+                    >
+                      <Flag code="vi" />
+                    </button>
+                    <button
+                      className="flex w-full px-3 py-2 hover:bg-gray-50"
+                      onClick={() => {
+                        setLang("en");
+                        setOpenLang(false);
+                      }}
+                    >
+                      <Flag code="en" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* ✅ Mobile notifications - via NotificationPanelMobile */}
             <NotificationPanelMobile user={user} loadingNoti={loadingNoti} setLoadingNoti={setLoadingNoti} />

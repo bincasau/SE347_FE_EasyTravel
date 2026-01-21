@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getToken } from "@/utils/auth";
 import { useLocation, useNavigate } from "react-router-dom";
-import { popup } from "@/utils/popup"; // ✅ ADD
+import { popup } from "@/utils/popup";
 
 const API_BASE = "http://localhost:8080";
-const UPDATE_ROOM_URL = `${API_BASE}/hotel_manager/rooms`; // ✅ BE saveOrUpdateRoom mapping "/rooms"
+const UPDATE_ROOM_URL = `${API_BASE}/hotel_manager/rooms`; // BE saveOrUpdateRoom mapping "/rooms"
+
 const S3_ROOM_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/room";
 const FALLBACK_IMAGE = `${S3_ROOM_BASE}/standard_bed.jpg`;
@@ -22,17 +23,17 @@ function safeNumber(v, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
-// ✅ parse VND input: "7.200.000₫" -> 7200000
+// parse VND input: "7.200.000₫" -> 7200000
 function parseVNDToNumber(v) {
   if (v === null || v === undefined) return NaN;
   const s = String(v).trim();
   if (!s) return NaN;
-  const cleaned = s.replace(/[^\d.-]/g, ""); // keep digits, dot, minus
+  const cleaned = s.replace(/[^\d.-]/g, "");
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : NaN;
 }
 
-// ✅ format: 7200000 -> "7.200.000₫"
+// format: 7200000 -> "7.200.000₫"
 function formatVND(v) {
   const n = Number(v);
   if (!Number.isFinite(n)) return "--";
@@ -54,7 +55,7 @@ async function apiFetch(url, { token, method = "GET", body } = {}) {
     credentials: "include",
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      // ❌ không set Content-Type khi FormData
+      // không set Content-Type khi FormData
     },
     cache: "no-store",
     body,
@@ -70,8 +71,9 @@ async function apiFetch(url, { token, method = "GET", body } = {}) {
         : typeof raw === "object"
         ? JSON.stringify(raw)
         : "";
+
     const err = new Error(
-      `${method} ${url} failed (${res.status})${msg ? ` - ${msg}` : ""}`
+      `${method} ${url} thất bại (${res.status})${msg ? ` - ${msg}` : ""}`
     );
     err.status = res.status;
     err.raw = raw;
@@ -84,39 +86,29 @@ async function apiFetch(url, { token, method = "GET", body } = {}) {
 export default function RoomEdit() {
   const navigate = useNavigate();
   const location = useLocation();
-
   const token = getToken();
 
   // room từ state
   const room = location.state?.room;
 
-  useEffect(() => {
-    if (!room) {
-      popup.error("Room data not found. Unable to edit.").finally(() => {
-        navigate(-1, { replace: true });
-      });
-    }
-  }, [room, navigate]);
-
   const [isEditing, setIsEditing] = useState(false);
   const [original, setOriginal] = useState(null);
 
-  // ✅ form theo UI snake_case, nhưng lúc gửi BE -> camelCase
-  // ❌ removed: status
+  // form UI snake_case
   const [form, setForm] = useState({
     room_id: "",
     room_number: "",
     room_type: "",
     number_of_guests: "",
-    price: "", // ✅ lưu dạng string số thô để edit
+    price: "",
     description: "",
   });
 
-  // ✅ single image (bedFile/wcFile)
+  // image files
   const [bedFile, setBedFile] = useState(null);
   const [wcFile, setWcFile] = useState(null);
 
-  // preview: ưu tiên ảnh mới (blob), không có thì ảnh cũ (aws)
+  // preview: blob ưu tiên, không có thì aws
   const [bedPreview, setBedPreview] = useState("");
   const [wcPreview, setWcPreview] = useState("");
 
@@ -124,6 +116,16 @@ export default function RoomEdit() {
   const wcInputRef = useRef(null);
 
   const [submitting, setSubmitting] = useState(false);
+
+  /** ---------- nếu không có room thì báo lỗi + quay lại ---------- */
+  useEffect(() => {
+    if (room) return;
+
+    (async () => {
+      await popup.error("Không tìm thấy dữ liệu phòng. Không thể chỉnh sửa.");
+      navigate(-1, { replace: true });
+    })();
+  }, [room, navigate]);
 
   /** ---------- init from state ---------- */
   useEffect(() => {
@@ -135,97 +137,120 @@ export default function RoomEdit() {
       room_id: String(roomId ?? ""),
       room_number: String(room.room_number ?? room.roomNumber ?? ""),
       room_type: String(room.room_type ?? room.roomType ?? ""),
-      number_of_guests: String(
-        room.number_of_guests ?? room.numberOfGuest ?? ""
-      ),
-      // ✅ giữ raw number string để edit
+      number_of_guests: String(room.number_of_guests ?? room.numberOfGuest ?? ""),
       price:
         room.price === null || room.price === undefined ? "" : String(room.price),
       description: String(room.description ?? room.desc ?? ""),
     };
 
-    // ảnh cũ
     const bedOld = toAwsUrl(room.image_bed ?? room.imageBed);
     const wcOld = toAwsUrl(room.image_wc ?? room.imageWC);
 
-    setForm(nextForm);
-
-    setOriginal({
-      form: nextForm,
-      bedOld,
-      wcOld,
+    // thu hồi blob cũ nếu có
+    setBedPreview((prev) => {
+      if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+      return bedOld || FALLBACK_IMAGE;
+    });
+    setWcPreview((prev) => {
+      if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+      return wcOld || FALLBACK_IMAGE;
     });
 
-    setBedPreview(bedOld || FALLBACK_IMAGE);
-    setWcPreview(wcOld || FALLBACK_IMAGE);
+    setForm(nextForm);
+    setOriginal({ form: nextForm, bedOld, wcOld });
 
-    // reset file mới
     setBedFile(null);
     setWcFile(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room]);
 
-  /** ---------- handlers ---------- */
-  const setField = (key, value) =>
-    setForm((p) => ({ ...p, [key]: value ?? "" }));
+  /** ---------- cleanup blob khi unmount ---------- */
+  useEffect(() => {
+    return () => {
+      if (bedPreview?.startsWith("blob:")) URL.revokeObjectURL(bedPreview);
+      if (wcPreview?.startsWith("blob:")) URL.revokeObjectURL(wcPreview);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  /** ---------- handlers ---------- */
+  const setField = (key, value) => setForm((p) => ({ ...p, [key]: value ?? "" }));
   const handleChange = (e) => setField(e.target.name, e.target.value);
 
-  // ✅ price handler: cho phép paste "7.200.000₫" -> tự làm sạch
+  // price: chỉ giữ số
   const handlePriceChange = (e) => {
     const v = e.target.value ?? "";
     const cleaned = String(v).replace(/[^\d]/g, "");
     setField("price", cleaned);
   };
 
-  const pickBed = () => isEditing && bedInputRef.current?.click();
-  const pickWc = () => isEditing && wcInputRef.current?.click();
+  const pickBed = () => {
+    if (!isEditing) return;
+    bedInputRef.current?.click();
+  };
 
-  const setSingleImage = (file, setFile, previewSetter) => {
-    if (!file) {
-      setFile(null);
-      return;
-    }
+  const pickWc = () => {
+    if (!isEditing) return;
+    wcInputRef.current?.click();
+  };
+
+  const setSingleImage = (file, setFile, setPreview) => {
+    if (!file) return;
     setFile(file);
-    previewSetter(URL.createObjectURL(file));
+    setPreview((prev) => {
+      if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
   };
 
   const clearBed = () => {
     if (!isEditing) return;
-    if (bedPreview?.startsWith("blob:")) URL.revokeObjectURL(bedPreview);
     setBedFile(null);
-    setBedPreview(original?.bedOld || FALLBACK_IMAGE);
+    setBedPreview((prev) => {
+      if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+      return original?.bedOld || FALLBACK_IMAGE;
+    });
   };
 
   const clearWc = () => {
     if (!isEditing) return;
-    if (wcPreview?.startsWith("blob:")) URL.revokeObjectURL(wcPreview);
     setWcFile(null);
-    setWcPreview(original?.wcOld || FALLBACK_IMAGE);
+    setWcPreview((prev) => {
+      if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+      return original?.wcOld || FALLBACK_IMAGE;
+    });
   };
 
   const onCancel = () => {
-    if (!original) return setIsEditing(false);
-
-    if (bedPreview?.startsWith("blob:")) URL.revokeObjectURL(bedPreview);
-    if (wcPreview?.startsWith("blob:")) URL.revokeObjectURL(wcPreview);
+    if (!original) {
+      setIsEditing(false);
+      return;
+    }
 
     setForm(original.form);
+
     setBedFile(null);
     setWcFile(null);
-    setBedPreview(original.bedOld || FALLBACK_IMAGE);
-    setWcPreview(original.wcOld || FALLBACK_IMAGE);
+
+    setBedPreview((prev) => {
+      if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+      return original.bedOld || FALLBACK_IMAGE;
+    });
+    setWcPreview((prev) => {
+      if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+      return original.wcOld || FALLBACK_IMAGE;
+    });
+
     setIsEditing(false);
   };
 
   /** ---------- VALIDATE ---------- */
   const validate = () => {
-    if (!form.room_id) return "Missing roomId (state room bị thiếu id)";
-    if (!String(form.room_number).trim()) return "Room number is required.";
-    if (!String(form.room_type).trim()) return "Room type is required.";
+    if (!form.room_id) return "Thiếu roomId (state room bị thiếu id).";
+    if (!String(form.room_number).trim()) return "Vui lòng nhập số phòng.";
+    if (!String(form.room_type).trim()) return "Vui lòng nhập loại phòng.";
     if (!String(form.number_of_guests).trim())
-      return "Number of guests is required.";
-    if (!String(form.price).trim()) return "Price is required.";
+      return "Vui lòng nhập số khách tối đa.";
+    if (!String(form.price).trim()) return "Vui lòng nhập giá phòng.";
     return null;
   };
 
@@ -235,12 +260,11 @@ export default function RoomEdit() {
     if (err) return popup.error(err);
 
     const priceNum = parseVNDToNumber(form.price);
-    if (!Number.isFinite(priceNum)) return popup.error("Price invalid.");
+    if (!Number.isFinite(priceNum)) return popup.error("Giá phòng không hợp lệ.");
 
     const ok = await popup.confirm("Bạn có chắc muốn lưu thay đổi?", "Xác nhận");
     if (!ok) return;
 
-    // ✅ JSON gửi vào @RequestPart("room") phải match entity Room
     const roomPayload = {
       roomId: safeNumber(form.room_id, 0),
       roomNumber: safeNumber(form.room_number, 0),
@@ -260,7 +284,6 @@ export default function RoomEdit() {
       "room",
       new Blob([JSON.stringify(roomPayload)], { type: "application/json" })
     );
-
     if (bedFile) fd.append("bedFile", bedFile);
     if (wcFile) fd.append("wcFile", wcFile);
 
@@ -273,31 +296,25 @@ export default function RoomEdit() {
         body: fd,
       });
 
-      await popup.success("Room updated successfully!");
+      await popup.success("Cập nhật phòng thành công!");
 
-      const bedOld = bedPreview?.startsWith("blob:")
-        ? bedPreview
-        : original?.bedOld || "";
-      const wcOld = wcPreview?.startsWith("blob:")
-        ? wcPreview
-        : original?.wcOld || "";
-
-      setOriginal({
+      // cập nhật original để Cancel lần sau đúng
+      setOriginal((prev) => ({
         form: { ...form },
-        bedOld: bedOld || original?.bedOld || "",
-        wcOld: wcOld || original?.wcOld || "",
-      });
+        bedOld: prev?.bedOld || "",
+        wcOld: prev?.wcOld || "",
+      }));
 
       setIsEditing(false);
     } catch (e) {
       console.error(e);
       if (e?.status === 403) {
         popup.error(
-          "403 Forbidden khi update /hotel_manager/rooms.\n" +
-            "=> BE chưa nhận JWT / role HOTEL_MANAGER chưa đúng / OPTIONS bị chặn."
+          "403 Forbidden khi cập nhật /hotel_manager/rooms.\n" +
+            "=> BE chưa nhận JWT / role HOTEL_MANAGER chưa đúng / CORS/OPTIONS bị chặn."
         );
       } else {
-        popup.error(e?.message || "Update failed");
+        popup.error(e?.message || "Cập nhật thất bại");
       }
     } finally {
       setSubmitting(false);
@@ -306,7 +323,9 @@ export default function RoomEdit() {
 
   if (!room) return null;
 
-  const readonlyCls = isEditing ? "" : "pointer-events-none select-none opacity-95";
+  const readonlyCls = isEditing
+    ? ""
+    : "pointer-events-none select-none opacity-95";
   const inputBase =
     "w-full border rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-200";
   const inputReadonly = isEditing ? "" : "bg-gray-50 text-gray-700 border-gray-200";
@@ -326,12 +345,12 @@ export default function RoomEdit() {
               onClick={() => navigate(-1)}
               className="text-sm px-3 py-2 rounded-xl border hover:bg-gray-50"
             >
-              ← Back
+              ← Quay lại
             </button>
           </div>
 
           <h1 className="flex-1 text-center text-xl font-semibold text-gray-900">
-            Room Detail
+            Chi tiết phòng
           </h1>
 
           <div className="flex-1" />
@@ -343,7 +362,7 @@ export default function RoomEdit() {
           {/* Mode */}
           <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
             <div className="text-sm text-gray-600">
-              Mode:{" "}
+              Chế độ:{" "}
               <span
                 className={`px-2 py-1 rounded-full border text-xs font-semibold ${
                   isEditing
@@ -351,14 +370,14 @@ export default function RoomEdit() {
                     : "bg-gray-50 text-gray-700 border-gray-200"
                 }`}
               >
-                {isEditing ? "Editing" : "Read-only"}
+                {isEditing ? "Đang chỉnh sửa" : "Chỉ xem"}
               </span>
             </div>
           </div>
 
           {/* Form */}
           <div className={`grid grid-cols-1 md:grid-cols-2 gap-5 ${readonlyCls}`}>
-            <Field label="Room Number" required>
+            <Field label="Số phòng" required>
               <input
                 name="room_number"
                 value={form.room_number}
@@ -366,20 +385,22 @@ export default function RoomEdit() {
                 className={`${inputBase} ${inputReadonly}`}
                 disabled={!isEditing}
                 inputMode="numeric"
+                placeholder="VD: 101"
               />
             </Field>
 
-            <Field label="Room Type" required>
+            <Field label="Loại phòng" required>
               <input
                 name="room_type"
                 value={form.room_type}
                 onChange={handleChange}
                 className={`${inputBase} ${inputReadonly}`}
                 disabled={!isEditing}
+                placeholder="VD: Standard"
               />
             </Field>
 
-            <Field label="Number of Guests" required>
+            <Field label="Số khách tối đa" required>
               <input
                 name="number_of_guests"
                 value={form.number_of_guests}
@@ -387,17 +408,17 @@ export default function RoomEdit() {
                 className={`${inputBase} ${inputReadonly}`}
                 disabled={!isEditing}
                 inputMode="numeric"
+                placeholder="VD: 2"
               />
             </Field>
 
-            <Field label="Price" required>
+            <Field label="Giá" required>
               {isEditing ? (
                 <input
                   name="price"
                   value={form.price}
                   onChange={handlePriceChange}
                   className={`${inputBase} ${inputReadonly}`}
-                  disabled={!isEditing}
                   inputMode="numeric"
                   placeholder="VD: 7200000"
                 />
@@ -410,18 +431,19 @@ export default function RoomEdit() {
               )}
               {isEditing ? (
                 <div className="text-xs text-gray-500 mt-1">
-                  Preview: <span className="font-medium">{priceDisplay}</span>
+                  Xem trước: <span className="font-medium">{priceDisplay}</span>
                 </div>
               ) : null}
             </Field>
 
-            <Field label="Description" className="md:col-span-2">
+            <Field label="Mô tả" className="md:col-span-2">
               <textarea
                 name="description"
                 value={form.description}
                 onChange={handleChange}
                 className={`${inputBase} ${inputReadonly} min-h-[120px]`}
                 disabled={!isEditing}
+                placeholder="Nhập mô tả..."
               />
             </Field>
           </div>
@@ -429,9 +451,9 @@ export default function RoomEdit() {
           {/* Images */}
           <div className="mt-8 border-t pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
             <SingleImage
-              title="Bed Image (bedFile)"
+              title="Ảnh giường (bedFile)"
               preview={bedPreview || FALLBACK_IMAGE}
-              onPick={() => pickBed()}
+              onPick={pickBed}
               onClear={clearBed}
               inputRef={bedInputRef}
               onChange={(e) => {
@@ -444,9 +466,9 @@ export default function RoomEdit() {
             />
 
             <SingleImage
-              title="WC Image (wcFile)"
+              title="Ảnh WC (wcFile)"
               preview={wcPreview || FALLBACK_IMAGE}
-              onPick={() => pickWc()}
+              onPick={pickWc}
               onClear={clearWc}
               inputRef={wcInputRef}
               onChange={(e) => {
@@ -466,7 +488,7 @@ export default function RoomEdit() {
                 onClick={() => setIsEditing(true)}
                 className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow"
               >
-                Change
+                Chỉnh sửa
               </button>
             ) : (
               <>
@@ -475,7 +497,7 @@ export default function RoomEdit() {
                   disabled={submitting}
                   className="px-5 py-2.5 rounded-xl border hover:bg-gray-50 disabled:opacity-60"
                 >
-                  Cancel
+                  Huỷ
                 </button>
 
                 <button
@@ -483,7 +505,7 @@ export default function RoomEdit() {
                   disabled={submitting}
                   className="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded-xl font-semibold shadow disabled:opacity-60"
                 >
-                  {submitting ? "Saving..." : "Save"}
+                  {submitting ? "Đang lưu..." : "Lưu"}
                 </button>
               </>
             )}
@@ -502,7 +524,7 @@ function Field({ label, required, children, className = "" }) {
         <label className="text-sm font-semibold text-gray-800">{label}</label>
         {required && (
           <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-100">
-            Required
+            Bắt buộc
           </span>
         )}
       </div>
@@ -537,7 +559,7 @@ function SingleImage({
                 : "border-orange-500 text-orange-600 hover:bg-orange-50",
             ].join(" ")}
           >
-            Choose
+            Chọn
           </button>
 
           <button
@@ -551,7 +573,7 @@ function SingleImage({
                 : "border-gray-300 text-gray-700 hover:bg-gray-100",
             ].join(" ")}
           >
-            Clear
+            Xoá
           </button>
         </div>
 

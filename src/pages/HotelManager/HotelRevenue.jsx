@@ -1,17 +1,27 @@
-import { useMemo, useEffect, useState, useCallback, useRef } from "react";
+﻿import { useMemo, useEffect, useState, useCallback, useRef } from "react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { getToken, isLoggedIn } from "@/utils/auth";
 
 import SummaryCards from "@/components/pages/HotelManager/HotelRevenue/SummaryCards";
 import RevenueTable from "@/components/pages/HotelManager/HotelRevenue/RevenueTable";
-import { popup } from "@/utils/popup"; // ✅ ADD
+import { popup } from "@/utils/popup";
 
 const API_BASE = "http://localhost:8080";
 
 function safeNumber(v, fallback = 0) {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
+}
+
+function buildSafeFileName(name) {
+  // Giữ tiếng Việt trong nội dung, nhưng tên file nên “an toàn” (không dấu) để tránh lỗi trên Windows
+  return String(name)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // bỏ dấu
+    .replace(/[^\w\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "_");
 }
 
 export default function HotelRevenue() {
@@ -23,11 +33,11 @@ export default function HotelRevenue() {
   });
 
   const [sortBy, setSortBy] = useState("revenue_desc");
-  const [data, setData] = useState([]); // ✅ array bookings (raw.content)
+  const [data, setData] = useState([]); // array bookings (raw.content)
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // ✅ PDF mode + ref export
+  // PDF mode + ref export
   const exportRef = useRef(null);
   const [pdfMode, setPdfMode] = useState(false);
 
@@ -44,13 +54,13 @@ export default function HotelRevenue() {
 
   const monthLabel = useMemo(() => {
     // monthNum: 1-12
-    return new Date(yearNum, monthNum - 1).toLocaleString("en-US", {
+    return new Date(yearNum, monthNum - 1).toLocaleString("vi-VN", {
       month: "long",
       year: "numeric",
     });
   }, [monthNum, yearNum]);
 
-  /** ✅ fetch bookings by month/year (JWT required) */
+  /** fetch bookings by month/year (JWT required) */
   const fetchBookingsByMonth = useCallback(
     async ({ month, year }) => {
       const url = `${API_BASE}/hotel_manager/bookings?month=${month}&year=${year}`;
@@ -89,7 +99,6 @@ export default function HotelRevenue() {
         setLoading(true);
         setError("");
 
-
         const bookings = await fetchBookingsByMonth({
           month: monthNum,
           year: yearNum,
@@ -97,7 +106,7 @@ export default function HotelRevenue() {
 
         if (alive) setData(bookings);
       } catch (e) {
-        if (alive) setError(e?.message || "Fetch failed");
+        if (alive) setError(e?.message || "Tải dữ liệu thất bại");
         if (alive) setData([]);
       } finally {
         if (alive) setLoading(false);
@@ -108,9 +117,9 @@ export default function HotelRevenue() {
     return () => {
       alive = false;
     };
-  }, [token, monthNum, yearNum, fetchBookingsByMonth]);
+  }, [monthNum, yearNum, fetchBookingsByMonth]);
 
-  /** sort (gọn) */
+  /** sort */
   const sortedData = useMemo(() => {
     const arr = [...data];
 
@@ -124,36 +133,38 @@ export default function HotelRevenue() {
         return arr.sort((a, b) => getRevenue(a) - getRevenue(b));
       case "checkin_desc":
         return arr.sort(
-          (a, b) => new Date(b?.checkInDate || 0) - new Date(a?.checkInDate || 0)
+          (a, b) =>
+            new Date(b?.checkInDate || 0) - new Date(a?.checkInDate || 0)
         );
       case "checkin_asc":
         return arr.sort(
-          (a, b) => new Date(a?.checkInDate || 0) - new Date(b?.checkInDate || 0)
+          (a, b) =>
+            new Date(a?.checkInDate || 0) - new Date(b?.checkInDate || 0)
         );
       default:
         return arr;
     }
   }, [data, sortBy]);
 
-  /** helpers tổng quan (để in lên PDF header) */
+  /** tổng quan để in lên PDF */
   const totalBookings = useMemo(() => sortedData.length, [sortedData]);
 
   const totalRevenue = useMemo(() => {
-    const sum = sortedData.reduce((acc, b) => {
+    return sortedData.reduce((acc, b) => {
       const r = safeNumber(b?.payment?.totalPrice ?? b?.totalPrice ?? 0, 0);
       return acc + r;
     }, 0);
-    return sum;
   }, [sortedData]);
 
   const totalRevenueText = useMemo(() => {
     return `${Math.round(totalRevenue).toLocaleString("vi-VN")}₫`;
   }, [totalRevenue]);
 
-  /** ✅ Export PDF */
+  /** Xuất PDF */
   const exportPDF = async () => {
     try {
-      if (!exportRef.current) return popup.error("Không tìm thấy vùng để export!");
+      if (!exportRef.current)
+        return popup.error("Không tìm thấy vùng để xuất PDF!");
       if (loading) return popup.error("Đang tải dữ liệu, thử lại sau nhé!");
       if (!isLoggedIn()) return popup.error("Bạn chưa đăng nhập!");
 
@@ -163,10 +174,7 @@ export default function HotelRevenue() {
       );
       if (!ok) return;
 
-      // bật layout PDF (title giữa + ẩn filter)
       setPdfMode(true);
-
-      // đợi render ổn định
       await new Promise((r) => setTimeout(r, 350));
 
       const el = exportRef.current;
@@ -201,11 +209,13 @@ export default function HotelRevenue() {
         heightLeft -= pageHeight;
       }
 
-      pdf.save(`Hotel_Revenue_${monthLabel}.pdf`);
-      popup.success("Export PDF thành công!");
+      const safeName = buildSafeFileName(`Bao_cao_doanh_thu_${monthLabel}`);
+      pdf.save(`${safeName}.pdf`);
+
+      popup.success("Xuất PDF thành công!");
     } catch (e) {
       console.error(e);
-      popup.error(e?.message || "Export PDF failed!");
+      popup.error(e?.message || "Xuất PDF thất bại!");
     } finally {
       setPdfMode(false);
     }
@@ -213,32 +223,33 @@ export default function HotelRevenue() {
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-gray-50">
-      {/* ✅ VÙNG EXPORT PDF */}
+      {/* VÙNG XUẤT PDF */}
       <div ref={exportRef} className="bg-white">
-        {/* ✅ Header PDF (title giữa) */}
+        {/* Header PDF (chỉ hiện khi pdfMode) */}
         {pdfMode && (
           <div className="px-6 pt-8 pb-4 text-center">
-            <h1 className="text-2xl font-semibold text-gray-900">HOTEL REVENUE</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">
+              DOANH THU KHÁCH SẠN
+            </h1>
             <div className="text-sm text-gray-600 mt-1">{monthLabel}</div>
             <div className="text-xs text-gray-500 mt-1">
-              Total bookings: {totalBookings} · Total revenue: {totalRevenueText}
+              Tổng lượt đặt: {totalBookings} · Tổng doanh thu: {totalRevenueText}
             </div>
             <div className="mt-4 h-px bg-gray-200" />
           </div>
         )}
 
-        {/* HEADER UI (ẩn khi pdfMode) */}
+        {/* Header UI (ẩn khi pdfMode) */}
         {!pdfMode && (
           <div className="bg-white border-b">
             <div className="max-w-6xl mx-auto px-6 py-6">
               <h1 className="text-2xl font-semibold text-gray-900 text-center">
-                Hotel Revenue
+                DOANH THU KHÁCH SẠN
               </h1>
               <p className="text-sm text-gray-500 text-center mt-1">
-                Booking revenue by month
+                Doanh thu đặt phòng theo tháng
               </p>
 
-              {/* Filters */}
               <div className="mt-6 flex flex-wrap justify-center items-center gap-4">
                 <input
                   type="month"
@@ -252,10 +263,10 @@ export default function HotelRevenue() {
                   onChange={(e) => setSortBy(e.target.value)}
                   className="border rounded-md px-3 py-2 text-sm bg-white"
                 >
-                  <option value="revenue_desc">Revenue: High → Low</option>
-                  <option value="revenue_asc">Revenue: Low → High</option>
-                  <option value="checkin_desc">Check-in: New → Old</option>
-                  <option value="checkin_asc">Check-in: Old → New</option>
+                  <option value="revenue_desc">Doanh thu: Cao → Thấp</option>
+                  <option value="revenue_asc">Doanh thu: Thấp → Cao</option>
+                  <option value="checkin_desc">Nhận phòng: Mới → Cũ</option>
+                  <option value="checkin_asc">Nhận phòng: Cũ → Mới</option>
                 </select>
 
                 <button
@@ -263,12 +274,16 @@ export default function HotelRevenue() {
                   className="px-4 py-2 bg-green-600 text-white rounded-md text-sm disabled:opacity-60"
                   disabled={loading}
                 >
-                  Export PDF
+                  Xuất PDF
                 </button>
               </div>
 
               <div className="mt-3 text-center text-xs text-gray-500">
-                {loading ? "Đang tải dữ liệu..." : error ? `Lỗi: ${error}` : ""}
+                {loading
+                  ? "Đang tải dữ liệu..."
+                  : error
+                  ? `Lỗi: ${error}`
+                  : ""}
               </div>
             </div>
           </div>
@@ -283,11 +298,10 @@ export default function HotelRevenue() {
         {/* Footer PDF */}
         {pdfMode && (
           <div className="px-6 pb-6 text-center text-xs text-gray-400">
-            Generated by EasyTravel · {new Date().toLocaleString("vi-VN")}
+            Tạo bởi EasyTravel · {new Date().toLocaleString("vi-VN")}
           </div>
         )}
       </div>
-      {/* ✅ END EXPORT */}
     </div>
   );
 }

@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+﻿import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { popup } from "@/utils/popup";
 import RoomCard from "@/components/pages/HotelManager/MyRoom/Card.jsx";
 import Pagination from "@/utils/Pagination";
-import { getToken as getCookieToken } from "@/utils/auth";
+import { getToken } from "@/utils/auth";
 
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
+
+const API_BASE = "http://localhost:8080";
 
 export default function MyRooms() {
   const navigate = useNavigate();
@@ -17,15 +19,11 @@ export default function MyRooms() {
   const [sortBy, setSortBy] = useState("price_asc");
   const [q, setQ] = useState("");
 
-  // ✅ Pagination
+  // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 5;
 
-  // ✅ lấy token (tự thử nhiều key phổ biến)
-  const getToken = () => getCookieToken();
-
-  // ✅ fetch auto gửi JWT
-  const fetchWithAuth = async (url, options = {}) => {
+  const fetchWithAuth = useCallback(async (url, options = {}) => {
     const token = getToken();
 
     const headers = {
@@ -47,39 +45,36 @@ export default function MyRooms() {
     }
 
     return res;
-  };
+  }, []);
 
-  // ✅ map camelCase API -> snake_case UI
-  const normalizeRoom = (r) => ({
-    room_id: r.roomId ?? r.room_id,
-    room_number: r.roomNumber ?? r.room_number,
-    room_type: r.roomType ?? r.room_type,
-    number_of_guests: r.numberOfGuest ?? r.number_of_guests,
-    price: r.price,
-    description: r.desc ?? r.description,
-    image_bed: r.imageBed ?? r.image_bed,
-    image_wc: r.imageWC ?? r.image_wc,
-    created_at: r.createdAt || r.created_at || "",
-    status: r.status,
-    floor: r.floor,
-  });
+  const normalizeRoom = useCallback((r) => {
+    return {
+      room_id: r.roomId ?? r.room_id,
+      room_number: r.roomNumber ?? r.room_number,
+      room_type: r.roomType ?? r.room_type,
+      number_of_guests: r.numberOfGuest ?? r.number_of_guests,
+      price: r.price,
+      description: r.desc ?? r.description,
+      image_bed: r.imageBed ?? r.image_bed,
+      image_wc: r.imageWC ?? r.image_wc,
+      created_at: r.createdAt || r.created_at || "",
+      status: r.status,
+      floor: r.floor,
+    };
+  }, []);
 
   const loadRooms = useCallback(async () => {
     setLoading(true);
     try {
-      // 1) lấy my hotel -> lấy hotelId
       const myHotelRes = await fetchWithAuth(
-        "http://localhost:8080/hotel_manager/my-hotel"
+        `${API_BASE}/hotel_manager/my-hotel`
       );
       const hotel = await myHotelRes.json();
 
       const hotelId = hotel?.hotelId ?? hotel?.hotel_id ?? hotel?.id;
       if (!hotelId) throw new Error("Không tìm thấy hotelId từ API my-hotel");
 
-      // 2) lấy rooms theo hotelId (HATEOAS: data._embedded.rooms)
-      const roomsRes = await fetchWithAuth(
-        `http://localhost:8080/hotels/${hotelId}/rooms`
-      );
+      const roomsRes = await fetchWithAuth(`${API_BASE}/hotels/${hotelId}/rooms`);
       const data = await roomsRes.json();
 
       const list = data?._embedded?.rooms ?? [];
@@ -87,35 +82,29 @@ export default function MyRooms() {
     } catch (err) {
       console.error("Lỗi load rooms:", err);
       setRooms([]);
+      popup.error(err?.message || "Tải danh sách phòng thất bại");
     } finally {
       setLoading(false);
     }
-  }, []); // fetchWithAuth dùng localStorage nên không cần dep
+  }, [fetchWithAuth, normalizeRoom]);
 
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      if (!mounted) return;
-      await loadRooms();
-    })();
-    return () => {
-      mounted = false;
-    };
+    loadRooms();
   }, [loadRooms]);
 
-  // ✅ Edit route (no id) => pass room via state
-  const goEditRoom = (room) => {
-    navigate("/hotel-manager/rooms/edit", { state: { room } });
-  };
+  const goEditRoom = useCallback(
+    (room) => {
+      navigate("/hotel-manager/rooms/edit", { state: { room } });
+    },
+    [navigate]
+  );
 
-  // ✅ callback: xóa xong update UI ngay (khỏi reload)
-  const handleDeleted = (deletedId) => {
+  const handleDeleted = useCallback((deletedId) => {
     setRooms((prev) =>
       prev.filter((r) => (r.room_id ?? r.roomId) !== deletedId)
     );
-  };
+  }, []);
 
-  // ✅ Filter by search
   const filteredRooms = useMemo(() => {
     const keyword = q.trim().toLowerCase();
     if (!keyword) return rooms;
@@ -133,55 +122,45 @@ export default function MyRooms() {
     });
   }, [rooms, q]);
 
-  // 🔽 Sort logic (sort after filter)
   const sortedRooms = useMemo(() => {
     const data = [...filteredRooms];
 
     switch (sortBy) {
       case "price_asc":
         return data.sort((a, b) => (a.price ?? 0) - (b.price ?? 0));
-
       case "price_desc":
         return data.sort((a, b) => (b.price ?? 0) - (a.price ?? 0));
-
       case "date_desc":
         return data.sort(
           (a, b) => new Date(b.created_at) - new Date(a.created_at)
         );
-
       case "date_asc":
         return data.sort(
           (a, b) => new Date(a.created_at) - new Date(b.created_at)
         );
-
       default:
         return data;
     }
   }, [filteredRooms, sortBy]);
 
-  // ✅ reset page khi search/sort đổi
   useEffect(() => {
     setCurrentPage(1);
   }, [q, sortBy]);
 
-  // ✅ total pages
   const totalPages = useMemo(() => {
     return Math.max(1, Math.ceil(sortedRooms.length / pageSize));
-  }, [sortedRooms.length, pageSize]);
+  }, [sortedRooms.length]);
 
-  // nếu dữ liệu thay đổi làm currentPage vượt totalPages => kéo về trang cuối hợp lệ
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
 
-  // ✅ paged rooms
   const pagedRooms = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     const end = start + pageSize;
     return sortedRooms.slice(start, end);
-  }, [sortedRooms, currentPage, pageSize]);
+  }, [sortedRooms, currentPage]);
 
-  // ✅ visible pages (gọn như Blog)
   const getVisiblePages = useCallback((page, total) => {
     if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1);
 
@@ -203,99 +182,92 @@ export default function MyRooms() {
     return getVisiblePages(currentPage, totalPages);
   }, [currentPage, totalPages, getVisiblePages]);
 
-  // ---------- EXPORT EXCEL ----------
-  const formatVND = (v) => {
+  const formatVND = useCallback((v) => {
     const n = Number(v);
     if (!Number.isFinite(n)) return "";
     return `${n.toLocaleString("vi-VN")}₫`;
-  };
+  }, []);
 
   const handleExportExcel = useCallback(async () => {
-    // Export đúng những gì đang hiển thị (đã search + sort)
     const dataToExport = sortedRooms;
 
     if (loading) return popup.error("Đang tải dữ liệu, thử lại sau nhé!");
     if (!dataToExport || dataToExport.length === 0) {
-      return popup.error("Không có phòng nào để export.");
+      return popup.error("Không có phòng nào để xuất.");
     }
 
     const ok = await popup.confirm(
       `Xuất ${dataToExport.length} phòng (đang hiển thị) ra Excel?`,
-      "Xác nhận export"
+      "Xác nhận xuất"
     );
     if (!ok) return;
 
     try {
+      // ✅ Việt hoá header cột để Excel không còn tiếng Anh
       const rows = dataToExport.map((r, idx) => ({
-        "No.": idx + 1,
-        "Room ID": r.room_id ?? "",
-        "Room Number": r.room_number ?? "",
-        Type: r.room_type ?? "",
-        Guests: r.number_of_guests ?? "",
-        Floor: r.floor ?? "",
-        Status: r.status ?? "",
-        "Price (VND)": r.price ?? "",
-        "Price (Formatted)": formatVND(r.price),
-        Description: r.description ?? "",
-        "Image Bed": Array.isArray(r.image_bed)
+        "STT": idx + 1,
+        "Mã phòng": r.room_id ?? "",
+        "Số phòng": r.room_number ?? "",
+        "Loại phòng": r.room_type ?? "",
+        "Số khách": r.number_of_guests ?? "",
+        "Tầng": r.floor ?? "",
+        "Trạng thái": r.status ?? "",
+        "Giá (VND)": r.price ?? "",
+        "Giá (hiển thị)": formatVND(r.price),
+        "Mô tả": r.description ?? "",
+        "Ảnh giường": Array.isArray(r.image_bed)
           ? r.image_bed.join(", ")
           : r.image_bed ?? "",
-        "Image WC": Array.isArray(r.image_wc)
+        "Ảnh WC": Array.isArray(r.image_wc)
           ? r.image_wc.join(", ")
           : r.image_wc ?? "",
-        "Created At": r.created_at ?? "",
+        "Ngày tạo": r.created_at ?? "",
       }));
 
       const ws = XLSX.utils.json_to_sheet(rows);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Rooms");
+      XLSX.utils.book_append_sheet(wb, ws, "Phòng");
 
       ws["!cols"] = [
-        { wch: 6 },
-        { wch: 10 },
-        { wch: 14 },
-        { wch: 16 },
-        { wch: 8 },
-        { wch: 8 },
-        { wch: 12 },
-        { wch: 12 },
-        { wch: 16 },
-        { wch: 40 },
-        { wch: 30 },
-        { wch: 30 },
-        { wch: 22 },
+        { wch: 6 },  // STT
+        { wch: 10 }, // Mã phòng
+        { wch: 10 }, // Số phòng
+        { wch: 16 }, // Loại phòng
+        { wch: 10 }, // Số khách
+        { wch: 8 },  // Tầng
+        { wch: 12 }, // Trạng thái
+        { wch: 14 }, // Giá (VND)
+        { wch: 16 }, // Giá hiển thị
+        { wch: 40 }, // Mô tả
+        { wch: 30 }, // Ảnh giường
+        { wch: 30 }, // Ảnh WC
+        { wch: 22 }, // Ngày tạo
       ];
 
-      const fileName = `rooms_export_${new Date()
-        .toISOString()
-        .slice(0, 10)}.xlsx`;
+      const fileName = `ds_phong_${new Date().toISOString().slice(0, 10)}.xlsx`;
       const out = XLSX.write(wb, { bookType: "xlsx", type: "array" });
       saveAs(new Blob([out], { type: "application/octet-stream" }), fileName);
 
-      popup.success("Export Excel thành công!");
+      popup.success("Xuất Excel thành công!");
     } catch (e) {
       console.error(e);
-      popup.error(e?.message || "Export Excel failed!");
+      popup.error(e?.message || "Xuất Excel thất bại!");
     }
-  }, [sortedRooms, loading]);
+  }, [sortedRooms, loading, formatVND]);
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-gray-50">
-      {/* ===== HEADER ===== */}
       <div className="bg-white border-b">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 sm:py-6">
-          {/* ✅ Top bar responsive */}
           <div className="flex flex-col gap-4 sm:gap-3">
-            {/* Row 1: Title center on desktop, but fine on mobile */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              {/* Left actions */}
               <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
                 <button
                   onClick={() => navigate("/hotel-manager/hotels/addroom/new")}
                   className="px-4 py-2 rounded-lg bg-orange-500 text-white text-sm font-semibold
                              hover:bg-orange-600 transition active:scale-95 w-full sm:w-auto"
                 >
-                  + Add Room
+                  + Thêm phòng
                 </button>
 
                 <button
@@ -307,23 +279,19 @@ export default function MyRooms() {
                       ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
                       : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50",
                   ].join(" ")}
-                  title="Export danh sách phòng (đang hiển thị) ra Excel"
+                  title="Xuất danh sách phòng (đang hiển thị) ra Excel"
                 >
-                  Export to Excel
+                  Xuất Excel
                 </button>
               </div>
 
-              {/* Title */}
               <div className="text-center sm:text-left">
                 <h1 className="text-2xl font-semibold text-gray-900">
-                  My Rooms
+                  Phòng của tôi
                 </h1>
-                <p className="text-sm text-gray-500 mt-1">
-                  Rooms you have added
-                </p>
+                <p className="text-sm text-gray-500 mt-1">Các phòng đã thêm</p>
               </div>
 
-              {/* Right controls */}
               <div className="flex gap-2 items-center justify-center sm:justify-end">
                 <select
                   value={sortBy}
@@ -331,27 +299,27 @@ export default function MyRooms() {
                   className="border rounded-md px-3 py-2 text-sm bg-white w-full sm:w-auto
                              focus:outline-none focus:ring-2 focus:ring-orange-200"
                 >
-                  <option value="price_asc">Price: Low → High</option>
-                  <option value="price_desc">Price: High → Low</option>
-                  
+                  <option value="price_asc">Giá: Thấp → Cao</option>
+                  <option value="price_desc">Giá: Cao → Thấp</option>
+                  <option value="date_desc">Ngày tạo: Mới → Cũ</option>
+                  <option value="date_asc">Ngày tạo: Cũ → Mới</option>
                 </select>
 
                 <button
                   onClick={loadRooms}
                   className="px-3 py-2 text-sm rounded-md border hover:bg-gray-50 whitespace-nowrap"
-                  title="Reload"
+                  title="Tải lại"
                 >
-                  ⟳
+                  Tải lại
                 </button>
               </div>
             </div>
 
-            {/* ✅ SEARCH BAR */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Search by room number, type, description..."
+                placeholder="Tìm theo số phòng, loại phòng, mô tả..."
                 className="w-full border rounded-xl px-4 py-2.5 bg-white
                            focus:outline-none focus:ring-2 focus:ring-orange-200"
               />
@@ -361,27 +329,26 @@ export default function MyRooms() {
                   onClick={() => setQ("")}
                   className="px-4 py-2.5 rounded-xl border border-gray-300 hover:bg-gray-50 text-sm w-full sm:w-auto"
                 >
-                  Clear
+                  Xoá
                 </button>
               )}
             </div>
 
             <div className="text-xs text-gray-500">
-              Showing{" "}
+              Hiện{" "}
               <span className="font-semibold">{sortedRooms.length}</span> /{" "}
-              <span className="font-semibold">{rooms.length}</span> rooms
+              <span className="font-semibold">{rooms.length}</span> phòng
             </div>
           </div>
         </div>
       </div>
 
-      {/* ===== CONTENT ===== */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         {loading ? (
-          <p className="text-gray-400 text-center">Loading...</p>
+          <p className="text-gray-400 text-center">Đang tải...</p>
         ) : sortedRooms.length === 0 ? (
           <p className="text-gray-400 text-center">
-            No rooms found{q.trim() ? ` for "${q.trim()}"` : ""}.
+            Không tìm thấy phòng{q.trim() ? ` cho "${q.trim()}"` : ""}.
           </p>
         ) : (
           <div className="flex flex-col gap-4">
@@ -396,7 +363,6 @@ export default function MyRooms() {
           </div>
         )}
 
-        {/* ✅ Pagination dưới cùng (khỏi tràn mobile) */}
         {!loading && sortedRooms.length > pageSize && (
           <div className="flex justify-center px-2">
             <div className="w-full sm:w-auto overflow-x-auto">

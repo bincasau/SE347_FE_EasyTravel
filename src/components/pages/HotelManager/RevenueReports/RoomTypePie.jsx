@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+﻿import React, { useMemo } from "react";
 import {
   PieChart,
   Pie,
@@ -23,7 +23,7 @@ function safeNumber(v, fallback = 0) {
 
 function formatMoneyVND(v) {
   const num = safeNumber(v, 0);
-  return `${num.toLocaleString("vi-VN")}₫`;
+  return `${num.toLocaleString("vi-VN")} VND`;
 }
 
 function CustomTooltip({ active, payload }) {
@@ -32,23 +32,21 @@ function CustomTooltip({ active, payload }) {
   return (
     <div className="bg-white border rounded-lg p-3 shadow text-sm">
       <div className="font-semibold text-gray-900">{p.type}</div>
-      <div className="text-gray-700">Bookings: {p.count}</div>
-      <div className="text-gray-700">Revenue: {formatMoneyVND(p.revenue)}</div>
-      <div className="text-gray-700">Share: {p.percent}%</div>
+      <div className="text-gray-700">Luot dat: {p.count}</div>
+      <div className="text-gray-700">Doanh thu: {formatMoneyVND(p.revenue)}</div>
+      <div className="text-gray-700">Ti le: {p.percent}%</div>
     </div>
   );
 }
 
-/** ✅ label đưa ra ngoài + ẩn lát nhỏ để khỏi đè */
 function renderOutsideLabel(props) {
   const { cx, cy, midAngle, outerRadius, payload } = props;
 
   const pct = safeNumber(payload?.percent, 0);
-  // ✅ lát nhỏ thì ẩn label (khỏi chồng lên nhau)
   if (pct < 6) return null;
 
   const RADIAN = Math.PI / 180;
-  const r = outerRadius + 18; // kéo ra ngoài
+  const r = outerRadius + 18;
   const x = cx + r * Math.cos(-midAngle * RADIAN);
   const y = cy + r * Math.sin(-midAngle * RADIAN);
 
@@ -91,7 +89,7 @@ export default function RoomTypePie({ stats }) {
 
     return rows.map((r) => ({
       type: r.type,
-      value: r.count, // pie theo COUNT
+      value: r.count,
       count: r.count,
       revenue: r.revenue,
       percent: total > 0 ? Math.round((r.count / total) * 100) : 0,
@@ -104,7 +102,7 @@ export default function RoomTypePie({ stats }) {
   if (!stats) {
     return (
       <div className="bg-white border rounded-lg p-6">
-        <p className="text-gray-400">No data available</p>
+        <p className="text-gray-400">Không có dữ liệu</p>
       </div>
     );
   }
@@ -113,9 +111,9 @@ export default function RoomTypePie({ stats }) {
     return (
       <div className="bg-white border rounded-lg p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-2">
-          Room Type Distribution
+          Phân bố loại phòng
         </h2>
-        <p className="text-gray-400">No bookings in this month</p>
+        <p className="text-gray-400">Không có dữ liệu</p>
       </div>
     );
   }
@@ -125,12 +123,11 @@ export default function RoomTypePie({ stats }) {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold text-gray-900">
-            Room Type Distribution
+            Phân bố loại phòng
           </h2>
           <div className="text-sm text-gray-500 mt-1">
-            Total bookings: <b className="text-gray-900">{totalBookings}</b> •
-            Total revenue:{" "}
-            <b className="text-gray-900">{formatMoneyVND(totalRevenue)}</b>
+            Tổng lượt đặt: <b className="text-gray-900">{totalBookings}</b> -
+            Tổng doanh thu: <b className="text-gray-900">{formatMoneyVND(totalRevenue)}</b>
           </div>
         </div>
       </div>
@@ -145,10 +142,8 @@ export default function RoomTypePie({ stats }) {
               cx="50%"
               cy="50%"
               outerRadius={110}
-              // ✅ tách lát ra + lát nhỏ có độ dày tối thiểu
               paddingAngle={3}
               minAngle={6}
-              // ✅ label không đè
               labelLine={false}
               label={renderOutsideLabel}
             >
@@ -176,14 +171,11 @@ export default function RoomTypePie({ stats }) {
               <span className="text-gray-800">{r.type}</span>
             </div>
             <div className="text-gray-700">
-              <b className="text-gray-900">{r.count}</b> ({r.percent}%) •{" "}
-              {formatMoneyVND(r.revenue)}
+              <b className="text-gray-900">{r.count}</b> ({r.percent}%) - {formatMoneyVND(r.revenue)}
             </div>
           </li>
         ))}
       </ul>
-
-      
     </div>
   );
 }
