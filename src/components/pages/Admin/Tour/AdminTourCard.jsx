@@ -82,7 +82,7 @@ export default function AdminTourCard({ tour, onEdit, onRemove }) {
 
     const close = popup.loading("Đang xóa tour...");
     try {
-      await deleteTour(Number(tourId));
+      await deleteTour((tourId));
       popup.success("Đã xóa tour");
       if (typeof onRemove === "function") onRemove(tour);
     } catch (e) {

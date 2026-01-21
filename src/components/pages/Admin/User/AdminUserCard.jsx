@@ -4,11 +4,9 @@ import {
   FaPhoneAlt,
   FaMapMarkerAlt,
   FaUserShield,
-  FaRegClock,
 } from "react-icons/fa";
 import { FaPlus } from "react-icons/fa6";
 import { useNavigate } from "react-router-dom";
-import { popup } from "@/utils/popup";
 
 const S3_USER_BASE =
   "https://s3.ap-southeast-2.amazonaws.com/aws.easytravel/user";
@@ -24,14 +22,10 @@ export default function AdminUserCard({ user, onRemove }) {
     navigate(`/admin/users/edit/${user.userId}`);
   };
 
-  // ✅ confirm bằng popup (không dùng window.confirm)
-  const handleRemove = async () => {
-    const ok = await popup.confirm(
-      `Bạn có chắc chắn muốn xóa người dùng "${user?.username}" không?`,
-      "Xác nhận xóa",
-    );
-    if (!ok) return;
-    onRemove?.(user.userId);
+  // ✅ card chỉ bắn event lên parent, không confirm, không popup
+  const handleRemove = () => {
+    onRemove?.(user);
+    // hoặc: onRemove?.(user.userId);
   };
 
   return (
@@ -42,7 +36,7 @@ export default function AdminUserCard({ user, onRemove }) {
           <div className="w-full aspect-[16/10] rounded-xl overflow-hidden bg-gray-100">
             <img
               src={avatarSrc}
-              alt={user?.name || "User"}
+              alt={user?.fullName ?? user?.name ?? "User"}
               className="w-full h-full object-cover"
               loading="lazy"
               onError={(e) => {
@@ -55,7 +49,7 @@ export default function AdminUserCard({ user, onRemove }) {
         {/* Content */}
         <div className="min-w-0 flex-1">
           <h2 className="text-lg sm:text-2xl font-semibold mb-3 line-clamp-2">
-            {user?.name || "Chưa có tên"}
+            {user?.fullName ?? user?.name ?? "Chưa có tên"}
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 text-sm text-gray-700">
@@ -133,7 +127,6 @@ export default function AdminUserCard({ user, onRemove }) {
 
 function Info({ icon, label, value, href }) {
   const content = value ?? "—";
-
   return (
     <div className="flex items-start gap-2 min-w-0">
       <span className="w-5 h-5 text-orange-400 mt-0.5 flex-shrink-0">
@@ -163,7 +156,6 @@ function formatDate(date) {
 
 function RoleBadge({ value }) {
   const v = String(value || "CUSTOMER").toUpperCase();
-
   const cls =
     v === "ADMIN"
       ? "bg-red-100 text-red-700"
@@ -194,7 +186,6 @@ function RoleBadge({ value }) {
 function StatusBadge({ value }) {
   const raw = String(value || "").toUpperCase();
   const isActivated = raw === "ACTIVATED";
-
   return (
     <span
       className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${

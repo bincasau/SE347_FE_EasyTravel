@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { saveTourUpsert } from "@/apis/Tour";
+import { popup } from "@/utils/popup";
 
 function toNumberSafe(v, fallback = 0) {
   if (v === "" || v === null || v === undefined) return fallback;
@@ -10,6 +11,7 @@ function toNumberSafe(v, fallback = 0) {
 
 function normalizeDateCell(v) {
   if (!v) return "";
+
   // đã là string yyyy-mm-dd
   if (typeof v === "string") return v.slice(0, 10);
 
@@ -70,11 +72,11 @@ function mapRowToPayload(row, defaultGuideId) {
 
 export default function ImportToursExcelButton({
   defaultGuideId = 0,
+  onDone,
   className = "w-full sm:w-auto px-5 py-2 rounded-full bg-purple-600 text-white hover:bg-purple-700 transition disabled:opacity-60 inline-flex items-center justify-center gap-2",
 }) {
   const inputRef = useRef(null);
   const [importing, setImporting] = useState(false);
-  const [msg, setMsg] = useState("");
 
   const pickFile = () => inputRef.current?.click();
 
@@ -83,7 +85,6 @@ export default function ImportToursExcelButton({
     e.target.value = ""; // để chọn lại cùng 1 file vẫn trigger
     if (!file) return;
 
-    setMsg("");
     setImporting(true);
 
     try {
@@ -127,15 +128,21 @@ export default function ImportToursExcelButton({
       }
 
       const summary = `Import xong: ${ok} thành công, ${fail} thất bại.`;
-      setMsg(
-        errors.length
-          ? `${summary}\n${errors.slice(0, 8).join("\n")}`
-          : summary,
-      );
 
+      //  dùng popup
+      if (fail > 0) {
+        const detail = errors.length
+          ? `\n\nChi tiết (tối đa 8 dòng):\n${errors.slice(0, 8).join("\n")}`
+          : "";
+        popup.error(`${summary}${detail}`, "Import có lỗi");
+      } else {
+        popup.success(summary, "Import thành công");
+      }
+
+      //  callback cho parent nếu cần reload list/refresh UI
       if (typeof onDone === "function") onDone({ ok, fail, errors });
     } catch (err) {
-      setMsg(err?.message || "Import thất bại.");
+      popup.error(err?.message || "Import thất bại.");
     } finally {
       setImporting(false);
     }
@@ -154,12 +161,6 @@ export default function ImportToursExcelButton({
       <button onClick={pickFile} disabled={importing} className={className}>
         {importing ? "Đang nhập..." : "Nhập Excel"}
       </button>
-
-      {msg ? (
-        <pre className="whitespace-pre-wrap text-sm p-3 rounded-xl border bg-white text-gray-700">
-          {msg}
-        </pre>
-      ) : null}
     </div>
   );
 }

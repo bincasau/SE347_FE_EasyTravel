@@ -132,7 +132,6 @@ export default function AddHotel() {
 
       close?.();
 
-      // ✅ Popup hỏi: về danh sách hay tiếp tục tạo
       const goList = await popup.confirm(
         "Thêm khách sạn thành công.\nBạn có muốn quay về danh sách khách sạn không?",
         "Thành công",

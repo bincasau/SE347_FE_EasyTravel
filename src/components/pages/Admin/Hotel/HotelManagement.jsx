@@ -35,17 +35,19 @@ export default function HotelManagement() {
   const [loading, setLoading] = useState(true);
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const pageFromUrl = Number(searchParams.get("page")) || 1;
 
-  // ✅ view mode (card | table) from URL
+  // URL state (giống UserManagement)
+  const pageRaw = searchParams.get("page");
+  const pageNum = Number(pageRaw);
+  const currentPage = Number.isFinite(pageNum) && pageNum > 0 ? pageNum : 1; // UI page: 1..n
+
+  // view mode from URL
   const viewFromUrl =
     (searchParams.get("view") || "card").toString().toLowerCase() === "table"
       ? "table"
       : "card";
-
   const [viewMode, setViewMode] = useState(viewFromUrl);
 
-  const [page, setPage] = useState(pageFromUrl - 1);
   const [totalPages, setTotalPages] = useState(1);
 
   const [removingId, setRemovingId] = useState(null);
@@ -56,7 +58,7 @@ export default function HotelManagement() {
     if (!Array.isArray(list) || list.length === 0) return [];
 
     const tasks = list.map(async (h) => {
-      const hid = h?.hotelId;
+      const hid = h?.hotelId ?? h?.id;
       if (!hid) return h;
 
       if (managerCacheRef.current.has(hid)) {
@@ -80,12 +82,14 @@ export default function HotelManagement() {
     return Promise.all(tasks);
   }
 
-  async function loadHotels(currentPage = 0) {
+  async function loadHotels(pageUI) {
+    // pageUI: 1..n (UI)
+    const page0 = Math.max(0, Number(pageUI || 1) - 1);
+
     setLoading(true);
-    const close = popup.loading("Đang tải danh sách khách sạn...");
     try {
       const data = await getHotels({
-        page: currentPage,
+        page: page0,
         size: 5,
         sort: "hotelId,asc",
       });
@@ -95,127 +99,141 @@ export default function HotelManagement() {
 
       setHotels(withManagers);
       setTotalPages(data?.page?.totalPages ?? 1);
-      setPage(data?.page?.number ?? 0);
     } catch (error) {
       setHotels([]);
       setTotalPages(1);
-      setPage(0);
       popup.error(error?.message || "Tải danh sách khách sạn thất bại");
     } finally {
-      close?.();
       setLoading(false);
     }
   }
 
+  // ✅ giống UserManagement: load theo URL state
   useEffect(() => {
-    loadHotels(pageFromUrl - 1);
+    loadHotels(currentPage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageFromUrl]);
+  }, [currentPage, viewFromUrl]);
 
   // sync URL -> state
   useEffect(() => setViewMode(viewFromUrl), [viewFromUrl]);
 
+  const safeTotalPages = Math.max(1, totalPages || 1);
+
+  // nếu currentPage vượt totalPages -> kéo về (giống cách xử lý an toàn)
+  useEffect(() => {
+    if (currentPage > safeTotalPages) {
+      const safe = clamp(currentPage, 1, safeTotalPages);
+      const next = { page: String(safe), view: viewMode };
+      setSearchParams(next);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [safeTotalPages]);
+
   const handlePageChange = (p) => {
-    const next = { page: String(p), view: viewMode };
+    const safe = clamp(Number(p || 1), 1, safeTotalPages);
+    const next = { page: String(safe), view: viewMode };
     setSearchParams(next);
   };
 
   const applyViewMode = (nextMode) => {
     const v = nextMode === "table" ? "table" : "card";
     setViewMode(v);
-    setSearchParams({ page: String(page + 1 || 1), view: v });
+
+    const next = { page: String(currentPage || 1), view: v };
+    setSearchParams(next);
   };
 
+  // ✅ Xoá + popup confirm + loading (không bị chớp) + reload list (giống user)
   const handleRemove = async (hotelId) => {
+    const hid = Number(hotelId);
+    if (!hid) return;
+
     const ok = await popup.confirm(
       "Bạn có chắc chắn muốn xóa khách sạn này không?",
       "Xác nhận xóa",
     );
     if (!ok) return;
 
-    setRemovingId(hotelId);
+    setRemovingId(hid);
     const close = popup.loading("Đang xóa khách sạn...");
+
     try {
-      await deleteHotel(Number(hotelId));
+      await deleteHotel(hid);
+
+      close?.();
       popup.success("Đã xóa khách sạn");
-      await loadHotels(page);
+
+      // ✅ reload list theo đúng currentPage (cách user)
+      await loadHotels(currentPage);
     } catch (e) {
+      close?.();
       popup.error(e?.message || "Xóa thất bại");
     } finally {
-      close?.();
       setRemovingId(null);
     }
   };
 
-  const safeTotalPages = Math.max(1, totalPages || 1);
-
-  // nếu current page vượt totalPages -> kéo về
-  useEffect(() => {
-    if (page + 1 > safeTotalPages) {
-      const safe = clamp(page + 1, 1, safeTotalPages);
-      setSearchParams({ page: String(safe), view: viewMode });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [safeTotalPages]);
-
-  const visibleHotels = hotels;
+  const visibleHotels = useMemo(() => hotels, [hotels]);
 
   return (
     <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
       {/* HEADER */}
       <div className="flex flex-col gap-3 sm:gap-4 mb-6">
-        <div className="flex flex-col gap-3 sm:gap-4 mb-6">
-          {/* ROW 1: Title + Toggle view */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <h1 className="text-xl sm:text-2xl font-semibold">
-              Quản lý khách sạn
-            </h1>
+        {/* ROW 1: Title + Toggle view */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <h1 className="text-xl sm:text-2xl font-semibold">
+            Quản lý khách sạn
+          </h1>
 
-            {/* Toggle view */}
-            <div className="inline-flex rounded-full bg-gray-100 p-1">
-              <button
-                type="button"
-                onClick={() => applyViewMode("card")}
-                disabled={loading}
-                className={`px-4 py-2 rounded-full text-sm font-semibold transition disabled:opacity-60 ${
-                  viewMode === "card"
-                    ? "bg-white shadow text-gray-900"
-                    : "text-gray-700 hover:bg-white/60"
-                }`}
-              >
-                Thẻ
-              </button>
-              <button
-                type="button"
-                onClick={() => applyViewMode("table")}
-                disabled={loading}
-                className={`px-4 py-2 rounded-full text-sm font-semibold transition disabled:opacity-60 ${
-                  viewMode === "table"
-                    ? "bg-white shadow text-gray-900"
-                    : "text-gray-700 hover:bg-white/60"
-                }`}
-              >
-                Bảng
-              </button>
-            </div>
+          {/* Toggle view */}
+          <div className="inline-flex rounded-full bg-gray-100 p-1">
+            <button
+              type="button"
+              onClick={() => applyViewMode("card")}
+              disabled={loading}
+              className={`px-4 py-2 rounded-full text-sm font-semibold transition disabled:opacity-60 ${
+                viewMode === "card"
+                  ? "bg-white shadow text-gray-900"
+                  : "text-gray-700 hover:bg-white/60"
+              }`}
+            >
+              Thẻ
+            </button>
+            <button
+              type="button"
+              onClick={() => applyViewMode("table")}
+              disabled={loading}
+              className={`px-4 py-2 rounded-full text-sm font-semibold transition disabled:opacity-60 ${
+                viewMode === "table"
+                  ? "bg-white shadow text-gray-900"
+                  : "text-gray-700 hover:bg-white/60"
+              }`}
+            >
+              Bảng
+            </button>
+          </div>
+        </div>
+
+        {/* ROW 2: Actions */}
+        <div className="flex flex-col sm:flex-row sm:justify-end gap-2 sm:gap-3">
+          <div className="w-full sm:w-auto">
+            <HotelsImportExcelButton
+              onImported={async () => {
+                // ✅ sau import: reload list theo current page (cách user)
+                await loadHotels(currentPage);
+              }}
+            />
           </div>
 
-          {/* ROW 2: Actions */}
-          <div className="flex flex-col sm:flex-row sm:justify-end gap-2 sm:gap-3">
-            <div className="w-full sm:w-auto">
-              <HotelsImportExcelButton onImported={() => loadHotels(page)} />
-            </div>
-
-            <div className="w-full sm:w-auto">
-              <ExportHotelsExcelButton />
-            </div>
-
-            <Link to="/admin/hotels/add" className="w-full sm:w-auto">
-              <button className="w-full sm:w-auto px-5 py-2 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition">
-                Thêm khách sạn
-              </button>
-            </Link>
+          <div className="w-full sm:w-auto">
+            <ExportHotelsExcelButton />
           </div>
+
+          <Link to="/admin/hotels/add" className="w-full sm:w-auto">
+            <button className="w-full sm:w-auto px-5 py-2 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition">
+              Thêm khách sạn
+            </button>
+          </Link>
         </div>
       </div>
 
@@ -231,16 +249,19 @@ export default function HotelManagement() {
         </p>
       ) : viewMode === "card" ? (
         <div className="flex flex-col gap-4 sm:gap-6">
-          {visibleHotels.map((hotel) => (
-            <AdminHotelCard
-              key={hotel.hotelId}
-              hotel={hotel}
-              managerId={hotel.managerId}
-              manager={hotel.manager}
-              onEdit={() => {}}
-              onRemove={() => loadHotels(page)}
-            />
-          ))}
+          {visibleHotels.map((hotel) => {
+            const hid = hotel?.hotelId ?? hotel?.id;
+            return (
+              <AdminHotelCard
+                key={hid}
+                hotel={hotel}
+                managerId={hotel?.managerId}
+                manager={hotel?.manager}
+                onEdit={() => {}}
+                onRemove={() => handleRemove(hid)}
+              />
+            );
+          })}
         </div>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white">
@@ -262,6 +283,7 @@ export default function HotelManagement() {
             <tbody className="divide-y divide-gray-100">
               {visibleHotels.map((h) => {
                 const hid = h?.hotelId ?? h?.id;
+
                 return (
                   <tr key={hid} className="hover:bg-gray-50/70">
                     <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
@@ -316,11 +338,11 @@ export default function HotelManagement() {
                         <button
                           type="button"
                           onClick={() => handleRemove(hid)}
-                          disabled={!!removingId && removingId === hid}
+                          disabled={!!removingId && removingId === Number(hid)}
                           className="px-3 py-1.5 rounded-full bg-red-600 text-white hover:bg-red-700 transition disabled:opacity-60 inline-flex items-center gap-2"
                           title="Xóa"
                         >
-                          {removingId === hid ? (
+                          {removingId === Number(hid) ? (
                             <>
                               <Spinner /> Đang xóa...
                             </>
@@ -339,18 +361,12 @@ export default function HotelManagement() {
       )}
 
       {/* PAGINATION */}
-      {totalPages > 1 && (
-        <div className="mt-8 flex justify-center px-2">
-          <div className="w-full sm:w-auto overflow-x-auto">
-            <Pagination
-              totalPages={totalPages}
-              currentPage={page + 1}
-              visiblePages={null}
-              onPageChange={handlePageChange}
-            />
-          </div>
-        </div>
-      )}
+      <Pagination
+        totalPages={safeTotalPages}
+        currentPage={clamp(currentPage, 1, safeTotalPages)}
+        onPageChange={handlePageChange}
+        visiblePages={null}
+      />
     </div>
   );
 }

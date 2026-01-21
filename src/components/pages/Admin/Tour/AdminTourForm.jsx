@@ -50,22 +50,6 @@ export default function AdminTourForm({
       </div>
 
       <div>
-        <div className="text-sm font-medium mb-1">Link video</div>
-        <input
-          name="linkVideo"
-          value={form.linkVideo}
-          onChange={onChange}
-          onBlur={onBlur}
-          className={inputCls}
-          placeholder="Dán link video"
-        />
-        <FieldError
-          msg={fieldErrors.linkVideo}
-          show={submitted || touched.linkVideo}
-        />
-      </div>
-
-      <div>
         <div className="text-sm font-medium mb-1">Mô tả</div>
         <textarea
           name="description"

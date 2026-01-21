@@ -112,7 +112,7 @@ export default function NotificationManagement() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div className="min-w-0">
           <h1 className="text-xl sm:text-2xl font-semibold truncate">
-            Notification management
+            Quản lý thông báo
           </h1>
           <p className="mt-1 text-sm text-gray-500">
             Lọc, tìm kiếm và quản lý thông báo.

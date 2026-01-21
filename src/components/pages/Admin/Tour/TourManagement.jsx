@@ -89,9 +89,9 @@ export default function TourManagement() {
 
   const pageSize = 5;
 
+  // ✅ FIX: không dùng close?.() khi không có popup.loading ở đây
   const loadTours = async () => {
     setLoading(true);
-    const close = popup.loading("Đang tải danh sách tour...");
     try {
       const list = await getAllTours();
       setTours(list ?? []);
@@ -99,7 +99,6 @@ export default function TourManagement() {
       setTours([]);
       popup.error(e?.message || "Tải danh sách tour thất bại");
     } finally {
-      close?.();
       setLoading(false);
     }
   };
@@ -399,7 +398,12 @@ export default function TourManagement() {
           </button>
 
           <div className="w-full sm:w-auto">
-            <TourImportExcelButton defaultGuideId={1} onImported={loadTours} />
+            {/* ✅ FIX: truyền cả 2 prop cho chắc chắn (component import có thể dùng onDone hoặc onImported) */}
+            <TourImportExcelButton
+              defaultGuideId={1}
+              onDone={loadTours}
+              onImported={loadTours}
+            />
           </div>
 
           <button

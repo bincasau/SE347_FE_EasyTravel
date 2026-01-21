@@ -65,7 +65,6 @@ function roleLabel(role) {
   return "—";
 }
 
-// ✅ màu role theo đúng snippet bạn đưa
 function roleBadgeClass(role) {
   const v = normUpper(role);
   return v === "ADMIN"
@@ -77,7 +76,6 @@ function roleBadgeClass(role) {
         : "bg-gray-100 text-gray-700";
 }
 
-// ✅ chỉ 2 trạng thái
 function statusLabel(status) {
   const v = normUpper(status);
   return v === "ACTIVATED" ? "Đã kích hoạt" : "Chưa kích hoạt";
@@ -86,8 +84,8 @@ function statusLabel(status) {
 function statusBadgeClass(status) {
   const v = normUpper(status);
   return v === "ACTIVATED"
-    ? "bg-blue-100 text-blue-700" // xanh
-    : "bg-gray-100 text-gray-700"; // xám
+    ? "bg-blue-100 text-blue-700"
+    : "bg-gray-100 text-gray-700";
 }
 
 function extractApiErrorMessage(err) {
@@ -95,7 +93,6 @@ function extractApiErrorMessage(err) {
   if (typeof err === "string") return err;
   if (err?.message) return String(err.message);
 
-  // các kiểu hay gặp: { error: "..."} / { message: "..."} / { errors: [...] }
   const any = err;
   if (any?.error) return String(any.error);
   if (any?.data?.message) return String(any.data.message);
@@ -137,7 +134,6 @@ export default function UserManagement() {
 
   async function loadUsers(pageUI, role) {
     setLoading(true);
-    const close = popup.loading("Đang tải danh sách người dùng...");
     try {
       const keyword = (searchParams.get("q") || "").trim();
 
@@ -159,7 +155,6 @@ export default function UserManagement() {
         extractApiErrorMessage(e) || "Tải danh sách người dùng thất bại",
       );
     } finally {
-      close?.();
       setLoading(false);
     }
   }
@@ -223,6 +218,7 @@ export default function UserManagement() {
     el?.click();
   };
 
+  // ✅ FIX: kết quả import bị chớp do close() ở finally đè popup result
   const handleImportExcel = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -230,6 +226,7 @@ export default function UserManagement() {
 
     setImporting(true);
     const close = popup.loading("Đang nhập Excel...");
+
     try {
       const rs = await importUsersExcel(file, {
         defaultRole: roleFilter === "ALL" ? "CUSTOMER" : roleFilter,
@@ -237,24 +234,25 @@ export default function UserManagement() {
         defaultPassword: "123456",
       });
 
+      // ✅ đóng loading TRƯỚC khi show kết quả (không để trong finally)
+      close?.();
+
+      const summary = `Nhập xong: ${rs.ok} OK, ${rs.fail} FAIL (Tổng ${rs.total})`;
+
       if (rs?.errors?.length) {
         popup.error(
-          `Nhập xong: ${rs.ok} OK, ${rs.fail} FAIL\n\n` +
-            rs.errors.slice(0, 10).join("\n"),
+          `${summary}\n\n${rs.errors.slice(0, 20).join("\n")}`,
           "Kết quả nhập",
         );
       } else {
-        popup.success(
-          `Nhập xong: ${rs.ok} OK, ${rs.fail} FAIL`,
-          "Kết quả nhập",
-        );
+        popup.success(summary, "Kết quả nhập");
       }
 
       await loadUsers(currentPage, roleFilter);
     } catch (err) {
+      close?.();
       popup.error(extractApiErrorMessage(err) || "Nhập Excel thất bại");
     } finally {
-      close?.();
       setImporting(false);
     }
   };
@@ -288,6 +286,50 @@ export default function UserManagement() {
     if (keyword) next.q = keyword;
 
     setSearchParams(next);
+  };
+
+  const handleRemove = async (userId) => {
+    if (!userId) return;
+
+    const close = popup.loading("Đang xoá người dùng...");
+    try {
+      await adminDeleteUser(userId);
+      popup.success("Xoá người dùng thành công");
+      await loadUsers(currentPage, roleFilter);
+    } catch (e) {
+      popup.error(
+        extractApiErrorMessage(e) || "Xoá người dùng thất bại",
+        "Lỗi",
+      );
+    } finally {
+      close?.();
+    }
+  };
+
+  const handleRemoveFromCard = async (user) => {
+    const id = user?.userId ?? user?.id;
+    if (!id) return;
+
+    const ok = await popup.confirm(
+      `Bạn có chắc chắn muốn xóa người dùng "${user?.username}" không?`,
+      "Xác nhận xóa",
+    );
+    if (!ok) return;
+
+    await handleRemove(id);
+  };
+
+  const handleRemoveFromTable = async (u) => {
+    const id = u?.userId ?? u?.id;
+    if (!id) return;
+
+    const ok = await popup.confirm(
+      `Bạn có chắc chắn muốn xóa người dùng "${u?.username}" không?`,
+      "Xác nhận xóa",
+    );
+    if (!ok) return;
+
+    await handleRemove(id);
   };
 
   return (
@@ -425,7 +467,11 @@ export default function UserManagement() {
       ) : viewMode === "card" ? (
         <div className="flex flex-col gap-4 sm:gap-6">
           {users.map((user) => (
-            <AdminUserCard key={user.userId} user={user} />
+            <AdminUserCard
+              key={user?.userId ?? user?.id}
+              user={user}
+              onRemove={handleRemoveFromCard}
+            />
           ))}
         </div>
       ) : (
@@ -504,7 +550,7 @@ export default function UserManagement() {
 
                         <button
                           type="button"
-                          onClick={() => handleRemove(id)}
+                          onClick={() => handleRemoveFromTable(u)}
                           className="px-3 py-1.5 rounded-full bg-red-600 text-white hover:bg-red-700 transition"
                           title="Xóa"
                         >

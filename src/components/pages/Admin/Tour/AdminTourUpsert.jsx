@@ -25,7 +25,6 @@ function Spinner() {
 function buildEmptyForm() {
   return {
     title: "",
-    linkVideo: "",
     description: "",
     priceAdult: 0,
     priceChild: 0,
@@ -59,7 +58,6 @@ function mapTourToForm(tour, tourGuides) {
 
   return {
     title: tour.title ?? "",
-    linkVideo: tour.linkVideo ?? "",
     description: tour.description ?? "",
     priceAdult: tour.priceAdult ?? 0,
     priceChild: tour.priceChild ?? 0,
@@ -105,7 +103,6 @@ function validateForm(next, isEdit) {
   const e = {};
 
   if (!next.title?.trim()) e.title = "Vui lòng nhập tiêu đề.";
-  if (!next.linkVideo?.trim()) e.linkVideo = "Vui lòng nhập link video.";
   if (!next.departureLocation?.trim())
     e.departureLocation = "Vui lòng nhập nơi xuất phát.";
   if (!next.destination?.trim()) e.destination = "Vui lòng nhập điểm đến.";
@@ -423,7 +420,6 @@ export default function AdminTourUpsert() {
       popup.error("Vui lòng kiểm tra lại các trường bị lỗi.");
       setTouched({
         title: true,
-        linkVideo: true,
         departureLocation: true,
         destination: true,
         tourGuideId: true,
