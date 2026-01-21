@@ -261,9 +261,7 @@ export default function HotelReviews({ hotelId }) {
 
   return (
     <section className="mt-14">
-      <h2 className="text-3xl font-podcast mb-6">
-        Hotel Reviews ({reviews.length})
-      </h2>
+      <h2 className="text-3xl font-semibold mb-6">Hotel Reviews</h2>
 
       {/* LIST */}
       {loading ? (

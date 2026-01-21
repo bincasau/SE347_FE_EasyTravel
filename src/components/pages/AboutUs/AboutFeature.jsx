@@ -18,7 +18,7 @@ export function AboutFeature() {
           </p>
 
           <h2
-            className="mt-3 font-poppins font-bold
+            className="mt-3 font-bold
                        text-3xl sm:text-4xl lg:text-[46px]
                        text-gray-900 leading-tight tracking-wide"
           >
@@ -54,3 +54,4 @@ function Stat({ title, label }) {
     </div>
   );
 }
+

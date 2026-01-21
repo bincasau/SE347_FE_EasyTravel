@@ -174,7 +174,7 @@ export default function HotelList() {
     <div className="bg-gray-50 py-10 sm:py-12 flex flex-col items-center min-h-screen">
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 relative z-30">
         <div className="flex items-center justify-between gap-3 mb-6">
-          <h2 className="text-3xl sm:text-4xl font-podcast text-gray-800">
+          <h2 className="text-3xl sm:text-4xl font-semibold text-gray-800">
             {t("hotelPage.title")}
           </h2>
 

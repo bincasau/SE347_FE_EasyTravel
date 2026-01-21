@@ -12,7 +12,7 @@ export function Hero() {
 
       <div className="relative z-10 text-center px-4 sm:px-6 max-w-6xl">
         <h1
-          className="font-podcast font-normal
+          className="font-semibold
                      text-3xl sm:text-5xl lg:text-[72px]
                      tracking-[0.02em] leading-tight
                      drop-shadow-[0_2px_12px_rgba(0,0,0,.45)]"
@@ -31,7 +31,7 @@ export function Hero() {
         </p>
 
         <a
-          href="#packages"
+          href="/tours"
           className="inline-flex items-center justify-center mt-8 sm:mt-12
                      px-6 sm:px-8 py-3
                      rounded-full border border-white/80 text-sm sm:text-base font-medium
@@ -43,3 +43,4 @@ export function Hero() {
     </section>
   );
 }
+

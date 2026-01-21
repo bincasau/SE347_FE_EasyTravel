@@ -1,10 +1,15 @@
 // src/pages/Admin/AdminDashboard.jsx
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { getToken, isLoggedIn } from "@/utils/auth";
+import { popup } from "@/utils/popup";
+
+const API_BASE = "http://localhost:8080";
+const API_URL = `${API_BASE}/admin/stats`; // <-- đổi nếu endpoint khác
 
 function formatVND(n) {
   const v = Number(n ?? 0);
-  if (Number.isNaN(v)) return String(n ?? "0");
+  if (!Number.isFinite(v)) return String(n ?? "0");
   return v.toLocaleString("vi-VN") + " đ";
 }
 
@@ -64,113 +69,146 @@ function MiniBar({ value = 50 }) {
   );
 }
 
+/** map revenueLast6Months => [{m:"Aug", v:62}, ...] */
+function mapRevenueLast6Months(revenueLast6Months) {
+  const order = ["AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER", "JANUARY"];
+  const label = {
+    AUGUST: "Aug",
+    SEPTEMBER: "Sep",
+    OCTOBER: "Oct",
+    NOVEMBER: "Nov",
+    DECEMBER: "Dec",
+    JANUARY: "Jan",
+  };
+
+  const vals = order.map((k) => Number(revenueLast6Months?.[k] ?? 0));
+  const max = Math.max(...vals, 0);
+
+  // percent mock bar theo max (nếu max=0 thì all 0)
+  return order.map((k, i) => ({
+    m: label[k] ?? k,
+    raw: vals[i],
+    v: max > 0 ? Math.round((vals[i] / max) * 100) : 0,
+  }));
+}
+
 export default function AdminDashboard() {
-  // ===================== MOCK DATA =====================
-  const kpis = useMemo(
-    () => [
-      { label: "Total Tours", value: 128, sub: "+12% vs last month" },
-      { label: "Total Users", value: 542, sub: "+3% vs last month" },
-      { label: "Total Hotels", value: 32, sub: "Stable" },
-      { label: "Bookings Today", value: 18, sub: "Last 24h" },
+  const token = getToken();
+
+  const [dash, setDash] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const fetchDashboard = useCallback(async () => {
+    const res = await fetch(API_URL, {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      cache: "no-store",
+    });
+
+    const ct = res.headers.get("content-type") || "";
+    const raw = ct.includes("application/json")
+      ? await res.json().catch(async () => await res.text())
+      : await res.text();
+
+    console.log("[AdminDashboard] GET", { url: API_URL, status: res.status, ct, raw });
+
+    if (!res.ok) {
+      throw new Error(typeof raw === "string" ? raw : JSON.stringify(raw));
+    }
+    return raw;
+  }, [token]);
+
+  useEffect(() => {
+    let alive = true;
+
+    const run = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        if (!isLoggedIn()) {
+          setDash(null);
+          setLoading(false);
+          return;
+        }
+
+        const data = await fetchDashboard();
+        if (alive) setDash(data);
+      } catch (e) {
+        if (alive) {
+          setError(e?.message || "Fetch failed");
+          setDash(null);
+        }
+      } finally {
+        if (alive) setLoading(false);
+      }
+    };
+
+    run();
+    return () => {
+      alive = false;
+    };
+  }, [fetchDashboard]);
+
+  /** ===== Derived UI data ===== */
+  const kpis = useMemo(() => {
+    const x = dash || {};
+    return [
+      { label: "Activated Tours", value: x.totalToursActive ?? 0 },
+      { label: "Passed Tours", value: x.totalToursPassed ?? 0 },
+      { label: "Canceled Tours", value: x.totalToursCanceled ?? 0 },
+      { label: "Total Hotels", value: x.totalHotels ?? 0 },
+      { label: "Bookings This Month", value: x.totalBookingsThisMonth ?? 0 },
       {
         label: "Revenue This Month",
-        value: formatVND(125000000),
-        sub: "Updated 5 mins ago",
+        value: formatVND(x.totalRevenueThisMonth ?? 0),
+        sub: loading ? "Loading..." : "Updated just now",
       },
-    ],
-    []
-  );
+      {
+        label: "Admins",
+        value: x.countAdmin ?? 0,
+      },
+      {
+        label: "Customers",
+        value: x.countCustomer ?? 0,
+      },
+      {
+        label: "Tour Guides",
+        value: x.countTourGuide ?? 0,
+      },
+      {
+        label: "Hotel Managers",
+        value: x.countHotelManager ?? 0,
+      },
+    ];
+  }, [dash, loading]);
 
-  const revenue = useMemo(
-    () => [
-      { m: "Aug", v: 62 },
-      { m: "Sep", v: 48 },
-      { m: "Oct", v: 75 },
-      { m: "Nov", v: 58 },
-      { m: "Dec", v: 82 },
-      { m: "Jan", v: 66 },
-    ],
-    []
-  );
+  const revenue = useMemo(() => {
+    return mapRevenueLast6Months(dash?.revenueLast6Months);
+  }, [dash]);
 
-  const tourStatus = useMemo(
-    () => [
-      { label: "Activated", value: 45, tone: "green" },
-      { label: "Passed", value: 32, tone: "blue" },
-      { label: "Pending", value: 18, tone: "yellow" },
-      { label: "Cancelled", value: 3, tone: "red" },
-    ],
-    []
-  );
+  const tourStatus = useMemo(() => {
+    return [
+      { label: "Activated", value: dash?.totalToursActive ?? 0, tone: "green" },
+      { label: "Passed", value: dash?.totalToursPassed ?? 0, tone: "blue" },
+      { label: "Cancelled", value: dash?.totalToursCanceled ?? 0, tone: "red" },
+      // Nếu BE có Pending thì add vào đây
+    ];
+  }, [dash]);
 
-  const upcomingTours = useMemo(
-    () => [
-      {
-        id: 1,
-        title: "Hạ Long - Kỳ Quan Thiên Nhiên",
-        start: "2025-12-14",
-        seats: "5/30",
-      },
-      {
-        id: 2,
-        title: "Ngũ Hành Sơn - Phố Cổ Hội An",
-        start: "2025-12-20",
-        seats: "0/25",
-      },
-      {
-        id: 3,
-        title: "Sapa - Chinh phục nóc nhà Đông Dương",
-        start: "2025-12-25",
-        seats: "2/20",
-      },
-      {
-        id: 4,
-        title: "Ninh Bình - Tràng An - Bái Đính",
-        start: "2025-12-28",
-        seats: "12/20",
-      },
-      {
-        id: 5,
-        title: "Đà Lạt - Thành phố ngàn hoa",
-        start: "2026-01-05",
-        seats: "7/25",
-      },
-    ],
-    []
-  );
+  const upcomingTours = useMemo(() => {
+    return Array.isArray(dash?.upcomingActiveTours) ? dash.upcomingActiveTours : [];
+  }, [dash]);
 
-  const recentNotis = useMemo(
-    () => [
-      {
-        id: 31,
-        type: "User",
-        status: "Unread",
-        active: true,
-        createdAt: "15/01/2026 22:52",
-        message:
-          'Tour "12132" đã bị huỷ. Hệ thống sẽ tự động hoàn tiền cho đơn đặt tour của bạn.',
-      },
-      {
-        id: 29,
-        type: "User",
-        status: "Unread",
-        active: true,
-        createdAt: "15/01/2026 22:41",
-        message: "1111",
-      },
-      {
-        id: 28,
-        type: "Broadcast",
-        status: "Read",
-        active: false,
-        createdAt: "14/01/2026 09:10",
-        message: "Hệ thống sẽ bảo trì lúc 23:30 hôm nay.",
-      },
-    ],
-    []
-  );
+  const recentNotis = useMemo(() => {
+    return Array.isArray(dash?.broadcastNotifications) ? dash.broadcastNotifications : [];
+  }, [dash]);
 
-  // ===================== UI =====================
+  /** ===== UI ===== */
   return (
     <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
       {/* HEADER */}
@@ -178,8 +216,16 @@ export default function AdminDashboard() {
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Overview admin (mock UI)
+            Overview admin {!loading && error ? "• Error" : ""}
           </p>
+          {error ? (
+            <div className="mt-2 text-sm text-red-600 break-words">{error}</div>
+          ) : null}
+          {!isLoggedIn() ? (
+            <div className="mt-2 text-sm text-yellow-700">
+              Bạn chưa đăng nhập.
+            </div>
+          ) : null}
         </div>
 
         {/* QUICK ACTIONS (top) */}
@@ -189,7 +235,7 @@ export default function AdminDashboard() {
               + Add Tour
             </button>
           </Link>
-          <Link to="/admin/hotels/new" className="w-full sm:w-auto">
+          <Link to="/admin/hotels/add" className="w-full sm:w-auto">
             <button className="w-full sm:w-auto bg-orange-500 text-white px-5 py-2 rounded-full font-semibold hover:bg-orange-600 transition">
               + Add Hotel
             </button>
@@ -204,14 +250,14 @@ export default function AdminDashboard() {
 
       {/* KPI */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-        {kpis.map((x, idx) => (
+        {kpis.slice(0, 5).map((x, idx) => (
           <KpiCard key={idx} label={x.label} value={x.value} sub={x.sub} />
         ))}
       </div>
 
       {/* CHARTS */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        {/* Revenue (mock bars) */}
+        {/* Revenue */}
         <div className="lg:col-span-2">
           <Panel
             title="Revenue (Last 6 Months)"
@@ -232,13 +278,13 @@ export default function AdminDashboard() {
                   <div className="flex-1 min-w-0">
                     <MiniBar value={r.v} />
                   </div>
-                  <div className="w-10 text-sm text-gray-500 text-right shrink-0">
-                    {r.v}%
+                  <div className="w-24 text-sm text-gray-500 text-right shrink-0">
+                    {formatVND(r.raw)}
                   </div>
                 </div>
               ))}
               <div className="text-xs text-gray-400 mt-2">
-                (Mock chart) — sau này thay bằng chart lib nếu muốn.
+                (Bar theo % của tháng cao nhất)
               </div>
             </div>
           </Panel>
@@ -258,21 +304,13 @@ export default function AdminDashboard() {
           >
             <div className="space-y-3">
               {tourStatus.map((s) => (
-                <div
-                  key={s.label}
-                  className="flex items-center justify-between gap-3"
-                >
+                <div key={s.label} className="flex items-center justify-between gap-3">
                   <Badge tone={s.tone}>{s.label}</Badge>
                   <div className="text-sm font-semibold text-gray-900">
                     {s.value}
                   </div>
                 </div>
               ))}
-              <div className="pt-2">
-                <div className="text-xs text-gray-400">
-                  Gợi ý: dùng Pie/Donut chart khi có thời gian.
-                </div>
-              </div>
             </div>
           </Panel>
         </div>
@@ -302,27 +340,35 @@ export default function AdminDashboard() {
               </thead>
               <tbody>
                 {upcomingTours.map((t) => (
-                  <tr key={t.id} className="border-t border-gray-100">
+                  <tr key={t.tourId} className="border-t border-gray-100">
                     <td className="py-3 pr-2">
                       <div className="font-semibold text-gray-900 line-clamp-1">
                         {t.title}
                       </div>
-                      <div className="text-xs text-gray-400">ID: {t.id}</div>
+                      <div className="text-xs text-gray-400">ID: {t.tourId}</div>
                     </td>
-                    <td className="py-3 pr-2 text-gray-700">{t.start}</td>
+                    <td className="py-3 pr-2 text-gray-700">{t.startDate}</td>
                     <td className="py-3 text-right font-semibold text-gray-900">
-                      {t.seats}
+                      {t.availableSeats}
                     </td>
                   </tr>
                 ))}
+
+                {!loading && upcomingTours.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="py-6 text-center text-gray-500">
+                      No upcoming tours
+                    </td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
           </div>
         </Panel>
 
-        {/* Recent Notifications */}
+        {/* Broadcast Notifications */}
         <Panel
-          title="Recent Notifications"
+          title="Broadcast Notifications"
           right={
             <Link to="/admin/notifications">
               <button className="border border-orange-500 text-orange-500 px-4 py-1.5 rounded-full hover:bg-orange-500 hover:text-white transition text-sm font-semibold w-full sm:w-auto">
@@ -333,33 +379,26 @@ export default function AdminDashboard() {
         >
           <div className="space-y-4">
             {recentNotis.map((n) => (
-              <div
-                key={n.id}
-                className="border border-gray-100 rounded-xl p-4"
-              >
+              <div key={n.notificationId} className="border border-gray-100 rounded-xl p-4">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-semibold text-gray-900">
-                      Mã: {n.id}
+                      Mã: {n.notificationId}
                     </span>
 
-                    <Badge tone={n.type === "Broadcast" ? "purple" : "blue"}>
-                      {n.type === "Broadcast"
-                        ? "Gửi broadcast"
-                        : "Gửi theo người dùng"}
+                    <Badge tone="purple">Broadcast</Badge>
+
+                    <Badge tone={n.read ? "gray" : "yellow"}>
+                      {n.read ? "Đã đọc" : "Chưa đọc"}
                     </Badge>
 
-                    <Badge tone={n.status === "Unread" ? "yellow" : "gray"}>
-                      {n.status === "Unread" ? "Chưa đọc" : "Đã đọc"}
-                    </Badge>
-
-                    <Badge tone={n.active ? "green" : "red"}>
-                      {n.active ? "Đang kích hoạt" : "Tắt kích hoạt"}
+                    <Badge tone={n.status === "ACTIVE" ? "green" : "red"}>
+                      {n.status === "ACTIVE" ? "Đang kích hoạt" : "Tắt kích hoạt"}
                     </Badge>
                   </div>
 
                   <div className="text-xs text-gray-400 whitespace-nowrap sm:text-right">
-                    {n.createdAt}
+                    {String(n.createdAt ?? "")}
                   </div>
                 </div>
 
@@ -368,6 +407,10 @@ export default function AdminDashboard() {
                 </div>
               </div>
             ))}
+
+            {!loading && recentNotis.length === 0 ? (
+              <div className="text-sm text-gray-500">No notifications</div>
+            ) : null}
           </div>
         </Panel>
       </div>
@@ -376,9 +419,7 @@ export default function AdminDashboard() {
       <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-4 sm:p-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <div className="text-base font-semibold text-gray-900">
-              Quick Actions
-            </div>
+            <div className="text-base font-semibold text-gray-900">Quick Actions</div>
             <div className="text-sm text-gray-500 mt-1">
               Điều hướng nhanh tới các trang quản lý.
             </div>
@@ -410,8 +451,34 @@ export default function AdminDashboard() {
                 Blogs
               </button>
             </Link>
+
+            <button
+              onClick={async () => {
+                try {
+                  if (!isLoggedIn()) return popup.error("Bạn chưa đăng nhập!");
+                  setLoading(true);
+                  const data = await fetchDashboard();
+                  setDash(data);
+                  popup.success("Reload dashboard OK!");
+                } catch (e) {
+                  popup.error(e?.message || "Reload failed");
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              className="w-full sm:w-auto border border-gray-300 text-gray-700 px-5 py-2 rounded-full font-semibold hover:bg-gray-50 transition"
+            >
+              Reload
+            </button>
           </div>
         </div>
+      </div>
+
+      {/* EXTRA KPI ROW (optional) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-6">
+        {kpis.slice(5, 10).map((x, idx) => (
+          <KpiCard key={idx} label={x.label} value={x.value} sub={x.sub} />
+        ))}
       </div>
     </div>
   );

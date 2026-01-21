@@ -15,12 +15,12 @@ export default function OurMember() {
     <section className="w-full py-12 sm:py-16 lg:py-24 bg-white">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-20 text-center">
         <div className="inline-block px-6 sm:px-8 py-2 rounded-full mb-4 bg-amber-100">
-          <span className="font-podcast text-xl sm:text-2xl tracking-wide text-amber-700 font-semibold">
+          <span className="text-xl sm:text-2xl tracking-wide text-amber-700 font-semibold">
             Easy Travel Team
           </span>
         </div>
 
-        <h2 className="font-poppins font-bold text-3xl sm:text-5xl text-gray-900">
+        <h2 className="font-bold text-3xl sm:text-5xl text-gray-900">
           Our Member
         </h2>
         <div className="w-24 h-1 bg-amber-500 mx-auto mt-3 rounded-full" />
@@ -46,7 +46,7 @@ export default function OurMember() {
               </div>
 
               <div className="py-6 px-6">
-                <h3 className="font-poppins font-semibold text-xl text-gray-900">
+                <h3 className="font-semibold text-xl text-gray-900">
                   {m.name}
                 </h3>
                 <p className="text-gray-500 text-sm mt-1">{m.role}</p>
@@ -64,3 +64,4 @@ export default function OurMember() {
     </section>
   );
 }
+

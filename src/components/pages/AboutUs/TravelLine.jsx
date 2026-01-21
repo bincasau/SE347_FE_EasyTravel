@@ -7,10 +7,10 @@ export default function Travelline() {
     <section className="relative w-full bg-white">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-20 py-12 sm:py-16">
         <div className="text-center mb-10 sm:mb-12">
-          <p className="font-poppins text-xs sm:text-sm tracking-[0.25em] uppercase text-gray-700">
+          <p className="text-xs sm:text-sm tracking-[0.25em] uppercase text-gray-700">
             Vacation Agency
           </p>
-          <h2 className="font-poppins font-extrabold text-4xl sm:text-6xl lg:text-7xl leading-tight">
+          <h2 className="font-extrabold text-4xl sm:text-6xl lg:text-7xl leading-tight">
             The Best Holidays
             <br />
             Start Here!
@@ -36,7 +36,7 @@ export default function Travelline() {
                   className="rounded-xl w-full max-w-[520px] aspect-[16/10] object-cover"
                   alt="Journey"
                 />
-                <h3 className="font-poppins font-semibold text-lg sm:text-xl mt-4">
+                <h3 className="font-semibold text-lg sm:text-xl mt-4">
                   Journey To Happiness
                 </h3>
                 <p className="text-gray-600 text-sm sm:text-base mt-1 max-w-xl">
@@ -56,7 +56,7 @@ export default function Travelline() {
 
             <div className="flex flex-col gap-y-12 sm:gap-y-16 lg:gap-y-20 lg:mt-32">
               <div className="text-center lg:text-left">
-                <h4 className="font-poppins font-semibold text-lg sm:text-xl">
+                <h4 className="font-semibold text-lg sm:text-xl">
                   Traveling on a Budget
                 </h4>
                 <p className="text-sm sm:text-base text-gray-600 mt-2">
@@ -71,7 +71,7 @@ export default function Travelline() {
               </div>
 
               <div className="text-center lg:text-left">
-                <h4 className="font-poppins font-semibold text-lg sm:text-xl">
+                <h4 className="font-semibold text-lg sm:text-xl">
                   Discover New Horizons
                 </h4>
                 <p className="text-sm sm:text-base text-gray-600 mt-2">
@@ -86,3 +86,4 @@ export default function Travelline() {
     </section>
   );
 }
+

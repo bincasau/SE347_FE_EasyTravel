@@ -41,7 +41,7 @@ export default function Testimonials() {
     <section className="w-full py-12 sm:py-16 bg-white">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-20">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="font-poppins font-semibold text-xl sm:text-3xl">
+          <h2 className="font-semibold text-xl sm:text-3xl">
             Happy Customers Says
           </h2>
 
@@ -100,10 +100,11 @@ function TestimonialCard({ name, avatar, text }) {
           alt={name}
           className="w-12 h-12 rounded-full object-cover ring-2 ring-white shadow mb-2"
         />
-        <div className="font-poppins text-gray-700 text-sm">{name}</div>
+        <div className="text-gray-700 text-sm">{name}</div>
       </div>
 
       <p className="mt-4 text-[13.5px] leading-6 text-gray-600">{text}</p>
     </div>
   );
 }
+

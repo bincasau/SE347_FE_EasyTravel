@@ -30,9 +30,10 @@ function FeatureCard({ icon, text }) {
                  transition-all duration-200 hover:bg-white/70 hover:-translate-y-1"
     >
       <i className={`${icon} text-[#E27A14] text-3xl mb-4`} />
-      <p className="text-sm font-poppins font-bold text-gray-800 leading-6">
+      <p className="text-sm font-bold text-gray-800 leading-6">
         {text}
       </p>
     </div>
   );
 }
+

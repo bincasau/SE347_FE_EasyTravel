@@ -5,6 +5,7 @@ import {
   getCommentsByBlogId,
   updateComment,
 } from "@/apis/CommentAPI";
+import { getAccountDetail } from "@/apis/AccountAPI";
 import { popup } from "@/utils/popup";
 import { isLoggedIn } from "@/utils/auth";
 
@@ -50,10 +51,11 @@ function Avatar({ name, avatar }) {
  * - isLoggedIn?: boolean (optional) -> nếu có, component dùng theo prop này
  * - onOpenLogin?: () => void (optional) -> bấm để mở modal login
  */
-export default function BlogComments({ blogId, isLoggedIn, onOpenLogin }) {
+export default function BlogComments({ blogId, isLoggedIn: isLoggedInProp, onOpenLogin }) {
   const [comments, setComments] = useState([]);
   const [visibleCount, setVisibleCount] = useState(4);
   const [loading, setLoading] = useState(true);
+  const [loggedIn, setLoggedIn] = useState(false);
 
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -62,17 +64,31 @@ export default function BlogComments({ blogId, isLoggedIn, onOpenLogin }) {
   const [editingContent, setEditingContent] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
-  // ===== detect login (fallback) =====
-  // Nếu bạn có auth store thì hãy truyền isLoggedIn từ ngoài vào cho chuẩn.
-  const fallbackLoggedIn = useMemo(() => {
-    try {
-      return isLoggedIn();
-    } catch {
-      return false;
-    }
-  }, []);
+  // ===== detect login (reactive) =====
+  useEffect(() => {
+    const syncLogin = async () => {
+      if (typeof isLoggedInProp === "boolean") {
+        setLoggedIn(isLoggedInProp);
+        return;
+      }
+      const flag = isLoggedIn();
+      if (flag) {
+        setLoggedIn(true);
+        return;
+      }
+      try {
+        await getAccountDetail();
+        setLoggedIn(true);
+      } catch {
+        setLoggedIn(false);
+      }
+    };
 
-  const loggedIn = typeof isLoggedIn === "boolean" ? isLoggedIn : fallbackLoggedIn;
+    syncLogin();
+    const onJwtChanged = () => syncLogin();
+    window.addEventListener("jwt-changed", onJwtChanged);
+    return () => window.removeEventListener("jwt-changed", onJwtChanged);
+  }, [isLoggedInProp]);
 
   const visibleComments = useMemo(
     () => comments.slice(0, visibleCount),
@@ -417,3 +433,6 @@ export default function BlogComments({ blogId, isLoggedIn, onOpenLogin }) {
     </div>
   );
 }
+
+
+

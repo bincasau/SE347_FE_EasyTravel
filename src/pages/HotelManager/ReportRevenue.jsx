@@ -29,7 +29,13 @@ function normalizeStats(raw) {
   };
 }
 
-/** ✅ reducer để update month+year atomically (không bị StrictMode double call) */
+/** ✅ current month/year */
+function getNowYM() {
+  const d = new Date();
+  return { month: d.getMonth() + 1, year: d.getFullYear() };
+}
+
+/** ✅ reducer month+year atomically */
 function ymReducer(state, action) {
   switch (action.type) {
     case "PREV": {
@@ -48,17 +54,23 @@ function ymReducer(state, action) {
       const y = clampInt(action.year, 1970, 2100, state.year);
       return { month: state.month, year: y };
     }
+    case "SET_YM": {
+      const m = clampInt(action.month, 1, 12, state.month);
+      const y = clampInt(action.year, 1970, 2100, state.year);
+      return { month: m, year: y };
+    }
     default:
       return state;
   }
 }
 
 export default function RevenueReport() {
-  /** ===== State ===== */
-  const [{ month, year }, dispatch] = useReducer(ymReducer, { month: 12, year: 2025 });
+  /** ✅ init = current month/year */
+  const nowYM = useMemo(() => getNowYM(), []);
+  const [{ month, year }, dispatch] = useReducer(ymReducer, nowYM);
 
   // ✅ draft year (string để nhập không bị giật)
-  const [draftYear, setDraftYear] = useState(String(2025));
+  const [draftYear, setDraftYear] = useState(String(nowYM.year));
 
   const [stats, setStats] = useState(null);
   const [prevStats, setPrevStats] = useState(null);
@@ -74,10 +86,25 @@ export default function RevenueReport() {
 
   const token = getToken();
 
-  const safeMonth = useMemo(() => clampInt(month, 1, 12, 1), [month]);
-  const safeYear = useMemo(() => clampInt(year, 1970, 2100, 2025), [year]);
+  const safeMonth = useMemo(() => clampInt(month, 1, 12, nowYM.month), [month, nowYM.month]);
+  const safeYear = useMemo(() => clampInt(year, 1970, 2100, nowYM.year), [year, nowYM.year]);
 
-  // ✅ commit draftYear -> year
+  /** ✅ giới hạn không cho vượt quá tháng hiện tại */
+  const isCurrentOrFuture = useMemo(() => {
+    // true nếu đang là tháng hiện tại hoặc tương lai (tương lai thì chặn)
+    if (safeYear > nowYM.year) return true;
+    if (safeYear === nowYM.year && safeMonth >= nowYM.month) return true;
+    return false;
+  }, [safeMonth, safeYear, nowYM.month, nowYM.year]);
+
+  const canGoNext = useMemo(() => {
+    // chỉ cho next nếu vẫn < tháng hiện tại
+    if (safeYear < nowYM.year) return true;
+    if (safeYear === nowYM.year) return safeMonth < nowYM.month;
+    return false;
+  }, [safeMonth, safeYear, nowYM.month, nowYM.year]);
+
+  // ✅ commit draftYear -> year (và nếu vượt hiện tại thì kéo month về tháng hiện tại)
   const commitDraftYear = useCallback(() => {
     const trimmed = String(draftYear ?? "").trim();
     if (trimmed === "") {
@@ -89,12 +116,20 @@ export default function RevenueReport() {
       setDraftYear(String(safeYear));
       return;
     }
-    const clamped = clampInt(n, 1970, 2100, safeYear);
-    dispatch({ type: "SET_YEAR", year: clamped });
-    setDraftYear(String(clamped));
-  }, [draftYear, safeYear]);
+    const y = clampInt(n, 1970, 2100, safeYear);
 
-  // ✅ sync draftYear khi year change (do prev/next month)
+    // nếu user nhập year tương lai -> clamp về year hiện tại
+    const finalYear = Math.min(y, nowYM.year);
+
+    // nếu cùng year hiện tại mà month đang > current month -> kéo về current month
+    const finalMonth =
+      finalYear === nowYM.year ? Math.min(safeMonth, nowYM.month) : safeMonth;
+
+    dispatch({ type: "SET_YM", year: finalYear, month: finalMonth });
+    setDraftYear(String(finalYear));
+  }, [draftYear, safeYear, safeMonth, nowYM.year, nowYM.month]);
+
+  // ✅ sync draftYear khi year change
   useEffect(() => {
     setDraftYear(String(safeYear));
   }, [safeYear]);
@@ -116,14 +151,15 @@ export default function RevenueReport() {
     return { pm, py };
   }, [safeMonth, safeYear]);
 
-  /** ✅ Prev/Next month: dispatch reducer (no side-effect inside updater) */
+  /** ✅ Prev/Next month */
   const goPrevMonth = useCallback(() => {
     dispatch({ type: "PREV" });
   }, []);
 
   const goNextMonth = useCallback(() => {
+    if (!canGoNext) return;
     dispatch({ type: "NEXT" });
-  }, []);
+  }, [canGoNext]);
 
   /** ✅ fetch stats by month/year */
   const fetchStatsByMonth = useCallback(
@@ -163,7 +199,6 @@ export default function RevenueReport() {
       try {
         setLoading(true);
         setError("");
-
 
         const cur = await fetchStatsByMonth({ month: safeMonth, year: safeYear });
         if (alive) setStats(cur);
@@ -310,9 +345,7 @@ export default function RevenueReport() {
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-gray-50">
-      {/* ✅ VÙNG EXPORT PDF */}
       <div ref={exportRef} className="bg-white">
-        {/* ✅ HEADER cho PDF */}
         {pdfMode && (
           <div className="px-4 sm:px-6 pt-8 pb-4 text-center">
             <h1 className="text-2xl font-semibold text-gray-900">REVENUE REPORT</h1>
@@ -324,20 +357,15 @@ export default function RevenueReport() {
           </div>
         )}
 
-        {/* ✅ UI header bình thường */}
         {!pdfMode && (
           <div className="bg-white border-b">
             <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-              <h1 className="text-2xl font-semibold text-gray-900 text-center">
-                Revenue Report
-              </h1>
+              <h1 className="text-2xl font-semibold text-gray-900 text-center">Revenue Report</h1>
               <p className="text-sm text-gray-500 text-center mt-1">
                 Room distribution & monthly comparison
               </p>
 
-              {/* ✅ responsive toolbar */}
               <div className="mt-6 flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
-                {/* Left: prev/label/next */}
                 <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3">
                   <button
                     onClick={goPrevMonth}
@@ -352,32 +380,40 @@ export default function RevenueReport() {
 
                   <button
                     onClick={goNextMonth}
-                    className="px-3 py-2 border rounded-lg text-sm hover:bg-gray-50"
+                    disabled={!canGoNext}
+                    className="px-3 py-2 border rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50"
+                    title={!canGoNext ? "Cannot view future months" : ""}
                   >
                     Next →
                   </button>
                 </div>
 
-                {/* Right: controls */}
                 <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center justify-center lg:justify-end gap-3">
                   <select
                     className="border rounded-lg px-3 py-2 text-sm bg-white w-full sm:w-auto"
                     value={safeMonth}
-                    onChange={(e) =>
-                      dispatch({ type: "SET_MONTH", month: Number(e.target.value) })
-                    }
+                    onChange={(e) => {
+                      const m = Number(e.target.value);
+
+                      // nếu chọn month vượt current month trong current year -> clamp về current month
+                      if (safeYear === nowYM.year && m > nowYM.month) {
+                        dispatch({ type: "SET_MONTH", month: nowYM.month });
+                        return;
+                      }
+                      dispatch({ type: "SET_MONTH", month: m });
+                    }}
                   >
                     {Array.from({ length: 12 }).map((_, i) => {
                       const m = i + 1;
+                      const disabled = safeYear === nowYM.year && m > nowYM.month;
                       return (
-                        <option key={m} value={m}>
+                        <option key={m} value={m} disabled={disabled}>
                           Month {m}
                         </option>
                       );
                     })}
                   </select>
 
-                  {/* ✅ Year input stable */}
                   <input
                     className="border rounded-lg px-3 py-2 text-sm w-full sm:w-32"
                     type="text"
@@ -418,7 +454,6 @@ export default function RevenueReport() {
           </div>
         )}
 
-        {/* ✅ BODY */}
         <div
           className={[
             "max-w-6xl mx-auto px-4 sm:px-6",
@@ -453,14 +488,12 @@ export default function RevenueReport() {
           )}
         </div>
 
-        {/* ✅ FOOTER PDF */}
         {pdfMode && (
           <div className="px-4 sm:px-6 pb-6 text-center text-xs text-gray-400">
             Generated by EasyTravel · {new Date().toLocaleString("vi-VN")}
           </div>
         )}
       </div>
-      {/* ✅ END EXPORT */}
     </div>
   );
 }
