@@ -77,8 +77,10 @@ export default function RoomCard({ room, onDeleted }) {
     return toUrl(bed) || toUrl(wc) || FALLBACK_IMAGE;
   }, [image_bed, imageBed, image_wc, imageWC]);
 
-  const goView = () => navigate("/hotel-manager/rooms/view", { state: { room } });
-  const goEdit = () => navigate("/hotel-manager/rooms/edit", { state: { room } });
+  const goView = () =>
+    navigate("/hotel-manager/rooms/view", { state: { room, id } });
+  const goEdit = () =>
+    navigate("/hotel-manager/rooms/edit", { state: { room, id } });
 
   const doDelete = async () => {
     setDeleteError("");
@@ -90,7 +92,10 @@ export default function RoomCard({ room, onDeleted }) {
       return;
     }
 
-    const ok = await popup.confirmDanger("Bạn chắc chắn muốn xoá phòng này?", "Xoá phòng");
+    const ok = await popup.confirmDanger(
+      "Bạn chắc chắn muốn xoá phòng này?",
+      "Xoá phòng"
+    );
     if (!ok) return;
 
     const token = getToken();
@@ -134,24 +139,28 @@ export default function RoomCard({ room, onDeleted }) {
   };
 
   return (
-    <div className="
-  bg-white border rounded-2xl shadow-sm hover:shadow-md transition overflow-hidden
-  h-[260px] sm:h-[200px]
-">
-
-      <div className="flex flex-col sm:flex-row">
-        <div className="w-full sm:w-[220px] bg-gray-100 shrink-0">
+    <div
+      className="
+        bg-white border rounded-2xl shadow-sm hover:shadow-md transition overflow-hidden
+        h-[280px] sm:h-[200px]
+      "
+    >
+      {/* ✅ h-full để nội dung không bị tràn */}
+      <div className="flex flex-col sm:flex-row h-full">
+        {/* ✅ FIX: vùng ảnh có height rõ ràng, img h-full */}
+        <div className="w-full sm:w-[220px] h-[160px] sm:h-full bg-gray-100 shrink-0">
           <img
             src={imageUrl}
             alt={showRoomNumber || "room"}
-            className="w-full h-52 sm:h-full object-cover"
+            className="w-full h-full object-cover"
             onError={(e) => {
               e.currentTarget.src = FALLBACK_IMAGE;
             }}
           />
         </div>
 
-        <div className="flex-1 px-4 sm:px-5 py-4 flex flex-col justify-between min-w-0">
+        {/* ✅ FIX: content h-full + justify-between để nút luôn nằm dưới */}
+        <div className="flex-1 px-4 sm:px-5 py-3 sm:py-4 flex flex-col justify-between min-w-0 h-full">
           <div className="min-w-0">
             <div className="flex justify-between items-start gap-3">
               <div className="min-w-0">
@@ -164,7 +173,7 @@ export default function RoomCard({ room, onDeleted }) {
 
                 <div className="text-sm text-gray-600 mt-1 break-words">
                   Loại:{" "}
-                  <span className="text-orange-600 font-medium">
+                  <span className="text-orange-600 font-medium line-clamp-1">
                     {showRoomType || "--"}
                   </span>
                 </div>
@@ -177,20 +186,24 @@ export default function RoomCard({ room, onDeleted }) {
               </span>
             </div>
 
-            <div className="mt-3 text-sm">
+            <div className="mt-2 text-sm">
               <Info label="Số khách" value={showGuests} />
             </div>
 
-            <p className="text-sm text-gray-600 mt-3 line-clamp-2 break-words">
+            {/* ✅ giữ 2 dòng để không đội chiều cao */}
+            <p className="text-sm text-gray-600 mt-2 line-clamp-2 break-words">
               {showDesc || "--"}
             </p>
 
             {!!deleteError && (
-              <p className="text-xs text-red-600 mt-2 break-words">{deleteError}</p>
+              <p className="text-xs text-red-600 mt-2 break-words">
+                {deleteError}
+              </p>
             )}
           </div>
 
-          <div className="mt-4 flex flex-wrap justify-end gap-2">
+          {/* ✅ nút luôn ở đáy */}
+          <div className="mt-3 flex flex-wrap justify-end gap-2">
             <button
               onClick={goView}
               className="px-4 py-2 text-sm rounded-lg border hover:bg-gray-50"

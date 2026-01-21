@@ -36,15 +36,68 @@ function safe(v) {
   return v === null || v === undefined ? "" : v;
 }
 
+function toInt(v, fallback = 0) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+/**
+ * ✅ Extract adults/children robustly from different shapes:
+ * - p.adults / p.children
+ * - p.booking.adults / p.booking.children
+ * - p.tourBooking.adults / p.tourBooking.children
+ * - p.bookingInfo.adults / p.bookingInfo.children
+ * - fallback: seats/quantity/people => adults, children=0
+ */
+function getAdultsChildren(p) {
+  const src =
+    p?.booking ||
+    p?.tourBooking ||
+    p?.bookingInfo ||
+    p?.tour_booking ||
+    p ||
+    {};
+
+  const adults =
+    src?.adults ??
+    src?.adult ??
+    src?.numberOfAdult ??
+    src?.number_of_adult ??
+    src?.numberOfAdults ??
+    src?.number_of_adults;
+
+  const children =
+    src?.children ??
+    src?.child ??
+    src?.numberOfChildren ??
+    src?.number_of_children;
+
+  const hasAdults = adults !== undefined && adults !== null && adults !== "";
+  const hasChildren = children !== undefined && children !== null && children !== "";
+
+  if (hasAdults || hasChildren) {
+    return {
+      adults: toInt(adults, 0),
+      children: toInt(children, 0),
+    };
+  }
+
+  const fallbackSeats = p?.seats ?? p?.quantity ?? p?.people ?? 1;
+  return { adults: toInt(fallbackSeats, 1), children: 0 };
+}
+
 // Map 1 participant row -> excel row
 function toRow(p, idx) {
   const user = p?.user || p?.customer || p?.account || {};
+  const { adults, children } = getAdultsChildren(p);
+
   return {
     No: idx + 1,
     FullName: safe(user?.name ?? user?.fullName ?? p?.customerName ?? p?.name),
     Email: safe(user?.email ?? p?.email),
     Phone: safe(user?.phoneNumber ?? user?.phone ?? p?.phone),
-    Seats: safe(p?.seats ?? p?.quantity ?? p?.people ?? 1),
+    Adults: adults,
+    Children: children,
     Status: safe(p?.status ?? p?.bookingStatus),
     Note: safe(p?.note ?? p?.remark),
   };
@@ -86,7 +139,6 @@ export default function TourParticipants() {
     );
   }, [participants, q]);
 
-  // ✅ FIX: truyền idx vào toRow
   const rows = useMemo(() => filtered.map((p, idx) => toRow(p, idx)), [filtered]);
 
   const load = useCallback(async () => {
@@ -121,13 +173,14 @@ export default function TourParticipants() {
 
     const ws = XLSX.utils.json_to_sheet(rows);
 
-    // ✅ cols đúng số cột
+    // ✅ cols theo cột mới
     ws["!cols"] = [
       { wch: 5 },  // No
       { wch: 22 }, // FullName
       { wch: 26 }, // Email
       { wch: 14 }, // Phone
-      { wch: 8 },  // Seats
+      { wch: 8 },  // Adults
+      { wch: 10 }, // Children
       { wch: 12 }, // Status
       { wch: 30 }, // Note
     ];
@@ -167,7 +220,6 @@ export default function TourParticipants() {
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
             Tour Participants
           </h1>
-          
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2">
@@ -217,7 +269,6 @@ export default function TourParticipants() {
           </div>
         </div>
 
-        {/* CONTENT */}
         <div className="mt-5">
           {loading ? (
             <div className="text-sm text-gray-500">Loading...</div>
@@ -256,21 +307,28 @@ export default function TourParticipants() {
                       </span>
                     </div>
 
-                    <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                    {/* ✅ Seats -> Adults/Children */}
+                    <div className="mt-3 grid grid-cols-3 gap-3 text-sm">
                       <div>
-                        <div className="text-xs text-gray-500">Seats</div>
+                        <div className="text-xs text-gray-500">Adults</div>
                         <div className="font-semibold text-gray-900">
-                          {r.Seats}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xs text-gray-500">No</div>
-                        <div className="font-semibold text-gray-900">
-                          {r.No}
+                          {r.Adults}
                         </div>
                       </div>
 
-                      <div className="col-span-2">
+                      <div>
+                        <div className="text-xs text-gray-500">Children</div>
+                        <div className="font-semibold text-gray-900">
+                          {r.Children}
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <div className="text-xs text-gray-500">No</div>
+                        <div className="font-semibold text-gray-900">{r.No}</div>
+                      </div>
+
+                      <div className="col-span-3">
                         <div className="text-xs text-gray-500">Note</div>
                         <div className="text-sm text-gray-800 break-words">
                           {r.Note || "-"}
@@ -283,7 +341,7 @@ export default function TourParticipants() {
 
               {/* ✅ Desktop: table */}
               <div className="hidden lg:block overflow-auto">
-                <table className="min-w-[900px] w-full text-sm border-separate border-spacing-y-2">
+                <table className="min-w-[980px] w-full text-sm border-separate border-spacing-y-2">
                   <thead>
                     <tr className="text-left text-gray-600">
                       {Object.keys(rows[0]).map((k) => (
