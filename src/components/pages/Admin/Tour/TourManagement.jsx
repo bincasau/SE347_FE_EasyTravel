@@ -93,7 +93,7 @@ export default function TourManagement() {
   const loadTours = async () => {
     setLoading(true);
     try {
-      const list = await getAllTours();
+      const list = await getAllTours("tourId,desc");
       setTours(list ?? []);
     } catch (e) {
       setTours([]);

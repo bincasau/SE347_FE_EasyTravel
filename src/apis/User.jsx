@@ -28,13 +28,21 @@ function buildUserFormData(user, file) {
 }
 
 export async function getAllUsers(page = 0, size = 20) {
-  const res = await fetch(`${API_BASE}/users?page=${page}&size=${size}`, {
-    method: "GET",
-    credentials: "include",
-    headers: getAuthHeaders(),
-  });
+  // Spring pageable: sort=field,direction
+  const sort = "userId,desc";
+
+  const res = await fetch(
+    `${API_BASE}/users?page=${page}&size=${size}&sort=${encodeURIComponent(sort)}`,
+    {
+      method: "GET",
+      credentials: "include",
+      headers: getAuthHeaders(),
+    }
+  );
+
   return readJsonOrText(res);
 }
+
 
 /**
  * @param {Object} params
@@ -54,7 +62,7 @@ export async function getUsers({
   const qp = new URLSearchParams();
   qp.set("page", String(page0));
   qp.set("size", String(size));
-  qp.set("sort", "userId,asc");
+  qp.set("sort", "userId,desc");
 
   const hasRole = role && role !== "ALL";
   const hasStatus = status && status !== "ALL";

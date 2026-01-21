@@ -205,7 +205,14 @@ export default function AdminDashboard() {
   }, [dash]);
 
   const recentNotis = useMemo(() => {
-    return Array.isArray(dash?.broadcastNotifications) ? dash.broadcastNotifications : [];
+    const list = Array.isArray(dash?.broadcastNotifications)
+      ? dash.broadcastNotifications
+      : [];
+    return [...list].sort((a, b) => {
+      const ida = Number(a?.notificationId ?? a?.id ?? 0);
+      const idb = Number(b?.notificationId ?? b?.id ?? 0);
+      return idb - ida;
+    });
   }, [dash]);
 
   /** ===== UI ===== */

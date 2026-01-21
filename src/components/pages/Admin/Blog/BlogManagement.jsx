@@ -19,8 +19,13 @@ export default function BlogManagement() {
     try {
       const data = await getAllBlogs();
       const list = Array.isArray(data) ? data : data?.content ?? [];
-      setAllBlogs(list);
-      setBlogs(list.slice(0, size));
+      const sorted = [...list].sort((a, b) => {
+        const aid = a?.blogId ?? a?.id ?? 0;
+        const bid = b?.blogId ?? b?.id ?? 0;
+        return Number(bid) - Number(aid);
+      });
+      setAllBlogs(sorted);
+      setBlogs(sorted.slice(0, size));
     } catch (error) {
       console.error("Error loading blogs:", error);
       setAllBlogs([]);

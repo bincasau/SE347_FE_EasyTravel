@@ -91,7 +91,7 @@ export default function HotelManagement() {
       const data = await getHotels({
         page: page0,
         size: 5,
-        sort: "hotelId,asc",
+        sort: "hotelId,desc",
       });
 
       const list = data?._embedded?.hotels ?? [];

@@ -97,9 +97,10 @@ export async function getDepartureLocations() {
   }
 }
 
-export async function getAllTours() {
+export async function getAllTours(sort) {
   let allTours = [];
   let url = `${API_BASE}/tours`;
+  if (sort) url += `?sort=${encodeURIComponent(sort)}`;
 
   try {
     while (url) {

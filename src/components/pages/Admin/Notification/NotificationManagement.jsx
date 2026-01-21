@@ -13,6 +13,24 @@ function Spinner() {
   );
 }
 
+// ✅ helper pages hiển thị gọn
+function getVisiblePages(page, total) {
+  if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1);
+
+  if (page === 1) return [1, 2, 3];
+  if (page === 2) return [1, 2, 3, 4];
+  if (page === 3) return [1, 2, 3, 4, 5];
+
+  if (page === total) return [total - 2, total - 1, total];
+  if (page === total - 1) return [total - 3, total - 2, total - 1, total];
+  if (page === total - 2)
+    return [total - 4, total - 3, total - 2, total - 1, total];
+
+  const start = Math.max(1, page - 2);
+  const end = Math.min(total, page + 2);
+  return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+}
+
 export default function NotificationManagement() {
   const navigate = useNavigate();
 
@@ -25,6 +43,10 @@ export default function NotificationManagement() {
   const [isBroadcast, setIsBroadcast] = useState("");
   const [search, setSearch] = useState("");
   const [targetUser, setTargetUser] = useState("");
+
+  // ✅ Pagination
+  const pageSize = 5;
+  const [currentPage, setCurrentPage] = useState(1);
 
   const filters = useMemo(() => {
     const f = {};
@@ -44,19 +66,17 @@ export default function NotificationManagement() {
       console.log("Fetched notifications:", list);
 
       const sorted = (Array.isArray(list) ? list : []).slice().sort((a, b) => {
-        const ida = Number(
-          a?.notificationId ?? a?.notification_id ?? a?.id ?? 0,
-        );
-        const idb = Number(
-          b?.notificationId ?? b?.notification_id ?? b?.id ?? 0,
-        );
+        const ida = Number(a?.notificationId ?? a?.notification_id ?? a?.id ?? 0);
+        const idb = Number(b?.notificationId ?? b?.notification_id ?? b?.id ?? 0);
         return idb - ida;
       });
 
       setItems(sorted);
+      setCurrentPage(1); // ✅ mỗi lần load lại thì về trang 1
     } catch (e) {
       setErr(e?.message || "Load notifications failed");
       setItems([]);
+      setCurrentPage(1);
     } finally {
       setLoading(false);
     }
@@ -70,7 +90,7 @@ export default function NotificationManagement() {
 
   const handleSearch = (e) => {
     e.preventDefault();
-    load();
+    load(); // load có setCurrentPage(1)
   };
 
   const handleUpdateStatus = async (id, nextStatus) => {
@@ -91,7 +111,9 @@ export default function NotificationManagement() {
       setErr("");
       setBusyId(id);
       await adminDeleteNotification(id);
-      await load();
+
+      // ✅ xoá xong: update local cho mượt + chỉnh trang nếu bị hụt
+      setItems((prev) => prev.filter((x) => (x?.notificationId ?? x?.notification_id ?? x?.id) !== id));
     } catch (e) {
       setErr(e?.message || "Delete failed");
     } finally {
@@ -104,7 +126,28 @@ export default function NotificationManagement() {
     setTargetUser("");
     setStatus("");
     setIsBroadcast("");
+    setCurrentPage(1);
   };
+
+  // ✅ Total pages
+  const totalPages = useMemo(() => {
+    return Math.max(1, Math.ceil(items.length / pageSize));
+  }, [items.length]);
+
+  // ✅ nếu currentPage vượt totalPages (sau khi xoá) thì kéo lại
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
+  // ✅ Items theo trang
+  const pagedItems = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return items.slice(start, start + pageSize);
+  }, [items, currentPage]);
+
+  const visiblePages = useMemo(() => {
+    return getVisiblePages(currentPage, totalPages);
+  }, [currentPage, totalPages]);
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
@@ -112,7 +155,7 @@ export default function NotificationManagement() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div className="min-w-0">
           <h1 className="text-xl sm:text-2xl font-semibold truncate">
-            Quản lý thông báo
+            Notification management
           </h1>
           <p className="mt-1 text-sm text-gray-500">
             Lọc, tìm kiếm và quản lý thông báo.
@@ -238,29 +281,94 @@ export default function NotificationManagement() {
           Loading notifications...
         </div>
       ) : items.length === 0 ? (
-        <p className="text-center py-10 text-gray-500">
-          No notifications found.
-        </p>
+        <p className="text-center py-10 text-gray-500">No notifications found.</p>
       ) : (
-        <div className="flex flex-col gap-4 sm:gap-5">
-          {items.map((n) => {
-            const id = n?.notificationId ?? n?.notification_id ?? n?.id;
-            const isBusy = busyId === id;
+        <>
+          <div className="flex flex-col gap-4 sm:gap-5">
+            {pagedItems.map((n) => {
+              const id = n?.notificationId ?? n?.notification_id ?? n?.id;
+              const isBusy = busyId === id;
 
-            return (
-              <div
-                key={id}
-                className={isBusy ? "opacity-70 pointer-events-none" : ""}
-              >
-                <AdminNotificationCard
-                  notif={n}
-                  onToggleActive={(nid, s) => handleUpdateStatus(nid, s)}
-                  onDelete={(nid) => handleDelete(nid)}
-                />
+              return (
+                <div
+                  key={id}
+                  className={isBusy ? "opacity-70 pointer-events-none" : ""}
+                >
+                  <AdminNotificationCard
+                    notif={n}
+                    onToggleActive={(nid, s) => handleUpdateStatus(nid, s)}
+                    onDelete={(nid) => handleDelete(nid)}
+                  />
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ✅ Pagination */}
+          {items.length > pageSize && (
+            <div className="mt-6 flex justify-center">
+              <div className="inline-flex items-center gap-2">
+                <button
+                  className="px-3 py-2 rounded-lg border hover:bg-gray-50 disabled:opacity-50"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Prev
+                </button>
+
+                {visiblePages[0] > 1 && (
+                  <>
+                    <button
+                      className={`px-3 py-2 rounded-lg border hover:bg-gray-50 ${
+                        currentPage === 1 ? "bg-gray-100" : ""
+                      }`}
+                      onClick={() => setCurrentPage(1)}
+                    >
+                      1
+                    </button>
+                    <span className="px-1 text-gray-400">...</span>
+                  </>
+                )}
+
+                {visiblePages.map((p) => (
+                  <button
+                    key={p}
+                    className={`px-3 py-2 rounded-lg border hover:bg-gray-50 ${
+                      currentPage === p ? "bg-orange-500 text-white border-orange-500" : ""
+                    }`}
+                    onClick={() => setCurrentPage(p)}
+                  >
+                    {p}
+                  </button>
+                ))}
+
+                {visiblePages[visiblePages.length - 1] < totalPages && (
+                  <>
+                    <span className="px-1 text-gray-400">...</span>
+                    <button
+                      className={`px-3 py-2 rounded-lg border hover:bg-gray-50 ${
+                        currentPage === totalPages ? "bg-gray-100" : ""
+                      }`}
+                      onClick={() => setCurrentPage(totalPages)}
+                    >
+                      {totalPages}
+                    </button>
+                  </>
+                )}
+
+                <button
+                  className="px-3 py-2 rounded-lg border hover:bg-gray-50 disabled:opacity-50"
+                  onClick={() =>
+                    setCurrentPage((p) => Math.min(totalPages, p + 1))
+                  }
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </button>
               </div>
-            );
-          })}
-        </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
