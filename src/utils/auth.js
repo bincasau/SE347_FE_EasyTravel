@@ -1,33 +1,29 @@
-const TOKEN_COOKIE = "jwt";
+// src/utils/auth.js
+// ✅ HttpOnly cookie => JS không đọc được token
+// => FE chỉ dùng auth-flag + cached user từ localStorage
+
 const AUTH_FLAG_KEY = "auth-flag";
 const AUTH_USER_KEY = "auth-user";
-const DEFAULT_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 
-function getCookie(name) {
-  const pairs = document.cookie ? document.cookie.split("; ") : [];
-  for (const pair of pairs) {
-    const idx = pair.indexOf("=");
-    if (idx === -1) continue;
-    const key = pair.slice(0, idx);
-    if (key === name) return decodeURIComponent(pair.slice(idx + 1));
-  }
+/**
+ * Token helpers (legacy)
+ * - setToken/clearToken giữ lại để không crash các chỗ cũ (ví dụ OAuth token in URL)
+ * - Nhưng với HttpOnly cookie, setToken/getToken sẽ không còn ý nghĩa
+ */
+export function getToken() {
+  // HttpOnly cookie không đọc được => luôn return ""
   return "";
 }
 
-export function getToken() {
-  return getCookie(TOKEN_COOKIE);
-}
-
-export function setToken(token, { maxAge = DEFAULT_MAX_AGE_SECONDS } = {}) {
-  if (!token) return;
-  const encoded = encodeURIComponent(token);
-  document.cookie = `${TOKEN_COOKIE}=${encoded}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+export function setToken(_token) {
+  // No-op: HttpOnly cookie phải set từ backend
 }
 
 export function clearToken() {
-  document.cookie = `${TOKEN_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
+  // No-op: HttpOnly cookie phải clear từ backend (/account/logout)
 }
 
+/** ---------- Auth flag (UI quick check) ---------- **/
 export function setAuthFlag() {
   try {
     localStorage.setItem(AUTH_FLAG_KEY, "1");
@@ -40,6 +36,15 @@ export function clearAuthFlag() {
   } catch {}
 }
 
+export function isLoggedIn() {
+  try {
+    return localStorage.getItem(AUTH_FLAG_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** ---------- Cached user ---------- **/
 export function setCachedUser(user) {
   try {
     if (!user) {
@@ -65,24 +70,11 @@ export function clearCachedUser() {
   } catch {}
 }
 
-export function isLoggedIn() {
-  try {
-    return localStorage.getItem(AUTH_FLAG_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
+/**
+ * Legacy: getUserFromToken()
+ * - Trước đây decode JWT để lấy role/username
+ * - Giờ không còn token trên FE => trả cached user (nếu có) hoặc null
+ */
 export function getUserFromToken() {
-  const token = getToken();
-  if (!token) return null;
-
-  try {
-    const payloadBase64 = token.split(".")[1];
-    const jsonPayload = atob(payloadBase64);
-    return JSON.parse(jsonPayload);
-  } catch (e) {
-    console.error("Invalid token", e);
-    return null;
-  }
+  return getCachedUser();
 }

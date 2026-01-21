@@ -2,11 +2,12 @@
 import {
   clearAuthFlag,
   clearCachedUser,
-  clearToken,
+  clearToken, // có thể không còn dùng nhưng giữ cho tương thích project
   setAuthFlag,
   setCachedUser,
-  setToken,
+  setToken, // có thể không còn dùng nhưng giữ cho tương thích project
 } from "@/utils/auth";
+
 const API_BASE = "http://localhost:8080";
 
 /** ---------------- HELPERS ---------------- **/
@@ -30,7 +31,7 @@ export async function loginApi(payload) {
   const res = await fetch(`${API_BASE}/account/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    credentials: "include",
+    credentials: "include", // ✅ để nhận cookie jwt từ BE
     body: JSON.stringify(payload),
   });
 
@@ -39,27 +40,22 @@ export async function loginApi(payload) {
     throw new Error(msg);
   }
 
-  const ct = res.headers.get("content-type") || "";
-  let token = "";
+  // ✅ cookie httpOnly => FE không đọc token nữa
+  // nếu backend trả json thì đọc message cho vui, không bắt buộc
+  try {
+    const ct = res.headers.get("content-type") || "";
+    if (ct.includes("application/json")) {
+      await res.json().catch(() => null);
+    } else {
+      await res.text().catch(() => "");
+    }
+  } catch {}
 
-  if (ct.includes("application/json")) {
-    const data = await res.json();
-    token = data.token || data.jwt || data.access_token || "";
-  } else {
-    token = (await res.text()).trim();
-  }
-
-  if (!token) {
-    setAuthFlag();
-    window.dispatchEvent(new Event("jwt-changed"));
-    return "";
-  }
-
-  setToken(token);
+  // ✅ đánh dấu đã auth (UI) và bắn event refresh
   setAuthFlag();
   window.dispatchEvent(new Event("jwt-changed"));
 
-  return token;
+  return true;
 }
 
 /** ---------------- SIGNUP ---------------- **/
@@ -82,7 +78,8 @@ export async function signupApi(payload) {
 /** ---------------- DETAIL USER ---------------- **/
 export async function getAccountDetail() {
   const res = await fetch(`${API_BASE}/account/detail`, {
-    credentials: "include",
+    method: "GET",
+    credentials: "include", // ✅ gửi cookie jwt lên
   });
 
   if (!res.ok) {
@@ -100,13 +97,9 @@ export async function getAccountDetail() {
 
 /** ---------------- CHANGE PASSWORD ---------------- **/
 export async function changePasswordApi({ oldPassword, newPassword }) {
-  const headers = {
-    "Content-Type": "application/json",
-  };
-
   const res = await fetch(`${API_BASE}/account/change-password`, {
     method: "POST",
-    headers,
+    headers: { "Content-Type": "application/json" },
     credentials: "include",
     body: JSON.stringify({ oldPassword, newPassword }),
   });
@@ -136,7 +129,9 @@ export async function activateAccount(email, code) {
 // Step 1: Request reset code to email
 export async function forgotPasswordRequestApi(email) {
   const res = await fetch(
-    `${API_BASE}/account/forgot-password/request?email=${encodeURIComponent(email)}`,
+    `${API_BASE}/account/forgot-password/request?email=${encodeURIComponent(
+      email
+    )}`,
     { method: "POST" }
   );
 
@@ -145,7 +140,6 @@ export async function forgotPasswordRequestApi(email) {
     throw new Error(msg);
   }
 
-  // backend có thể trả text hoặc json
   const ct = res.headers.get("content-type") || "";
   if (ct.includes("application/json")) {
     const data = await res.json();
@@ -179,6 +173,7 @@ export async function forgotPasswordConfirmApi({ email, code, newPassword }) {
 
 /** ---------------- LOGOUT ---------------- **/
 export async function logout() {
+  // ✅ quan trọng: gọi endpoint KHÔNG redirect (để khỏi CORS)
   try {
     await fetch(`${API_BASE}/account/logout`, {
       method: "POST",
@@ -186,8 +181,10 @@ export async function logout() {
     });
   } catch {}
 
-  clearToken();
-  clearCachedUser();
-  clearAuthFlag();
+  // ✅ Clear local flags/cache (token local không còn dùng nhưng clear cho sạch)
+  clearToken?.();
+  clearCachedUser?.();
+  clearAuthFlag?.();
+
   window.dispatchEvent(new Event("jwt-changed"));
 }
