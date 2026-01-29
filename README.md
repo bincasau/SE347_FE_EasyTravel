@@ -2,7 +2,7 @@
 
 **EasyTravel** là website hỗ trợ người dùng **tìm kiếm, đặt tour du lịch và khách sạn**, đồng thời khám phá các **bài viết blog du lịch** với nội dung phong phú và trực quan.
 
-## Dự án được xây dựng bằng **React 19** và **Vite**, tích hợp **REST API**, hỗ trợ **đa ngôn ngữ** và **phân quyền người dùng**, hướng tới trải nghiệm mượt mà, hiện đại và dễ sử dụng.
+Dự án được xây dựng bằng **React 19** và **Vite**, tích hợp **REST API**, hỗ trợ **đa ngôn ngữ** và **phân quyền người dùng**, hướng tới trải nghiệm mượt mà, hiện đại và dễ sử dụng.
 
 ## 🚀 Cách chạy dự án
 
